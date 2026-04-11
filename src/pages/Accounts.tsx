@@ -28,10 +28,11 @@ export default function Accounts() {
 
   const handleSave = async () => {
     try {
+      const payload = { ...form, opening_balance: parseFloat(form.opening_balance), type: form.type as any };
       if (editId) {
-        await updateAccount.mutateAsync({ id: editId, ...form, opening_balance: parseFloat(form.opening_balance) });
+        await updateAccount.mutateAsync({ id: editId, ...payload });
       } else {
-        await createAccount.mutateAsync({ ...form, opening_balance: parseFloat(form.opening_balance) } as any);
+        await createAccount.mutateAsync(payload);
       }
       toast.success(editId ? 'Account updated' : 'Account created');
       setShowForm(false);
