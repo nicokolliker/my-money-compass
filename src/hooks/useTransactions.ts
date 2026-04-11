@@ -11,7 +11,7 @@ export function useTransactions(filters?: { accountId?: string; categoryId?: str
       let q = supabase.from('transactions').select('*, accounts!inner(name, currency), categories(name, icon, color)').order('date', { ascending: false }).order('created_at', { ascending: false });
       if (filters?.accountId) q = q.eq('account_id', filters.accountId);
       if (filters?.categoryId) q = q.eq('category_id', filters.categoryId);
-      if (filters?.type) q = q.eq('type', filters.type);
+      if (filters?.type) q = q.eq('type', filters.type as 'expense' | 'income' | 'transfer' | 'adjustment');
       if (filters?.dateFrom) q = q.gte('date', filters.dateFrom);
       if (filters?.dateTo) q = q.lte('date', filters.dateTo);
       if (filters?.search) q = q.or(`description.ilike.%${filters.search}%,merchant.ilike.%${filters.search}%`);
