@@ -211,10 +211,36 @@ export default function WiseTab() {
                             </span>
                           </div>
                         )}
-                        {result.reconciled === true && (
+                    {result.reconciled === true && (
                           <div className="flex items-center gap-1.5 mt-2 text-emerald-500">
                             <CheckCircle2 className="h-3.5 w-3.5" />
                             <span className="text-xs">Reconciled ✓</span>
+                          </div>
+                        )}
+                        {result.status && result.status !== 'success' && (
+                          <div className="flex items-center gap-1.5 mt-2 text-amber-500 bg-amber-500/10 rounded-md px-2 py-1.5">
+                            <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                            <span className="text-xs font-medium">
+                              Sync status: {result.status}
+                            </span>
+                          </div>
+                        )}
+                        {result.diagnostics && result.diagnostics.length > 0 && (
+                          <details className="mt-2 text-xs text-muted-foreground">
+                            <summary className="cursor-pointer font-medium">Diagnostics</summary>
+                            <ul className="mt-1 space-y-0.5 list-disc list-inside">
+                              {result.diagnostics.map((d, i) => (
+                                <li key={i}>{d}</li>
+                              ))}
+                            </ul>
+                          </details>
+                        )}
+                        {result.tx_count === 0 && result.official_balance === 0 && (
+                          <div className="flex items-center gap-1.5 mt-2 text-destructive bg-destructive/10 rounded-md px-2 py-1.5">
+                            <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                            <span className="text-xs font-medium">
+                              Wise connected but no data imported
+                            </span>
                           </div>
                         )}
                       </div>
