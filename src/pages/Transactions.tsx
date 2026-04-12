@@ -156,7 +156,7 @@ export default function Transactions() {
               {categories?.map(c => (
                 <SelectItem key={c.id} value={c.id}>
                   <span className="flex items-center gap-1.5">
-                    <span>{getCategoryIcon(c.name)}</span>
+                    <span>{getCategoryIcon(c.name, c.icon)}</span>
                     {c.name}
                   </span>
                 </SelectItem>
@@ -214,8 +214,10 @@ export default function Transactions() {
                           {/* Inline category change */}
                           <Popover>
                             <PopoverTrigger asChild>
-                              <button className={`text-[11px] font-medium px-1.5 py-0.5 rounded-full hover:ring-1 hover:ring-primary/30 transition-all ${catColor ? `${catColor.bg} ${catColor.text}` : 'bg-muted text-muted-foreground'}`}>
-                                {cat ? `${getCategoryIcon(cat.name)} ${cat.name}` : '+ Category'}
+                              <button className={`text-[11px] font-medium px-1.5 py-0.5 rounded-full hover:ring-1 hover:ring-primary/30 transition-all`}
+                                style={cat?.color ? { backgroundColor: `hsl(${cat.color} / 0.15)`, color: `hsl(${cat.color})` } : undefined}
+                                className={`text-[11px] font-medium px-1.5 py-0.5 rounded-full hover:ring-1 hover:ring-primary/30 transition-all ${!cat?.color ? (catColor ? `${catColor.bg} ${catColor.text}` : 'bg-muted text-muted-foreground') : ''}`}>
+                                {cat ? `${getCategoryIcon(cat.name, cat.icon)} ${cat.name}` : '+ Category'}
                               </button>
                             </PopoverTrigger>
                             <PopoverContent className="w-48 p-1" align="start">
@@ -232,7 +234,7 @@ export default function Transactions() {
                                     className="w-full text-left px-2 py-1.5 text-xs rounded hover:bg-accent"
                                     onClick={() => handleCategoryChange(tx.id, c.id)}
                                   >
-                                    {getCategoryIcon(c.name)} {c.name}
+                                    {getCategoryIcon(c.name, c.icon)} {c.name}
                                   </button>
                                 ))}
                               </div>
