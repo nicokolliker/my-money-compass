@@ -320,6 +320,40 @@ export default function Accounts() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Post-creation dialog */}
+      <Dialog open={showPostCreate} onOpenChange={setShowPostCreate}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>Account Created ✓</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">What would you like to do next?</p>
+          <div className="space-y-3 pt-2">
+            <button
+              onClick={() => { setShowPostCreate(false); navigate('/settings', { state: { tab: 'import' } }); }}
+              className="w-full flex items-center gap-4 p-4 rounded-xl border hover:border-primary/40 hover:bg-accent/50 transition-colors text-left"
+            >
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                <FileUp className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-foreground">Import CSV</p>
+                <p className="text-xs text-muted-foreground">Upload a bank statement to import transactions</p>
+              </div>
+            </button>
+            <button
+              onClick={() => { setShowPostCreate(false); setShowForm(false); }}
+              className="w-full flex items-center gap-4 p-4 rounded-xl border hover:border-primary/40 hover:bg-accent/50 transition-colors text-left"
+            >
+              <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0">
+                <Plus className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-foreground">Add Transactions Later</p>
+                <p className="text-xs text-muted-foreground">Start with an empty account and add as you go</p>
+              </div>
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
