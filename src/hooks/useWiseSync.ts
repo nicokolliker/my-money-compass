@@ -31,6 +31,8 @@ export interface WiseSyncResult {
   tx_count: number;
   date_range: { start: string | null; end: string | null };
   reconciled: boolean | null;
+  status: 'success' | 'partial' | 'failed';
+  diagnostics: string[];
 }
 
 export function useWiseSyncTransactions() {
