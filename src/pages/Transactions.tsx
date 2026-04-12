@@ -255,6 +255,11 @@ export default function Transactions() {
                           </Popover>
 
                           {tx.is_subscription && <Badge variant="secondary" className="text-[10px] h-4 px-1.5 font-medium">🔄 Recurring</Badge>}
+                          {recurringMatchMap[tx.id] && (
+                            <Badge variant="outline" className="text-[10px] h-4 px-1.5 font-medium flex items-center gap-0.5">
+                              <Link2 className="h-2.5 w-2.5" /> {recurringMatchMap[tx.id]}
+                            </Badge>
+                          )}
                         </div>
                       </div>
 
