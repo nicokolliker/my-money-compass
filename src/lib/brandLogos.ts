@@ -81,8 +81,8 @@ export const BRAND_LOGOS: Record<string, { icon: string; bg: string; text: strin
   'cash': { icon: '💵', bg: 'bg-emerald-50', text: 'text-emerald-600' },
 };
 
-// Category icons
-export const CATEGORY_ICONS: Record<string, string> = {
+// Fallback category icons - only used when DB category has no icon set
+const CATEGORY_ICON_FALLBACKS: Record<string, string> = {
   'Food & Drink': '🍔',
   'Transport': '🚗',
   'Housing': '🏠',
@@ -125,10 +125,13 @@ export function getBrandLogo(name: string): { icon: string; bg: string; text: st
 }
 
 /**
- * Get category icon emoji
+ * Get category icon. Prefers DB-stored icon, falls back to hardcoded map.
+ * @param name Category name
+ * @param dbIcon Optional icon from DB category record
  */
-export function getCategoryIcon(name: string): string {
-  return CATEGORY_ICONS[name] || '📌';
+export function getCategoryIcon(name: string, dbIcon?: string | null): string {
+  if (dbIcon) return dbIcon;
+  return CATEGORY_ICON_FALLBACKS[name] || '📌';
 }
 
 /**
