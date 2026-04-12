@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Wallet, ArrowLeftRight, BarChart3, Settings, Repeat, BookOpen, Plus, CalendarDays, Target, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -7,6 +7,9 @@ import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { useState } from 'react';
 import { TransactionForm } from '@/components/transactions/TransactionForm';
 import { useAuth } from '@/hooks/useAuth';
+import { useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { DebugPanel } from '@/components/DebugPanel';
 
 const NAV_ITEMS = [
   { path: '/', label: 'Home', icon: LayoutDashboard },
@@ -36,6 +39,17 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const { signOut, user } = useAuth();
+  const qc = useQueryClient();
+
+  // Invalidate all queries on auth state change (login/logout/user switch)
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
+        qc.invalidateQueries();
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [qc]);
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -124,6 +138,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
           <TransactionForm onSuccess={() => setShowQuickAdd(false)} />
         </SheetContent>
       </Sheet>
+      {/* Debug Panel (temporary) */}
+      <DebugPanel />
     </div>
   );
 }
