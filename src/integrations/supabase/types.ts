@@ -368,6 +368,7 @@ export type Database = {
           currency: string
           date: string
           description: string | null
+          external_id: string | null
           fx_rate: number
           id: string
           is_subscription: boolean
@@ -388,6 +389,7 @@ export type Database = {
           currency?: string
           date?: string
           description?: string | null
+          external_id?: string | null
           fx_rate?: number
           id?: string
           is_subscription?: boolean
@@ -408,6 +410,7 @@ export type Database = {
           currency?: string
           date?: string
           description?: string | null
+          external_id?: string | null
           fx_rate?: number
           id?: string
           is_subscription?: boolean
@@ -446,6 +449,47 @@ export type Database = {
             columns: ["subcategory_id"]
             isOneToOne: false
             referencedRelation: "subcategories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wise_sync_log: {
+        Row: {
+          account_id: string | null
+          created_at: string
+          error_message: string | null
+          id: string
+          last_transaction_date: string | null
+          profile_id: string | null
+          status: string
+          transactions_imported: number
+        }
+        Insert: {
+          account_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          last_transaction_date?: string | null
+          profile_id?: string | null
+          status?: string
+          transactions_imported?: number
+        }
+        Update: {
+          account_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          last_transaction_date?: string | null
+          profile_id?: string | null
+          status?: string
+          transactions_imported?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wise_sync_log_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
             referencedColumns: ["id"]
           },
         ]
