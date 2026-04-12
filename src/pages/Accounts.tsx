@@ -13,7 +13,7 @@ import { useAccountGroups, useCreateAccountGroup, useUpdateAccountGroup, useDele
 import { ACCOUNT_TYPE_LABELS, CURRENCIES, formatCurrency, formatUSD } from '@/lib/constants';
 import { getBrandLogo } from '@/lib/brandLogos';
 import { getAccountStyle } from '@/lib/accountIcons';
-import { Plus, ChevronDown, FolderPlus, Pencil, Trash2, Wifi, FileUp, PenLine } from 'lucide-react';
+import { Plus, ChevronDown, FolderPlus, Pencil, Trash2, FileUp, PenLine, Wifi, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { DemoDataBanner } from '@/components/DemoDataBanner';
 import { useDemoData } from '@/hooks/useDemoData';
@@ -55,14 +55,12 @@ export default function Accounts() {
   const [editGroupId, setEditGroupId] = useState<string | null>(null);
   const [showAddChoice, setShowAddChoice] = useState(false);
   const [showPostCreate, setShowPostCreate] = useState(false);
-  const [newAccountId, setNewAccountId] = useState<string | null>(null);
 
   const totalNetWorth = useMemo(() => {
     if (!accounts) return 0;
     return accounts.reduce((s, a) => s + (a.currency === 'USD' ? a.computed_balance : a.computed_balance_usd), 0);
   }, [accounts]);
 
-  // Build sections from custom groups only — no system type fallback
   const sections = useMemo(() => {
     if (!accounts) return [];
     const result: { key: string; label: string; icon: string; isCustomGroup: boolean; accounts: typeof accounts }[] = [];
@@ -74,13 +72,11 @@ export default function Accounts() {
         result.push({ key: g.id, label: g.name, icon: g.icon || '📁', isCustomGroup: true, accounts: groupAccounts });
         groupAccounts.forEach(a => assignedIds.add(a.id));
       }
-      // Ungrouped accounts go into "Other" section
       const ungrouped = accounts.filter(a => !assignedIds.has(a.id));
       if (ungrouped.length > 0) {
         result.push({ key: 'ungrouped', label: 'Ungrouped', icon: '📦', isCustomGroup: false, accounts: ungrouped });
       }
     } else {
-      // Fallback: all accounts flat
       result.push({ key: 'all', label: 'All Accounts', icon: '🏦', isCustomGroup: false, accounts });
     }
 
@@ -96,9 +92,8 @@ export default function Accounts() {
         await updateAccount.mutateAsync({ id: editId, ...payload });
         toast.success('Account updated');
       } else {
-        const created = await createAccount.mutateAsync(payload);
+        await createAccount.mutateAsync(payload);
         toast.success('Account created');
-        setNewAccountId(created.id);
         setShowPostCreate(true);
       }
       setShowForm(false);
@@ -203,7 +198,6 @@ export default function Accounts() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5">
                             <p className="text-sm font-semibold text-foreground truncate">{a.name}</p>
-                            {(a as any).source === 'wise' && <Badge variant="outline" className="text-[9px] h-4 px-1.5 shrink-0"><Wifi className="h-2.5 w-2.5 mr-0.5" />Wise</Badge>}
                             {(a as any).source === 'csv' && <Badge variant="outline" className="text-[9px] h-4 px-1.5 shrink-0"><FileUp className="h-2.5 w-2.5 mr-0.5" />CSV</Badge>}
                             {(a as any).source === 'manual' && <Badge variant="outline" className="text-[9px] h-4 px-1.5 shrink-0 text-muted-foreground"><PenLine className="h-2.5 w-2.5 mr-0.5" />Manual</Badge>}
                           </div>
@@ -293,18 +287,20 @@ export default function Accounts() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader><DialogTitle>Add Account</DialogTitle></DialogHeader>
           <div className="space-y-3 pt-2">
-            <button
-              onClick={() => { setShowAddChoice(false); navigate('/settings', { state: { tab: 'integrations' } }); }}
-              className="w-full flex items-center gap-4 p-4 rounded-xl border hover:border-primary/40 hover:bg-accent/50 transition-colors text-left"
-            >
-              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                <Wifi className="h-5 w-5 text-primary" />
+            <div className="flex items-center gap-4 p-4 rounded-xl border border-dashed opacity-60 cursor-not-allowed">
+              <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0">
+                <Wifi className="h-5 w-5 text-muted-foreground" />
               </div>
-              <div>
-                <p className="text-sm font-semibold text-foreground">Connect via API</p>
-                <p className="text-xs text-muted-foreground">Sync automatically from Wise or other services</p>
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-semibold text-foreground">Connect via API</p>
+                  <Badge variant="outline" className="text-[9px] h-4 px-1.5 text-amber-600 border-amber-300">
+                    <Clock className="h-2.5 w-2.5 mr-0.5" /> Coming Soon
+                  </Badge>
+                </div>
+                <p className="text-xs text-muted-foreground">Auto-sync from Wise, Deel, and more</p>
               </div>
-            </button>
+            </div>
             <button
               onClick={() => { setShowAddChoice(false); setEditId(null); setForm({ name: '', type: 'bank', institution: '', currency: 'USD', opening_balance: '0', notes: '', group_id: '' }); setShowForm(true); }}
               className="w-full flex items-center gap-4 p-4 rounded-xl border hover:border-primary/40 hover:bg-accent/50 transition-colors text-left"
@@ -336,19 +332,19 @@ export default function Accounts() {
               </div>
               <div>
                 <p className="text-sm font-semibold text-foreground">Import CSV</p>
-                <p className="text-xs text-muted-foreground">Upload a bank statement to import transactions</p>
+                <p className="text-xs text-muted-foreground">Upload transactions from a bank statement</p>
               </div>
             </button>
             <button
-              onClick={() => { setShowPostCreate(false); setShowForm(false); }}
+              onClick={() => setShowPostCreate(false)}
               className="w-full flex items-center gap-4 p-4 rounded-xl border hover:border-primary/40 hover:bg-accent/50 transition-colors text-left"
             >
               <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0">
-                <Plus className="h-5 w-5 text-muted-foreground" />
+                <PenLine className="h-5 w-5 text-muted-foreground" />
               </div>
               <div>
                 <p className="text-sm font-semibold text-foreground">Add Transactions Later</p>
-                <p className="text-xs text-muted-foreground">Start with an empty account and add as you go</p>
+                <p className="text-xs text-muted-foreground">You can always import or add them manually</p>
               </div>
             </button>
           </div>
