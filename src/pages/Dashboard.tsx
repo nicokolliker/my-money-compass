@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAccountBalances } from '@/hooks/useAccounts';
 import { useTransactions } from '@/hooks/useTransactions';
@@ -13,12 +13,23 @@ import { supabase } from '@/integrations/supabase/client';
 import { useBlueDollarRate } from '@/hooks/useBlueDollar';
 import { Badge } from '@/components/ui/badge';
 import { isBefore } from 'date-fns';
+import { DemoDataBanner } from '@/components/DemoDataBanner';
 
 export default function Dashboard() {
   const { data: accountBalances, isLoading } = useAccountBalances();
   const { data: transactions } = useTransactions();
   const { data: blueDollar } = useBlueDollarRate();
   const { data: recurringItems } = useRecurringExpenses();
+
+  const { data: profile, refetch: refetchProfile } = useQuery({
+    queryKey: ['profile-demo-flag'],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+      const { data } = await supabase.from('profiles').select('has_demo_data').eq('user_id', user.id).single();
+      return data;
+    },
+  });
 
   const { data: snapshots } = useQuery({
     queryKey: ['net-worth-snapshots'],
@@ -105,6 +116,9 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-5">
+      {profile?.has_demo_data && (
+        <DemoDataBanner onCleared={() => refetchProfile()} />
+      )}
       <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
 
       {/* Net Worth */}

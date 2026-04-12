@@ -356,6 +356,7 @@ export type Database = {
           base_currency: string
           created_at: string
           display_name: string | null
+          has_demo_data: boolean
           id: string
           updated_at: string
           user_id: string
@@ -365,6 +366,7 @@ export type Database = {
           base_currency?: string
           created_at?: string
           display_name?: string | null
+          has_demo_data?: boolean
           id?: string
           updated_at?: string
           user_id: string
@@ -374,6 +376,7 @@ export type Database = {
           base_currency?: string
           created_at?: string
           display_name?: string | null
+          has_demo_data?: boolean
           id?: string
           updated_at?: string
           user_id?: string
@@ -825,7 +828,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      seed_demo_data: { Args: { p_user_id: string }; Returns: undefined }
     }
     Enums: {
       account_type:
