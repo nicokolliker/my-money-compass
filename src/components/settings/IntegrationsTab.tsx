@@ -1,8 +1,7 @@
 import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { getBrandLogo, getInitialsColor } from '@/lib/brandLogos';
-import { Wifi, Upload, CheckCircle2, XCircle, RefreshCw } from 'lucide-react';
+import { Wifi, Upload, CheckCircle2, RefreshCw } from 'lucide-react';
 import WiseTab from './WiseTab';
 import { useState } from 'react';
 import { useWiseSyncLog } from '@/hooks/useWiseSync';
@@ -35,7 +34,7 @@ export default function IntegrationsTab() {
   const { data: syncLog } = useWiseSyncLog();
   const { data: accounts } = useAccounts();
 
-  const wiseAccounts = accounts?.filter(a => (a as any).source === 'wise') || [];
+  const wiseAccounts = accounts?.filter(a => a.source === 'wise') || [];
   const lastWiseSync = syncLog?.[0];
   const isWiseConnected = !!lastWiseSync && lastWiseSync.status === 'success';
 
@@ -44,10 +43,14 @@ export default function IntegrationsTab() {
       return {
         connected: isWiseConnected,
         lastSync: lastWiseSync?.created_at ? new Date(lastWiseSync.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : null,
-        linkedAccounts: wiseAccounts.length,
+        linkedAccounts: wiseAccounts,
       };
     }
-    return { connected: false, lastSync: null, linkedAccounts: 0 };
+    // CSV-based integrations: check if any account has matching source/institution
+    const csvAccounts = accounts?.filter(a =>
+      a.source === 'csv' && a.institution?.toLowerCase().includes(id.toLowerCase())
+    ) || [];
+    return { connected: csvAccounts.length > 0, lastSync: null, linkedAccounts: csvAccounts };
   }
 
   return (
@@ -84,19 +87,22 @@ export default function IntegrationsTab() {
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5">{integration.description}</p>
-                  {status.connected && (
-                    <div className="flex items-center gap-3 mt-1">
-                      {status.lastSync && (
-                        <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                          <RefreshCw className="h-2.5 w-2.5" /> Last sync: {status.lastSync}
-                        </span>
-                      )}
-                      {status.linkedAccounts > 0 && (
-                        <span className="text-[10px] text-muted-foreground">
-                          {status.linkedAccounts} account{status.linkedAccounts !== 1 ? 's' : ''} linked
-                        </span>
-                      )}
+
+                  {/* Linked accounts */}
+                  {status.linkedAccounts.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                      {status.linkedAccounts.map((acct: any) => (
+                        <Badge key={acct.id} variant="outline" className="text-[10px] h-5 px-1.5 font-medium">
+                          {acct.name} · {acct.currency}
+                        </Badge>
+                      ))}
                     </div>
+                  )}
+
+                  {status.connected && status.lastSync && (
+                    <span className="text-[10px] text-muted-foreground flex items-center gap-1 mt-1">
+                      <RefreshCw className="h-2.5 w-2.5" /> Last sync: {status.lastSync}
+                    </span>
                   )}
                 </div>
                 {integration.method === 'api' && !status.connected && (
