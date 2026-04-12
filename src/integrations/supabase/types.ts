@@ -259,6 +259,7 @@ export type Database = {
           created_at: string
           currency: string
           due_day: number | null
+          end_date: string | null
           frequency: string
           id: string
           is_active: boolean
@@ -267,6 +268,7 @@ export type Database = {
           name: string
           next_due_date: string | null
           notes: string | null
+          renewal_notes: string | null
           status: string
           type: string
           updated_at: string
@@ -278,6 +280,7 @@ export type Database = {
           created_at?: string
           currency?: string
           due_day?: number | null
+          end_date?: string | null
           frequency?: string
           id?: string
           is_active?: boolean
@@ -286,6 +289,7 @@ export type Database = {
           name: string
           next_due_date?: string | null
           notes?: string | null
+          renewal_notes?: string | null
           status?: string
           type?: string
           updated_at?: string
@@ -297,6 +301,7 @@ export type Database = {
           created_at?: string
           currency?: string
           due_day?: number | null
+          end_date?: string | null
           frequency?: string
           id?: string
           is_active?: boolean
@@ -305,6 +310,7 @@ export type Database = {
           name?: string
           next_due_date?: string | null
           notes?: string | null
+          renewal_notes?: string | null
           status?: string
           type?: string
           updated_at?: string
