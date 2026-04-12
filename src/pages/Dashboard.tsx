@@ -178,6 +178,63 @@ export default function Dashboard() {
         </Card>
       </div>
 
+      {/* Intelligence Insights */}
+      <Card className="border-primary/20">
+        <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-primary" /> Insights</CardTitle></CardHeader>
+        <CardContent className="space-y-2">
+          {recurringInsights.fixedPct > 0 && (
+            <p className="text-xs text-muted-foreground">💡 <span className="font-medium text-foreground">{recurringInsights.fixedPct.toFixed(0)}%</span> of your spending is fixed/recurring ({formatUSD(recurringInsights.monthlyTotal)}/mo)</p>
+          )}
+          {momChange > 10 && (
+            <p className="text-xs text-muted-foreground">📈 Spending is <span className="font-medium text-destructive">up {momChange.toFixed(0)}%</span> vs last month</p>
+          )}
+          {momChange < -10 && (
+            <p className="text-xs text-muted-foreground">📉 Spending is <span className="font-medium text-success">down {Math.abs(momChange).toFixed(0)}%</span> vs last month</p>
+          )}
+          {topCategories[0] && totalMonthSpending > 0 && (topCategories[0].total / totalMonthSpending) > 0.3 && (
+            <p className="text-xs text-muted-foreground">⚠️ <span className="font-medium text-foreground">{topCategories[0].name}</span> is {((topCategories[0].total / totalMonthSpending) * 100).toFixed(0)}% of your spending</p>
+          )}
+          {recurringInsights.overdue > 0 && (
+            <p className="text-xs text-destructive">🔴 <span className="font-medium">{recurringInsights.overdue} overdue</span> recurring payment{recurringInsights.overdue > 1 ? 's' : ''}</p>
+          )}
+          {recurringInsights.fixedPct === 0 && momChange <= 10 && momChange >= -10 && recurringInsights.overdue === 0 && (
+            <p className="text-xs text-muted-foreground">✅ Everything looks good this month</p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Upcoming Payments */}
+      {recurringInsights.upcoming.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold flex items-center gap-2"><CalendarDays className="h-4 w-4 text-muted-foreground" /> Upcoming Payments</CardTitle></CardHeader>
+          <CardContent className="space-y-2">
+            {recurringInsights.upcoming.map((item: any) => {
+              const cat = item.categories;
+              const acc = item.accounts;
+              const dueDate = item.next_due_date ? new Date(item.next_due_date + 'T12:00:00') : null;
+              const daysUntil = dueDate ? Math.ceil((dueDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null;
+              return (
+                <div key={item.id} className="flex items-center gap-3 py-1.5">
+                  <span className="text-lg">{cat?.icon || '📌'}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">{item.name}</p>
+                    <p className="text-[10px] text-muted-foreground">{acc?.name || ''}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-sm font-semibold text-foreground tabular-nums">{formatCurrency(Math.abs(Number(item.amount)), item.currency)}</p>
+                    {daysUntil !== null && (
+                      <Badge variant={daysUntil < 0 ? 'destructive' : daysUntil <= 3 ? 'secondary' : 'outline'} className="text-[9px] h-4 px-1.5">
+                        {daysUntil < 0 ? 'Overdue' : daysUntil === 0 ? 'Today' : `${daysUntil}d`}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Blue Dollar */}
       {blueDollar && (
         <Card className="border-primary/20">
