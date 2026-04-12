@@ -4,14 +4,16 @@ import { useAccountBalances } from '@/hooks/useAccounts';
 import { useTransactions } from '@/hooks/useTransactions';
 import { formatUSD, formatCurrency, ASSET_TYPES, LIABILITY_TYPES } from '@/lib/constants';
 import { getCategoryColor, getCategoryHex } from '@/lib/categoryColors';
-import { TrendingUp, TrendingDown, Wallet, CreditCard, ArrowUpDown, Repeat } from 'lucide-react';
+import { TrendingUp, TrendingDown, Wallet, CreditCard, ArrowUpDown, Repeat, DollarSign } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useBlueDollarRate } from '@/hooks/useBlueDollar';
 
 export default function Dashboard() {
   const { data: accountBalances, isLoading } = useAccountBalances();
   const { data: transactions } = useTransactions();
+  const { data: blueDollar } = useBlueDollarRate();
 
   const { data: snapshots } = useQuery({
     queryKey: ['net-worth-snapshots'],
@@ -141,6 +143,27 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Blue Dollar Rate */}
+      {blueDollar && (
+        <Card className="border-primary/20">
+          <CardContent className="pt-4 pb-4 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+              <DollarSign className="h-5 w-5 text-primary" />
+            </div>
+            <div className="flex-1">
+              <p className="text-xs text-muted-foreground">ARS/USD (Blue)</p>
+              <p className="text-lg font-bold text-foreground">
+                1 USD = {blueDollar.blue_avg ? Math.round(blueDollar.blue_avg).toLocaleString() : Math.round(1 / blueDollar.rate).toLocaleString()} ARS
+              </p>
+              <p className="text-[10px] text-muted-foreground">
+                Updated: {new Date(blueDollar.updated_at).toLocaleString()}
+                {blueDollar.cached && ' (cached)'}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Top Spending Categories */}
       {topCategories.length > 0 && (
