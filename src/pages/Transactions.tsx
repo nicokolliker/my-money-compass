@@ -4,10 +4,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useTransactions, useDeleteTransaction, useUpdateTransaction } from '@/hooks/useTransactions';
 import { useAccounts } from '@/hooks/useAccounts';
 import { useCategories } from '@/hooks/useCategories';
+import { useRecurringExpenses } from '@/hooks/useRecurringExpenses';
 import { formatCurrency, formatUSD, TRANSACTION_TYPE_LABELS } from '@/lib/constants';
 import { getCategoryColor } from '@/lib/categoryColors';
 import { getBrandLogo, getInitialsColor, getCategoryIcon } from '@/lib/brandLogos';
-import { Search, Trash2, ArrowLeftRight, Repeat, Calendar } from 'lucide-react';
+import { Search, Trash2, ArrowLeftRight, Repeat, Calendar, Link2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
