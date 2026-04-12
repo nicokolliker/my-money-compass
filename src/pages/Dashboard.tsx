@@ -18,6 +18,7 @@ export default function Dashboard() {
   const { data: accountBalances, isLoading } = useAccountBalances();
   const { data: transactions } = useTransactions();
   const { data: blueDollar } = useBlueDollarRate();
+  const { data: recurringItems } = useRecurringExpenses();
 
   const { data: snapshots } = useQuery({
     queryKey: ['net-worth-snapshots'],
