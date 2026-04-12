@@ -54,6 +54,8 @@ export default function Accounts() {
   const [newGroupName, setNewGroupName] = useState('');
   const [editGroupId, setEditGroupId] = useState<string | null>(null);
   const [showAddChoice, setShowAddChoice] = useState(false);
+  const [showPostCreate, setShowPostCreate] = useState(false);
+  const [newAccountId, setNewAccountId] = useState<string | null>(null);
 
   const totalNetWorth = useMemo(() => {
     if (!accounts) return 0;
@@ -92,10 +94,13 @@ export default function Accounts() {
 
       if (editId) {
         await updateAccount.mutateAsync({ id: editId, ...payload });
+        toast.success('Account updated');
       } else {
-        await createAccount.mutateAsync(payload);
+        const created = await createAccount.mutateAsync(payload);
+        toast.success('Account created');
+        setNewAccountId(created.id);
+        setShowPostCreate(true);
       }
-      toast.success(editId ? 'Account updated' : 'Account created');
       setShowForm(false);
       setEditId(null);
     } catch (e: any) { toast.error(e.message); }
