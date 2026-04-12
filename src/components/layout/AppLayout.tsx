@@ -61,9 +61,12 @@ export function AppLayout({ children }: { children: ReactNode }) {
             </button>
           ))}
         </nav>
-        <div className="p-4 border-t">
+        <div className="p-4 border-t space-y-2">
           <Button className="w-full rounded-xl h-11 shadow-soft" onClick={() => setShowQuickAdd(true)}>
             <Plus className="h-4 w-4 mr-2" /> Quick Add
+          </Button>
+          <Button variant="ghost" className="w-full rounded-xl h-9 text-muted-foreground" onClick={() => signOut()}>
+            <LogOut className="h-4 w-4 mr-2" /> Sign Out
           </Button>
         </div>
       </aside>
