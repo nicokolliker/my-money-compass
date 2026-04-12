@@ -4,7 +4,8 @@ import { useAccountBalances } from '@/hooks/useAccounts';
 import { useTransactions } from '@/hooks/useTransactions';
 import { formatUSD, formatCurrency, ASSET_TYPES, LIABILITY_TYPES } from '@/lib/constants';
 import { getCategoryColor, getCategoryHex } from '@/lib/categoryColors';
-import { TrendingUp, TrendingDown, Wallet, CreditCard, ArrowUpDown, Repeat, DollarSign } from 'lucide-react';
+import { getCategoryIcon } from '@/lib/brandLogos';
+import { TrendingUp, TrendingDown, Wallet, CreditCard, ArrowUpDown, Repeat, DollarSign, ArrowUp, ArrowDown, Percent } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -34,8 +35,21 @@ export default function Dashboard() {
   // Monthly spending
   const now = new Date();
   const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+  const prevMonthStart = now.getMonth() === 0
+    ? `${now.getFullYear() - 1}-12-01`
+    : `${now.getFullYear()}-${String(now.getMonth()).padStart(2, '0')}-01`;
+
   const monthExpenses = transactions?.filter(t => t.type === 'expense' && t.date >= monthStart) || [];
+  const prevMonthExpenses = transactions?.filter(t => t.type === 'expense' && t.date >= prevMonthStart && t.date < monthStart) || [];
   const totalMonthSpending = Math.abs(monthExpenses.reduce((s, t) => s + Number(t.amount_usd), 0));
+  const totalPrevMonthSpending = Math.abs(prevMonthExpenses.reduce((s, t) => s + Number(t.amount_usd), 0));
+
+  // Month-over-month change
+  const momChange = totalPrevMonthSpending > 0 ? ((totalMonthSpending - totalPrevMonthSpending) / totalPrevMonthSpending) * 100 : 0;
+
+  // Monthly income
+  const monthIncome = Math.abs(transactions?.filter(t => t.type === 'income' && t.date >= monthStart).reduce((s, t) => s + Number(t.amount_usd), 0) || 0);
+  const savingsRate = monthIncome > 0 ? ((monthIncome - totalMonthSpending) / monthIncome) * 100 : 0;
 
   // Top spending categories this month
   const topCategories = useMemo(() => {
@@ -50,14 +64,20 @@ export default function Dashboard() {
 
   const maxCatSpend = topCategories[0]?.total || 1;
 
-  // Subscriptions count
-  const subsCount = useMemo(() => {
+  // Subscriptions
+  const subsData = useMemo(() => {
     const subs = new Set<string>();
+    let subTotal = 0;
     transactions?.filter(t => t.is_subscription && t.type === 'expense').forEach(t => {
-      subs.add((t.merchant || t.description || '').toLowerCase());
+      const key = (t.merchant || t.description || '').toLowerCase();
+      if (!subs.has(key)) {
+        subs.add(key);
+        subTotal += Math.abs(Number(t.amount_usd));
+      }
     });
-    return subs.size;
-  }, [transactions]);
+    const pct = totalMonthSpending > 0 ? (subTotal / totalMonthSpending * 100) : 0;
+    return { count: subs.size, total: subTotal, pct };
+  }, [transactions, totalMonthSpending]);
 
   // Currency breakdown
   const byCurrency: Record<string, number> = {};
@@ -90,7 +110,7 @@ export default function Dashboard() {
         </CardContent>
       </Card>
 
-      {/* Asset / Liability / Spending cards */}
+      {/* Key Metrics */}
       <div className="grid grid-cols-3 gap-3">
         <Card className="border-success/20">
           <CardContent className="pt-4 pb-4">
@@ -114,32 +134,37 @@ export default function Dashboard() {
               <ArrowUpDown className="h-3.5 w-3.5" /> This Month
             </div>
             <p className="text-lg font-bold text-foreground">{formatUSD(totalMonthSpending)}</p>
+            {momChange !== 0 && (
+              <p className={`text-[10px] flex items-center gap-0.5 mt-0.5 font-medium ${momChange > 0 ? 'text-destructive' : 'text-success'}`}>
+                {momChange > 0 ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
+                {Math.abs(momChange).toFixed(0)}% vs last month
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>
 
-      {/* Insights row */}
-      <div className="grid grid-cols-2 gap-3">
+      {/* Insights */}
+      <div className="grid grid-cols-3 gap-3">
         <Card>
-          <CardContent className="pt-4 pb-4 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-              <Wallet className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Accounts</p>
-              <p className="text-lg font-bold text-foreground">{accountBalances?.length || 0}</p>
-            </div>
+          <CardContent className="pt-3 pb-3">
+            <p className="text-[10px] text-muted-foreground font-medium">Savings Rate</p>
+            <p className="text-lg font-bold text-foreground">{savingsRate.toFixed(0)}%</p>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-4 pb-4 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-              <Repeat className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Subscriptions</p>
-              <p className="text-lg font-bold text-foreground">{subsCount}</p>
-            </div>
+          <CardContent className="pt-3 pb-3">
+            <p className="text-[10px] text-muted-foreground font-medium">Subscriptions</p>
+            <p className="text-lg font-bold text-foreground">{subsData.count}</p>
+            <p className="text-[10px] text-muted-foreground">{subsData.pct.toFixed(0)}% of expenses</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-3 pb-3">
+            <p className="text-[10px] text-muted-foreground font-medium">Top Category</p>
+            <p className="text-sm font-bold text-foreground truncate">
+              {topCategories[0] ? `${getCategoryIcon(topCategories[0].name)} ${topCategories[0].name}` : '—'}
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -174,20 +199,22 @@ export default function Dashboard() {
           <CardContent className="space-y-3">
             {topCategories.map(cat => {
               const colors = getCategoryColor(cat.name);
-              const pct = (cat.total / maxCatSpend) * 100;
+              const pct = totalMonthSpending > 0 ? (cat.total / totalMonthSpending * 100) : 0;
+              const barPct = (cat.total / maxCatSpend) * 100;
               return (
                 <div key={cat.name} className="space-y-1">
                   <div className="flex items-center justify-between text-sm">
                     <div className="flex items-center gap-2">
-                      <span className={`w-2.5 h-2.5 rounded-full`} style={{ backgroundColor: colors.hex }} />
+                      <span className="text-base">{getCategoryIcon(cat.name)}</span>
                       <span className="font-medium text-foreground">{cat.name}</span>
+                      <span className="text-xs text-muted-foreground">{pct.toFixed(0)}%</span>
                     </div>
                     <span className="font-semibold text-foreground tabular-nums">{formatUSD(cat.total)}</span>
                   </div>
                   <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
                     <div
                       className="h-full rounded-full transition-all duration-500"
-                      style={{ width: `${pct}%`, backgroundColor: colors.hex }}
+                      style={{ width: `${barPct}%`, backgroundColor: colors.hex }}
                     />
                   </div>
                 </div>
@@ -224,6 +251,24 @@ export default function Dashboard() {
         </Card>
       )}
 
+      {/* Net Worth by Currency */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-semibold">By Currency</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {Object.entries(byCurrency).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).map(([currency, balance]) => (
+            <div key={currency} className="flex justify-between items-center text-sm py-1.5 px-2 rounded-lg hover:bg-accent/50 transition-colors">
+              <div className="flex items-center gap-2">
+                <span className="text-base">{currency === 'USD' ? '🇺🇸' : currency === 'ARS' ? '🇦🇷' : currency === 'EUR' ? '🇪🇺' : currency === 'GBP' ? '🇬🇧' : currency === 'BRL' ? '🇧🇷' : '💱'}</span>
+                <span className="text-muted-foreground font-medium">{currency}</span>
+              </div>
+              <span className="font-bold text-foreground tabular-nums">{formatCurrency(balance, currency)}</span>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
       {/* Account Balances */}
       <Card>
         <CardHeader className="pb-3">
@@ -242,21 +287,6 @@ export default function Dashboard() {
                   <p className="text-xs text-muted-foreground tabular-nums">≈ {formatUSD(a.computed_balance_usd)}</p>
                 )}
               </div>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
-
-      {/* Currency Breakdown */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-semibold">By Currency</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {Object.entries(byCurrency).map(([currency, balance]) => (
-            <div key={currency} className="flex justify-between text-sm py-1">
-              <span className="text-muted-foreground font-medium">{currency}</span>
-              <span className="font-bold text-foreground tabular-nums">{formatCurrency(balance, currency)}</span>
             </div>
           ))}
         </CardContent>

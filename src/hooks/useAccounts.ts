@@ -8,7 +8,7 @@ export function useAccounts() {
   return useQuery({
     queryKey: ['accounts'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('accounts').select('*').order('name');
+      const { data, error } = await supabase.from('accounts').select('*').order('sort_order').order('name');
       if (error) throw error;
       return data as Account[];
     },
@@ -19,7 +19,7 @@ export function useAccountBalances() {
   return useQuery({
     queryKey: ['account-balances'],
     queryFn: async () => {
-      const { data: accounts, error: aErr } = await supabase.from('accounts').select('*').eq('is_active', true).order('name');
+      const { data: accounts, error: aErr } = await supabase.from('accounts').select('*, account_groups(name, icon, sort_order)').eq('is_active', true).order('sort_order').order('name');
       if (aErr) throw aErr;
       const { data: txSums, error: tErr } = await supabase.from('transactions').select('account_id, amount, amount_usd');
       if (tErr) throw tErr;
@@ -35,6 +35,7 @@ export function useAccountBalances() {
         ...a,
         computed_balance: a.opening_balance + (sumsByAccount[a.id]?.native || 0),
         computed_balance_usd: (a.currency === 'USD' ? a.opening_balance : 0) + (sumsByAccount[a.id]?.usd || 0),
+        group: (a as any).account_groups as { name: string; icon: string | null; sort_order: number } | null,
       }));
     },
   });

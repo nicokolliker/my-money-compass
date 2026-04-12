@@ -14,44 +14,82 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_groups: {
+        Row: {
+          created_at: string
+          icon: string | null
+          id: string
+          name: string
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          icon?: string | null
+          id?: string
+          name: string
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          icon?: string | null
+          id?: string
+          name?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
       accounts: {
         Row: {
           created_at: string
           currency: string
+          group_id: string | null
           id: string
           institution: string | null
           is_active: boolean
           name: string
           notes: string | null
           opening_balance: number
+          sort_order: number
           type: Database["public"]["Enums"]["account_type"]
           updated_at: string
         }
         Insert: {
           created_at?: string
           currency?: string
+          group_id?: string | null
           id?: string
           institution?: string | null
           is_active?: boolean
           name: string
           notes?: string | null
           opening_balance?: number
+          sort_order?: number
           type?: Database["public"]["Enums"]["account_type"]
           updated_at?: string
         }
         Update: {
           created_at?: string
           currency?: string
+          group_id?: string | null
           id?: string
           institution?: string | null
           is_active?: boolean
           name?: string
           notes?: string | null
           opening_balance?: number
+          sort_order?: number
           type?: Database["public"]["Enums"]["account_type"]
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "accounts_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "account_groups"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       categories: {
         Row: {
