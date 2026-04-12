@@ -2,9 +2,11 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { getBrandLogo, getInitialsColor } from '@/lib/brandLogos';
-import { Wifi, Upload, ExternalLink } from 'lucide-react';
+import { Wifi, Upload, CheckCircle2, XCircle, RefreshCw } from 'lucide-react';
 import WiseTab from './WiseTab';
 import { useState } from 'react';
+import { useWiseSyncLog } from '@/hooks/useWiseSync';
+import { useAccounts } from '@/hooks/useAccounts';
 
 interface Integration {
   id: string;
@@ -30,6 +32,23 @@ const METHOD_LABELS: Record<string, { label: string; variant: 'default' | 'secon
 
 export default function IntegrationsTab() {
   const [expanded, setExpanded] = useState<string | null>(null);
+  const { data: syncLog } = useWiseSyncLog();
+  const { data: accounts } = useAccounts();
+
+  const wiseAccounts = accounts?.filter(a => (a as any).source === 'wise') || [];
+  const lastWiseSync = syncLog?.[0];
+  const isWiseConnected = !!lastWiseSync && lastWiseSync.status === 'success';
+
+  function getIntegrationStatus(id: string) {
+    if (id === 'wise') {
+      return {
+        connected: isWiseConnected,
+        lastSync: lastWiseSync?.created_at ? new Date(lastWiseSync.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : null,
+        linkedAccounts: wiseAccounts.length,
+      };
+    }
+    return { connected: false, lastSync: null, linkedAccounts: 0 };
+  }
 
   return (
     <div className="space-y-3 mt-4">
@@ -38,6 +57,7 @@ export default function IntegrationsTab() {
         const initials = getInitialsColor(integration.name);
         const methodCfg = METHOD_LABELS[integration.method];
         const isExpanded = expanded === integration.id;
+        const status = getIntegrationStatus(integration.id);
 
         return (
           <div key={integration.id}>
@@ -57,10 +77,29 @@ export default function IntegrationsTab() {
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-semibold text-foreground">{integration.name}</p>
                     <Badge variant={methodCfg.variant} className="text-[9px] h-4 px-1.5">{methodCfg.label}</Badge>
+                    {status.connected && (
+                      <Badge variant="default" className="text-[9px] h-4 px-1.5 bg-success/10 text-success border-success/20">
+                        <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" /> Connected
+                      </Badge>
+                    )}
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5">{integration.description}</p>
+                  {status.connected && (
+                    <div className="flex items-center gap-3 mt-1">
+                      {status.lastSync && (
+                        <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                          <RefreshCw className="h-2.5 w-2.5" /> Last sync: {status.lastSync}
+                        </span>
+                      )}
+                      {status.linkedAccounts > 0 && (
+                        <span className="text-[10px] text-muted-foreground">
+                          {status.linkedAccounts} account{status.linkedAccounts !== 1 ? 's' : ''} linked
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
-                {integration.method === 'api' && (
+                {integration.method === 'api' && !status.connected && (
                   <Wifi className="h-4 w-4 text-muted-foreground shrink-0" />
                 )}
                 {integration.method === 'csv' && (
