@@ -21,6 +21,16 @@ export default function Dashboard() {
   const { data: blueDollar } = useBlueDollarRate();
   const { data: recurringItems } = useRecurringExpenses();
 
+  const { data: profile, refetch: refetchProfile } = useQuery({
+    queryKey: ['profile-demo-flag'],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+      const { data } = await supabase.from('profiles').select('has_demo_data').eq('user_id', user.id).single();
+      return data;
+    },
+  });
+
   const { data: snapshots } = useQuery({
     queryKey: ['net-worth-snapshots'],
     queryFn: async () => {
