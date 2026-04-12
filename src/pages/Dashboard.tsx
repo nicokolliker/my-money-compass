@@ -2,19 +2,23 @@ import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAccountBalances } from '@/hooks/useAccounts';
 import { useTransactions } from '@/hooks/useTransactions';
+import { useRecurringExpenses } from '@/hooks/useRecurringExpenses';
 import { formatUSD, formatCurrency, ASSET_TYPES, LIABILITY_TYPES } from '@/lib/constants';
 import { getCategoryColor, getCategoryHex } from '@/lib/categoryColors';
 import { getCategoryIcon } from '@/lib/brandLogos';
-import { TrendingUp, TrendingDown, ArrowUpDown, DollarSign, ArrowUp, ArrowDown } from 'lucide-react';
+import { TrendingUp, TrendingDown, ArrowUpDown, DollarSign, ArrowUp, ArrowDown, CalendarDays, Repeat, Building, AlertTriangle } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useBlueDollarRate } from '@/hooks/useBlueDollar';
+import { Badge } from '@/components/ui/badge';
+import { isBefore } from 'date-fns';
 
 export default function Dashboard() {
   const { data: accountBalances, isLoading } = useAccountBalances();
   const { data: transactions } = useTransactions();
   const { data: blueDollar } = useBlueDollarRate();
+  const { data: recurringItems } = useRecurringExpenses();
 
   const { data: snapshots } = useQuery({
     queryKey: ['net-worth-snapshots'],
@@ -70,6 +74,29 @@ export default function Dashboard() {
     const pct = totalMonthSpending > 0 ? (subTotal / totalMonthSpending * 100) : 0;
     return { count: subs.size, total: subTotal, pct };
   }, [transactions, totalMonthSpending]);
+
+  // Recurring intelligence
+  const recurringInsights = useMemo(() => {
+    if (!recurringItems) return { monthlyTotal: 0, overdue: 0, upcoming: [] as any[], fixedPct: 0 };
+    const active = recurringItems.filter(i => i.is_active);
+    let monthlyTotal = 0;
+    active.forEach(i => {
+      const amt = Math.abs(Number(i.amount));
+      switch (i.frequency) {
+        case 'weekly': monthlyTotal += amt * 4.33; break;
+        case 'quarterly': monthlyTotal += amt / 3; break;
+        case 'yearly': monthlyTotal += amt / 12; break;
+        default: monthlyTotal += amt;
+      }
+    });
+    const overdue = active.filter(i => i.next_due_date && isBefore(new Date(i.next_due_date), new Date()) && i.status !== 'paid').length;
+    const upcoming = active
+      .filter(i => i.next_due_date)
+      .sort((a, b) => new Date(a.next_due_date!).getTime() - new Date(b.next_due_date!).getTime())
+      .slice(0, 3);
+    const fixedPct = totalMonthSpending > 0 ? (monthlyTotal / totalMonthSpending * 100) : 0;
+    return { monthlyTotal, overdue, upcoming, fixedPct };
+  }, [recurringItems, totalMonthSpending]);
 
   const byCurrency: Record<string, number> = {};
   accountBalances?.forEach(a => { byCurrency[a.currency] = (byCurrency[a.currency] || 0) + a.computed_balance; });
@@ -150,6 +177,63 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Intelligence Insights */}
+      <Card className="border-primary/20">
+        <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-primary" /> Insights</CardTitle></CardHeader>
+        <CardContent className="space-y-2">
+          {recurringInsights.fixedPct > 0 && (
+            <p className="text-xs text-muted-foreground">💡 <span className="font-medium text-foreground">{recurringInsights.fixedPct.toFixed(0)}%</span> of your spending is fixed/recurring ({formatUSD(recurringInsights.monthlyTotal)}/mo)</p>
+          )}
+          {momChange > 10 && (
+            <p className="text-xs text-muted-foreground">📈 Spending is <span className="font-medium text-destructive">up {momChange.toFixed(0)}%</span> vs last month</p>
+          )}
+          {momChange < -10 && (
+            <p className="text-xs text-muted-foreground">📉 Spending is <span className="font-medium text-success">down {Math.abs(momChange).toFixed(0)}%</span> vs last month</p>
+          )}
+          {topCategories[0] && totalMonthSpending > 0 && (topCategories[0].total / totalMonthSpending) > 0.3 && (
+            <p className="text-xs text-muted-foreground">⚠️ <span className="font-medium text-foreground">{topCategories[0].name}</span> is {((topCategories[0].total / totalMonthSpending) * 100).toFixed(0)}% of your spending</p>
+          )}
+          {recurringInsights.overdue > 0 && (
+            <p className="text-xs text-destructive">🔴 <span className="font-medium">{recurringInsights.overdue} overdue</span> recurring payment{recurringInsights.overdue > 1 ? 's' : ''}</p>
+          )}
+          {recurringInsights.fixedPct === 0 && momChange <= 10 && momChange >= -10 && recurringInsights.overdue === 0 && (
+            <p className="text-xs text-muted-foreground">✅ Everything looks good this month</p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Upcoming Payments */}
+      {recurringInsights.upcoming.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold flex items-center gap-2"><CalendarDays className="h-4 w-4 text-muted-foreground" /> Upcoming Payments</CardTitle></CardHeader>
+          <CardContent className="space-y-2">
+            {recurringInsights.upcoming.map((item: any) => {
+              const cat = item.categories;
+              const acc = item.accounts;
+              const dueDate = item.next_due_date ? new Date(item.next_due_date + 'T12:00:00') : null;
+              const daysUntil = dueDate ? Math.ceil((dueDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null;
+              return (
+                <div key={item.id} className="flex items-center gap-3 py-1.5">
+                  <span className="text-lg">{cat?.icon || '📌'}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">{item.name}</p>
+                    <p className="text-[10px] text-muted-foreground">{acc?.name || ''}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-sm font-semibold text-foreground tabular-nums">{formatCurrency(Math.abs(Number(item.amount)), item.currency)}</p>
+                    {daysUntil !== null && (
+                      <Badge variant={daysUntil < 0 ? 'destructive' : daysUntil <= 3 ? 'secondary' : 'outline'} className="text-[9px] h-4 px-1.5">
+                        {daysUntil < 0 ? 'Overdue' : daysUntil === 0 ? 'Today' : `${daysUntil}d`}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Blue Dollar */}
       {blueDollar && (
