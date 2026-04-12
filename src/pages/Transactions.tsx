@@ -213,8 +213,8 @@ export default function Transactions() {
 
                           {/* Inline category change */}
                           <Popover>
-                            <PopoverTrigger asChild>
-                              <button className={`text-[11px] font-medium px-1.5 py-0.5 rounded-full hover:ring-1 hover:ring-primary/30 transition-all`}
+                             <PopoverTrigger asChild>
+                              <button
                                 style={cat?.color ? { backgroundColor: `hsl(${cat.color} / 0.15)`, color: `hsl(${cat.color})` } : undefined}
                                 className={`text-[11px] font-medium px-1.5 py-0.5 rounded-full hover:ring-1 hover:ring-primary/30 transition-all ${!cat?.color ? (catColor ? `${catColor.bg} ${catColor.text}` : 'bg-muted text-muted-foreground') : ''}`}>
                                 {cat ? `${getCategoryIcon(cat.name, cat.icon)} ${cat.name}` : '+ Category'}
