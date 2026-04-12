@@ -1,84 +1,63 @@
 
+What I already verified
 
-## Personal Finance App — Refined V1 Plan
+- This exact preview is connected to this exact backend/project. The preview network traffic, `supabase/config.toml`, and the backend project ref all match, so this is not a wrong preview/project problem.
+- The current session is authenticated correctly. The live session shows the logged-in user as `nicolaskolliker@gmail.com` with user id `88c3c139-7a95-43e0-ae95-8a755e8e7f54`.
+- The frontend is reading that same authenticated user’s backend state correctly:
+  - `profiles.has_demo_data` returns `false`
+  - `accounts` returns `[]`
+  - `transactions` returns `[]`
+  - `recurring_expenses` returns `[]`
+  - `net_worth_snapshots` returns `[]`
+- So the current issue is not “data exists but the UI is reading another user”. The UI is hitting the right backend and reading the current auth session correctly.
+- Important timing clue: the current user was created at `05:42 UTC`, but the demo-data migration was added later (`20260412054837...`, about `05:48 UTC`). That means this specific user was never seeded retroactively.
+- There is also a backend consistency warning: the migration files define `handle_new_user` + `on_auth_user_created`, but the live backend schema snapshot reports no database triggers. That strongly suggests signup seeding is not reliably installed in the live backend right now.
 
-### Database Schema
+Conclusion
 
-**accounts**
-- id (uuid PK), name, type (enum: bank, digital_wallet, cash, credit_card, debt, receivable, investment, manual), institution, currency, opening_balance (default 0), notes, is_active, created_at, updated_at
+- A) is the current real problem for the logged-in user: demo data was not created.
+- B) is not the main issue in the current session: the UI is reading the logged-in user correctly.
+- C) does not look like a wrong preview/project: code, preview, and backend match. The mismatch is backend rollout/state, not the route/project.
 
-Balance is computed from `opening_balance + sum(transactions)`. No `current_balance` column.
+Plan to fix once approved
 
-**categories**
-- id, name, icon, color, is_system, sort_order, created_at
+1. Repair signup seeding in the backend
+- Create a migration that safely re-creates `handle_new_user` and the `on_auth_user_created` trigger on `auth.users`.
+- Make `seed_demo_data` idempotent so it can be re-run safely without duplicates.
+- Ensure the profile row is created/upserted first, then seed rows are created for that same `auth.uid`, then `has_demo_data` is set to `true`.
 
-**subcategories**
-- id, category_id (FK), name, created_at
+2. Backfill already-affected users
+- Add a one-time repair path for users who already exist, have a profile, but have zero seeded rows and `has_demo_data = false`.
+- This is necessary because fixing the trigger alone will not help users who signed up before demo seeding was added, including the currently affected user.
 
-**tags**
-- id, name, color, created_at
+3. Harden frontend auth/data refresh
+- Add auth-ready gating so user-scoped queries only run after auth initialization is complete.
+- Add `user.id` into React Query keys for user-scoped hooks (`useDemoData`, accounts, transactions, recurring, budgets, account groups, FX, sync logs).
+- Invalidate/reset user-scoped queries on auth changes so switching users cannot keep stale empty data or stale previous-user data.
 
-**transactions**
-- id, date, description, merchant, amount, currency, fx_rate, amount_usd, account_id (FK), category_id (FK), subcategory_id (FK), type (enum: **expense, income, transfer, adjustment**), notes, is_subscription, linked_transfer_id (FK self-ref, nullable), raw_imported_description, created_at, updated_at
+4. Add the temporary debug indicator
+- Add a small debug panel in the protected app shell showing:
+  - current logged-in email
+  - current user id
+  - `has_demo_data`
+  - accounts loaded
+  - transactions loaded
+- Keep it clearly temporary and preview-focused so we can confirm whether the issue is backend creation or frontend rendering/cache.
 
-Transfer logic: A transfer creates **two transactions** (one per account) linked via `linked_transfer_id`. Each stores its own currency/amount/fx_rate. Neither counts as expense or income. Debt increases/repayments are just transfers to/from a liability account.
+5. Re-verify end to end
+- Sign up a brand new user
+- Confirm email
+- Log in
+- Confirm the profile row exists for that exact user id
+- Confirm seeded accounts, transactions, and recurring rows exist for that same user id
+- Confirm the UI shows them immediately
+- Confirm the demo banner appears
+- Test “Clear demo data” and verify counts drop to zero and `has_demo_data` flips to `false`
 
-**transaction_tags** (junction)
-- transaction_id, tag_id
+Technical notes
 
-**transaction_splits**
-- id, transaction_id (FK), category_id, subcategory_id, amount, amount_usd, notes
+- The demo banner is already implemented across the key pages; it is not appearing because `has_demo_data` is currently `false`.
+- The read hooks mostly rely on RLS instead of explicit `.eq('user_id', user.id)`, which is acceptable, but their query keys are not yet user-scoped. That is risky after auth changes and should be corrected in this pass.
+- There is a separate console warning in Settings (`Badge`/ref forwarding). It appears unrelated to the seed/auth issue, so I would keep that as a separate cleanup unless you want it bundled into the same implementation pass.
 
-**fx_rates**
-- id, from_currency, to_currency, rate, date, source (manual/api), created_at
-
-**rules**
-- id, keyword, match_field (merchant/description), category_id, subcategory_id, tag_ids (jsonb), mark_as_subscription, is_active, created_at
-
-**import_logs**
-- id, filename, account_id, row_count, imported_at
-
-**net_worth_snapshots**
-- id, date, total_assets_usd, total_liabilities_usd, net_worth_usd, snapshot_data (jsonb), created_at
-
-No separate `subscriptions` table in v1 — subscriptions view queries transactions where `is_subscription = true`, grouped by merchant/description.
-
-### Core Screens (7 tabs, bottom nav on mobile)
-
-1. **Dashboard** — Net worth in USD, assets vs liabilities, net worth trend (Recharts), account balances (computed), month spending summary, currency breakdown
-2. **Accounts** — Grouped by type, each showing computed native balance + USD equivalent, tap to see account transactions, add/edit account sheet
-3. **Transactions** — Searchable list, quick-add FAB, inline edit, bulk categorize, duplicate, split, filter by account/category/date/tags
-4. **Analytics** — Monthly spending bar chart, category donut, month-over-month, top merchants, income vs expenses, filter bar
-5. **Subscriptions** — Derived view from `is_subscription` transactions, grouped by name, showing monthly USD cost, last/next charge estimates
-6. **Rules** — Simple CRUD list for auto-categorization keywords
-7. **Settings** — Three clear sub-sections: **Categories & Tags**, **FX Rates**, **CSV Import** (each as separate sub-pages/tabs, not one big form)
-
-### Key User Flows
-
-**Quick-add transaction (mobile-optimized)**
-FAB → bottom sheet → date (default today), amount, account (default last-used), category (recent first), type toggle (expense default) → save. Under 5 taps for common entries.
-
-**Transfer between accounts**
-FAB → select "Transfer" → from account, to account, amount, FX rate (auto-suggested if cross-currency) → creates two linked transactions automatically.
-
-**Debt workflow**
-Create liability account "Debt to father" → Transfer from any account to debt account = debt increase → Transfer from debt account back = repayment. Dashboard shows liability balance naturally.
-
-**CSV Import**
-Settings → Import → Upload → Map columns → Set account → Preview rows → Confirm → Rules auto-applied on import.
-
-### V1 Scope
-
-**In scope:** Accounts, transactions (4 types), linked transfers, computed balances, categories/subcategories/tags, rules engine, FX rates (manual), CSV import with column mapping, dashboard with net worth + spending, analytics charts, subscription view (derived), seed data, mobile-first responsive UI, light theme with CSS vars ready for dark mode.
-
-**Deferred:** Auth, auto FX fetch, bank sync, recurring detection, merchant normalization, dark mode, scheduled snapshots, separate subscriptions table.
-
-### Seed Data
-- 8 accounts (Wise USD, Wise EUR, Mercado Pago ARS, Galicia ARS, DolarApp USD, Cash USD, Debt to father, Splitwise)
-- 12 default categories with subcategories
-- ~30 transactions including linked transfers and debt flows
-- Sample FX rates, 4 rules, a few `is_subscription` transactions
-
-### Tech
-React + TypeScript + Tailwind + shadcn/ui + Recharts + Supabase + React Query. Bottom tab nav on mobile, sidebar on desktop.
-
+Because I’m in read-only mode, I can’t execute the live repair or complete the mutating sign-up test from here. But the evidence above is enough to isolate the current problem and define the exact fix path.
