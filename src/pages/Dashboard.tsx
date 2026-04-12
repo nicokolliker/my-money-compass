@@ -164,7 +164,7 @@ export default function Dashboard() {
           <CardContent className="pt-3 pb-3">
             <p className="text-[10px] text-muted-foreground font-medium">Top Category</p>
             <p className="text-sm font-bold text-foreground truncate">
-              {topCategories[0] ? `${getCategoryIcon(topCategories[0].name)} ${topCategories[0].name}` : '—'}
+              {topCategories[0] ? `${getCategoryIcon(topCategories[0].name, topCategories[0].icon)} ${topCategories[0].name}` : '—'}
             </p>
           </CardContent>
         </Card>
@@ -199,14 +199,14 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent className="space-y-3">
             {topCategories.map(cat => {
-              const colors = getCategoryColor(cat.name);
+              const colors = getCategoryColor(cat.name, cat.color);
               const pct = totalMonthSpending > 0 ? (cat.total / totalMonthSpending * 100) : 0;
               const barPct = (cat.total / maxCatSpend) * 100;
               return (
                 <div key={cat.name} className="space-y-1">
                   <div className="flex items-center justify-between text-sm">
                     <div className="flex items-center gap-2">
-                      <span className="text-base">{getCategoryIcon(cat.name)}</span>
+                      <span className="text-base">{getCategoryIcon(cat.name, cat.icon)}</span>
                       <span className="font-medium text-foreground">{cat.name}</span>
                       <span className="text-xs text-muted-foreground">{pct.toFixed(0)}%</span>
                     </div>
