@@ -1,4 +1,6 @@
 // Consistent category color palette for pills, icons, and charts
+// These serve as FALLBACKS when DB categories don't have color set
+
 export const CATEGORY_COLORS: Record<string, { bg: string; text: string; hex: string }> = {
   'Food & Drink': { bg: 'bg-orange-100', text: 'text-orange-700', hex: '#f97316' },
   'Transport': { bg: 'bg-blue-100', text: 'text-blue-700', hex: '#3b82f6' },
@@ -25,14 +27,28 @@ const FALLBACK_COLORS = [
   { bg: 'bg-zinc-100', text: 'text-zinc-600', hex: '#71717a' },
 ];
 
-export function getCategoryColor(name: string) {
-  if (CATEGORY_COLORS[name]) return CATEGORY_COLORS[name];
+/**
+ * Get category color. Prefers DB-stored HSL color, falls back to hardcoded map.
+ * @param name Category name
+ * @param dbColor Optional HSL color string from DB (e.g. "24, 100%, 50%")
+ */
+export function getCategoryColor(name: string, dbColor?: string | null) {
+  if (dbColor) {
+    return {
+      bg: 'bg-transparent',
+      text: 'text-foreground',
+      hex: `hsl(${dbColor})`,
+      hsl: dbColor,
+    };
+  }
+  if (CATEGORY_COLORS[name]) return { ...CATEGORY_COLORS[name], hsl: undefined };
   // Hash-based fallback
   let hash = 0;
   for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  return FALLBACK_COLORS[Math.abs(hash) % FALLBACK_COLORS.length];
+  return { ...FALLBACK_COLORS[Math.abs(hash) % FALLBACK_COLORS.length], hsl: undefined };
 }
 
-export function getCategoryHex(name: string): string {
+export function getCategoryHex(name: string, dbColor?: string | null): string {
+  if (dbColor) return `hsl(${dbColor})`;
   return getCategoryColor(name).hex;
 }
