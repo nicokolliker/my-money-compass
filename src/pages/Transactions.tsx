@@ -230,7 +230,7 @@ export default function Transactions() {
                     <div key={tx.id} className={`flex items-center gap-3 py-3 px-3 rounded-xl hover:bg-accent/60 active:bg-accent transition-colors group ${tx.is_subscription ? 'border-l-2 border-l-primary/40' : ''}`}>
                       <MerchantAvatar tx={tx} cat={cat} />
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-foreground truncate">{tx.merchant || tx.description || 'Untitled'}</p>
+                        <p className="text-sm font-semibold text-foreground truncate">{(tx as any).merchants?.display_name || tx.merchant || tx.description || 'Untitled'}</p>
                         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                           <span className="text-xs text-muted-foreground">{acct?.name}</span>
 
