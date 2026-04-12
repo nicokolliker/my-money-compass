@@ -21,6 +21,7 @@ export type Database = {
           id: string
           name: string
           sort_order: number
+          user_id: string | null
         }
         Insert: {
           created_at?: string
@@ -28,6 +29,7 @@ export type Database = {
           id?: string
           name: string
           sort_order?: number
+          user_id?: string | null
         }
         Update: {
           created_at?: string
@@ -35,6 +37,7 @@ export type Database = {
           id?: string
           name?: string
           sort_order?: number
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -46,12 +49,14 @@ export type Database = {
           id: string
           institution: string | null
           is_active: boolean
+          logo_url: string | null
           name: string
           notes: string | null
           opening_balance: number
           sort_order: number
           type: Database["public"]["Enums"]["account_type"]
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string
@@ -60,12 +65,14 @@ export type Database = {
           id?: string
           institution?: string | null
           is_active?: boolean
+          logo_url?: string | null
           name: string
           notes?: string | null
           opening_balance?: number
           sort_order?: number
           type?: Database["public"]["Enums"]["account_type"]
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string
@@ -74,12 +81,14 @@ export type Database = {
           id?: string
           institution?: string | null
           is_active?: boolean
+          logo_url?: string | null
           name?: string
           notes?: string | null
           opening_balance?: number
           sort_order?: number
           type?: Database["public"]["Enums"]["account_type"]
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -100,6 +109,7 @@ export type Database = {
           id: string
           month: string
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           amount?: number
@@ -109,6 +119,7 @@ export type Database = {
           id?: string
           month: string
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           amount?: number
@@ -118,6 +129,7 @@ export type Database = {
           id?: string
           month?: string
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -138,6 +150,7 @@ export type Database = {
           is_system: boolean
           name: string
           sort_order: number
+          user_id: string | null
         }
         Insert: {
           color?: string | null
@@ -147,6 +160,7 @@ export type Database = {
           is_system?: boolean
           name: string
           sort_order?: number
+          user_id?: string | null
         }
         Update: {
           color?: string | null
@@ -156,6 +170,7 @@ export type Database = {
           is_system?: boolean
           name?: string
           sort_order?: number
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -168,6 +183,7 @@ export type Database = {
           rate: number
           source: string
           to_currency: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string
@@ -177,6 +193,7 @@ export type Database = {
           rate: number
           source?: string
           to_currency?: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string
@@ -186,6 +203,7 @@ export type Database = {
           rate?: number
           source?: string
           to_currency?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -196,6 +214,7 @@ export type Database = {
           id: string
           imported_at: string
           row_count: number
+          user_id: string | null
         }
         Insert: {
           account_id?: string | null
@@ -203,6 +222,7 @@ export type Database = {
           id?: string
           imported_at?: string
           row_count?: number
+          user_id?: string | null
         }
         Update: {
           account_id?: string | null
@@ -210,6 +230,7 @@ export type Database = {
           id?: string
           imported_at?: string
           row_count?: number
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -221,6 +242,45 @@ export type Database = {
           },
         ]
       }
+      merchants: {
+        Row: {
+          created_at: string
+          default_category_id: string | null
+          display_name: string | null
+          id: string
+          is_active: boolean
+          logo_url: string | null
+          name: string
+          notes: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          default_category_id?: string | null
+          display_name?: string | null
+          id?: string
+          is_active?: boolean
+          logo_url?: string | null
+          name: string
+          notes?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          default_category_id?: string | null
+          display_name?: string | null
+          id?: string
+          is_active?: boolean
+          logo_url?: string | null
+          name?: string
+          notes?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       net_worth_snapshots: {
         Row: {
           created_at: string
@@ -230,6 +290,7 @@ export type Database = {
           snapshot_data: Json | null
           total_assets_usd: number
           total_liabilities_usd: number
+          user_id: string | null
         }
         Insert: {
           created_at?: string
@@ -239,6 +300,7 @@ export type Database = {
           snapshot_data?: Json | null
           total_assets_usd?: number
           total_liabilities_usd?: number
+          user_id?: string | null
         }
         Update: {
           created_at?: string
@@ -248,6 +310,73 @@ export type Database = {
           snapshot_data?: Json | null
           total_assets_usd?: number
           total_liabilities_usd?: number
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      payment_methods: {
+        Row: {
+          created_at: string
+          icon: string | null
+          id: string
+          is_active: boolean
+          linked_account_id: string | null
+          name: string
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          icon?: string | null
+          id?: string
+          is_active?: boolean
+          linked_account_id?: string | null
+          name: string
+          type?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          icon?: string | null
+          id?: string
+          is_active?: boolean
+          linked_account_id?: string | null
+          name?: string
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          base_currency: string
+          created_at: string
+          display_name: string | null
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          base_currency?: string
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          base_currency?: string
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -268,10 +397,12 @@ export type Database = {
           name: string
           next_due_date: string | null
           notes: string | null
+          payment_method_id: string | null
           renewal_notes: string | null
           status: string
           type: string
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           account_id?: string | null
@@ -289,10 +420,12 @@ export type Database = {
           name: string
           next_due_date?: string | null
           notes?: string | null
+          payment_method_id?: string | null
           renewal_notes?: string | null
           status?: string
           type?: string
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           account_id?: string | null
@@ -310,10 +443,12 @@ export type Database = {
           name?: string
           next_due_date?: string | null
           notes?: string | null
+          payment_method_id?: string | null
           renewal_notes?: string | null
           status?: string
           type?: string
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -350,6 +485,7 @@ export type Database = {
           match_field: string
           subcategory_id: string | null
           tag_ids: Json | null
+          user_id: string | null
         }
         Insert: {
           category_id?: string | null
@@ -361,6 +497,7 @@ export type Database = {
           match_field?: string
           subcategory_id?: string | null
           tag_ids?: Json | null
+          user_id?: string | null
         }
         Update: {
           category_id?: string | null
@@ -372,6 +509,7 @@ export type Database = {
           match_field?: string
           subcategory_id?: string | null
           tag_ids?: Json | null
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -396,18 +534,21 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          user_id: string | null
         }
         Insert: {
           category_id: string
           created_at?: string
           id?: string
           name: string
+          user_id?: string | null
         }
         Update: {
           category_id?: string
           created_at?: string
           id?: string
           name?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -425,18 +566,21 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          user_id: string | null
         }
         Insert: {
           color?: string | null
           created_at?: string
           id?: string
           name: string
+          user_id?: string | null
         }
         Update: {
           color?: string | null
           created_at?: string
           id?: string
           name?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -449,6 +593,7 @@ export type Database = {
           notes: string | null
           subcategory_id: string | null
           transaction_id: string
+          user_id: string | null
         }
         Insert: {
           amount?: number
@@ -458,6 +603,7 @@ export type Database = {
           notes?: string | null
           subcategory_id?: string | null
           transaction_id: string
+          user_id?: string | null
         }
         Update: {
           amount?: number
@@ -467,6 +613,7 @@ export type Database = {
           notes?: string | null
           subcategory_id?: string | null
           transaction_id?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -496,14 +643,17 @@ export type Database = {
         Row: {
           tag_id: string
           transaction_id: string
+          user_id: string | null
         }
         Insert: {
           tag_id: string
           transaction_id: string
+          user_id?: string | null
         }
         Update: {
           tag_id?: string
           transaction_id?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -538,11 +688,14 @@ export type Database = {
           is_subscription: boolean
           linked_transfer_id: string | null
           merchant: string | null
+          merchant_id: string | null
           notes: string | null
+          payment_method_id: string | null
           raw_imported_description: string | null
           subcategory_id: string | null
           type: Database["public"]["Enums"]["transaction_type"]
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           account_id: string
@@ -559,11 +712,14 @@ export type Database = {
           is_subscription?: boolean
           linked_transfer_id?: string | null
           merchant?: string | null
+          merchant_id?: string | null
           notes?: string | null
+          payment_method_id?: string | null
           raw_imported_description?: string | null
           subcategory_id?: string | null
           type?: Database["public"]["Enums"]["transaction_type"]
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           account_id?: string
@@ -580,11 +736,14 @@ export type Database = {
           is_subscription?: boolean
           linked_transfer_id?: string | null
           merchant?: string | null
+          merchant_id?: string | null
           notes?: string | null
+          payment_method_id?: string | null
           raw_imported_description?: string | null
           subcategory_id?: string | null
           type?: Database["public"]["Enums"]["transaction_type"]
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -627,6 +786,7 @@ export type Database = {
           profile_id: string | null
           status: string
           transactions_imported: number
+          user_id: string | null
         }
         Insert: {
           account_id?: string | null
@@ -637,6 +797,7 @@ export type Database = {
           profile_id?: string | null
           status?: string
           transactions_imported?: number
+          user_id?: string | null
         }
         Update: {
           account_id?: string | null
@@ -647,6 +808,7 @@ export type Database = {
           profile_id?: string | null
           status?: string
           transactions_imported?: number
+          user_id?: string | null
         }
         Relationships: [
           {
