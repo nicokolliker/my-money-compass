@@ -1,7 +1,9 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -279,6 +281,39 @@ export default function Accounts() {
           </div>
         </SheetContent>
       </Sheet>
+
+      {/* Add Account Choice Dialog */}
+      <Dialog open={showAddChoice} onOpenChange={setShowAddChoice}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>Add Account</DialogTitle></DialogHeader>
+          <div className="space-y-3 pt-2">
+            <button
+              onClick={() => { setShowAddChoice(false); navigate('/settings', { state: { tab: 'integrations' } }); }}
+              className="w-full flex items-center gap-4 p-4 rounded-xl border hover:border-primary/40 hover:bg-accent/50 transition-colors text-left"
+            >
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                <Wifi className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-foreground">Connect via API</p>
+                <p className="text-xs text-muted-foreground">Sync automatically from Wise or other services</p>
+              </div>
+            </button>
+            <button
+              onClick={() => { setShowAddChoice(false); setEditId(null); setForm({ name: '', type: 'bank', institution: '', currency: 'USD', opening_balance: '0', notes: '', group_id: '' }); setShowForm(true); }}
+              className="w-full flex items-center gap-4 p-4 rounded-xl border hover:border-primary/40 hover:bg-accent/50 transition-colors text-left"
+            >
+              <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0">
+                <PenLine className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-foreground">Manual Account</p>
+                <p className="text-xs text-muted-foreground">Create manually and add transactions or import CSV</p>
+              </div>
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
