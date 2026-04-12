@@ -8,7 +8,9 @@ import Dashboard from "./pages/Dashboard";
 import Accounts from "./pages/Accounts";
 import Transactions from "./pages/Transactions";
 import Analytics from "./pages/Analytics";
-import Subscriptions from "./pages/Subscriptions";
+import RecurringExpenses from "./pages/RecurringExpenses";
+import CalendarPage from "./pages/Calendar";
+import BudgetPage from "./pages/Budget";
 import Rules from "./pages/Rules";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
@@ -27,7 +29,9 @@ const App = () => (
             <Route path="/accounts" element={<Accounts />} />
             <Route path="/transactions" element={<Transactions />} />
             <Route path="/analytics" element={<Analytics />} />
-            <Route path="/subscriptions" element={<Subscriptions />} />
+            <Route path="/recurring" element={<RecurringExpenses />} />
+            <Route path="/calendar" element={<CalendarPage />} />
+            <Route path="/budget" element={<BudgetPage />} />
             <Route path="/rules" element={<Rules />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="*" element={<NotFound />} />
