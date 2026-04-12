@@ -5,6 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAccounts } from '@/hooks/useAccounts';
 import { useCategories } from '@/hooks/useCategories';
+import { useMerchants } from '@/hooks/useMerchants';
 import { useCreateTransaction, useCreateTransfer } from '@/hooks/useTransactions';
 import { useFxRates } from '@/hooks/useFxRates';
 import { CURRENCIES, TRANSACTION_TYPE_LABELS } from '@/lib/constants';
@@ -19,6 +20,7 @@ interface Props {
 export function TransactionForm({ onSuccess, editData }: Props) {
   const { data: accounts } = useAccounts();
   const { data: categories } = useCategories();
+  const { data: merchants } = useMerchants();
   const { data: fxRates } = useFxRates();
   const createTx = useCreateTransaction();
   const createTransfer = useCreateTransfer();
@@ -26,6 +28,7 @@ export function TransactionForm({ onSuccess, editData }: Props) {
   const [type, setType] = useState<string>('expense');
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
+  const [merchantId, setMerchantId] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [accountId, setAccountId] = useState('');
   const [toAccountId, setToAccountId] = useState('');

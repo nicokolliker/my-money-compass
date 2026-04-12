@@ -9,7 +9,7 @@ import { TransactionForm } from '@/components/transactions/TransactionForm';
 import { useAuth } from '@/hooks/useAuth';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { DebugPanel } from '@/components/DebugPanel';
+
 
 const NAV_ITEMS = [
   { path: '/', label: 'Home', icon: LayoutDashboard },
@@ -138,8 +138,6 @@ export function AppLayout({ children }: { children: ReactNode }) {
           <TransactionForm onSuccess={() => setShowQuickAdd(false)} />
         </SheetContent>
       </Sheet>
-      {/* Debug Panel (temporary) */}
-      <DebugPanel />
     </div>
   );
 }
