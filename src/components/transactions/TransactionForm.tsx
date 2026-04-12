@@ -196,6 +196,29 @@ export function TransactionForm({ onSuccess, editData }: Props) {
         </div>
       )}
 
+      {/* Merchant (not for transfers) */}
+      {type !== 'transfer' && (
+        <div>
+          <Label>Merchant</Label>
+          <Select value={merchantId} onValueChange={(v) => {
+            setMerchantId(v);
+            // Auto-set category from merchant default
+            if (v && !categoryId) {
+              const m = merchants?.find(m => m.id === v);
+              if (m?.default_category_id) setCategoryId(m.default_category_id);
+            }
+          }}>
+            <SelectTrigger className="mt-1"><SelectValue placeholder="Select merchant (optional)" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">No merchant</SelectItem>
+              {merchants?.map((m: any) => (
+                <SelectItem key={m.id} value={m.id}>{m.display_name || m.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
       {/* Description */}
       <div>
         <Label>Description</Label>
@@ -216,7 +239,7 @@ export function TransactionForm({ onSuccess, editData }: Props) {
             <SelectTrigger className="mt-1"><SelectValue placeholder="Select category" /></SelectTrigger>
             <SelectContent>
               {categories?.map(c => (
-                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                <SelectItem key={c.id} value={c.id}>{c.icon} {c.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
