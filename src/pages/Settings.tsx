@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useCategories, useCreateCategory, useDeleteCategory } from '@/hooks/useCategories';
 import { useFxRates, useCreateFxRate, useDeleteFxRate } from '@/hooks/useFxRates';
 import { useBlueDollarRate, useRefreshBlueDollar } from '@/hooks/useBlueDollar';
 import { useAccounts } from '@/hooks/useAccounts';
@@ -15,6 +14,7 @@ import { CURRENCIES } from '@/lib/constants';
 import { Plus, Trash2, Upload, FileSpreadsheet, RefreshCw, DollarSign } from 'lucide-react';
 import { toast } from 'sonner';
 import WiseTab from '@/components/settings/WiseTab';
+import CategoriesTab from '@/components/settings/CategoriesTab';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -38,47 +38,6 @@ export default function Settings() {
   );
 }
 
-function CategoriesTab() {
-  const { data: categories } = useCategories();
-  const createCategory = useCreateCategory();
-  const deleteCategory = useDeleteCategory();
-  const [name, setName] = useState('');
-
-  const handleAdd = async () => {
-    if (!name.trim()) return;
-    try {
-      await createCategory.mutateAsync({ name: name.trim() });
-      setName('');
-      toast.success('Category added');
-    } catch (e: any) { toast.error(e.message); }
-  };
-
-  return (
-    <div className="space-y-4 mt-4">
-      <div className="flex gap-2">
-        <Input value={name} onChange={e => setName(e.target.value)} placeholder="New category name" className="flex-1" />
-        <Button onClick={handleAdd} disabled={createCategory.isPending}><Plus className="h-4 w-4" /></Button>
-      </div>
-      <div className="space-y-1">
-        {categories?.map(c => (
-          <div key={c.id} className="flex items-center justify-between py-2 px-2 rounded hover:bg-accent">
-            <div className="flex items-center gap-2">
-              {c.color && <div className="w-3 h-3 rounded-full" style={{ backgroundColor: `hsl(${c.color})` }} />}
-              <span className="text-sm text-foreground">{c.name}</span>
-              {c.is_system && <span className="text-[10px] text-muted-foreground">(system)</span>}
-            </div>
-            {!c.is_system && (
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => deleteCategory.mutateAsync(c.id)}>
-                <Trash2 className="h-3 w-3 text-muted-foreground" />
-              </Button>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function FxRatesTab() {
   const { data: rates } = useFxRates();
   const createRate = useCreateFxRate();
@@ -98,7 +57,6 @@ function FxRatesTab() {
 
   return (
     <div className="space-y-4 mt-4">
-      {/* Blue Dollar Card */}
       <Card className="border-primary/20">
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
@@ -106,13 +64,7 @@ function FxRatesTab() {
               <DollarSign className="h-4 w-4 text-primary" />
               ARS/USD (Blue)
             </CardTitle>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              onClick={() => refreshBlue.mutate()}
-              disabled={refreshBlue.isPending}
-            >
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => refreshBlue.mutate()} disabled={refreshBlue.isPending}>
               <RefreshCw className={`h-3.5 w-3.5 ${refreshBlue.isPending ? 'animate-spin' : ''}`} />
             </Button>
           </div>
@@ -142,7 +94,6 @@ function FxRatesTab() {
         </CardContent>
       </Card>
 
-      {/* Manual Rate Entry */}
       <Card>
         <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Add Rate</CardTitle></CardHeader>
         <CardContent className="space-y-3">
@@ -241,7 +192,6 @@ function ImportTab() {
         const date = getValue('date') || new Date().toISOString().split('T')[0];
         const fxRate = account?.currency === 'USD' ? 1 : parseFloat(getValue('fx_rate') || '1');
 
-        // Apply rules
         let categoryId: string | null = null;
         let isSub = false;
         if (rules) {
@@ -273,7 +223,6 @@ function ImportTab() {
         imported++;
       }
 
-      // Log import
       await supabase.from('import_logs').insert({ filename: file?.name || 'unknown', account_id: accountId, row_count: imported });
       toast.success(`Imported ${imported} transactions`);
       setStep('upload');
