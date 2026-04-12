@@ -2,17 +2,19 @@ import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useTransactions } from '@/hooks/useTransactions';
 import { formatUSD, formatCurrency } from '@/lib/constants';
+import { getCategoryColor } from '@/lib/categoryColors';
 import { Badge } from '@/components/ui/badge';
 import { Repeat } from 'lucide-react';
 
 export default function Subscriptions() {
   const { data: transactions, isLoading } = useTransactions();
 
-  const subscriptions = useMemo(() => {
+  const { subscriptions, byCategory } = useMemo(() => {
     const subs = transactions?.filter(t => t.is_subscription && t.type === 'expense') || [];
-    const grouped: Record<string, { name: string; currency: string; lastAmount: number; lastAmountUsd: number; lastDate: string; count: number; accountName: string }> = {};
+    const grouped: Record<string, { name: string; currency: string; lastAmount: number; lastAmountUsd: number; lastDate: string; count: number; accountName: string; categoryName: string }> = {};
     subs.forEach(t => {
       const key = (t.merchant || t.description || 'Unknown').toLowerCase();
+      const catName = (t as any).categories?.name || 'Other';
       if (!grouped[key] || t.date > grouped[key].lastDate) {
         grouped[key] = {
           name: t.merchant || t.description || 'Unknown',
@@ -22,12 +24,23 @@ export default function Subscriptions() {
           lastDate: t.date,
           count: (grouped[key]?.count || 0) + 1,
           accountName: (t as any).accounts?.name || '',
+          categoryName: catName,
         };
       } else {
         grouped[key].count += 1;
       }
     });
-    return Object.values(grouped).sort((a, b) => b.lastAmountUsd - a.lastAmountUsd);
+    const allSubs = Object.values(grouped).sort((a, b) => b.lastAmountUsd - a.lastAmountUsd);
+    
+    // Group by category
+    const byCat: Record<string, { subs: typeof allSubs; total: number }> = {};
+    allSubs.forEach(sub => {
+      if (!byCat[sub.categoryName]) byCat[sub.categoryName] = { subs: [], total: 0 };
+      byCat[sub.categoryName].subs.push(sub);
+      byCat[sub.categoryName].total += sub.lastAmountUsd;
+    });
+    
+    return { subscriptions: allSubs, byCategory: byCat };
   }, [transactions]);
 
   const totalMonthly = subscriptions.reduce((s, sub) => s + sub.lastAmountUsd, 0);
@@ -35,37 +48,65 @@ export default function Subscriptions() {
   if (isLoading) return <div className="flex items-center justify-center h-64 text-muted-foreground">Loading...</div>;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <h1 className="text-2xl font-bold text-foreground">Subscriptions</h1>
 
-      <Card className="bg-primary text-primary-foreground">
-        <CardContent className="pt-6">
-          <p className="text-sm opacity-80">Est. Monthly Cost</p>
-          <p className="text-3xl font-bold mt-1">{formatUSD(totalMonthly)}</p>
-          <p className="text-sm opacity-80 mt-1">{subscriptions.length} active subscriptions</p>
+      <Card className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground border-0 shadow-elevated">
+        <CardContent className="pt-6 pb-6">
+          <p className="text-sm opacity-80 font-medium">Est. Monthly Cost</p>
+          <p className="text-4xl font-extrabold mt-1 tracking-tight">{formatUSD(totalMonthly)}</p>
+          <p className="text-sm opacity-80 mt-1">{subscriptions.length} active subscription{subscriptions.length !== 1 ? 's' : ''}</p>
         </CardContent>
       </Card>
 
-      <div className="space-y-2">
-        {subscriptions.map(sub => (
-          <Card key={sub.name}>
-            <CardContent className="flex items-center gap-3 py-4">
-              <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center">
-                <Repeat className="h-4 w-4 text-accent-foreground" />
+      {Object.entries(byCategory).sort((a, b) => b[1].total - a[1].total).map(([catName, { subs, total }]) => {
+        const colors = getCategoryColor(catName);
+        return (
+          <div key={catName} className="space-y-2">
+            <div className="flex items-center justify-between px-1">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: colors.hex }} />
+                <span className="text-sm font-semibold text-foreground">{catName}</span>
               </div>
-              <div className="flex-1">
-                <p className="text-sm font-medium text-foreground">{sub.name}</p>
-                <p className="text-xs text-muted-foreground">{sub.accountName} · Last: {new Date(sub.lastDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
-              </div>
-              <div className="text-right">
-                <p className="text-sm font-semibold text-foreground">{formatCurrency(sub.lastAmount, sub.currency)}</p>
-                {sub.currency !== 'USD' && <p className="text-xs text-muted-foreground">≈ {formatUSD(sub.lastAmountUsd)}</p>}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-        {subscriptions.length === 0 && <p className="text-center py-8 text-muted-foreground">No subscriptions yet. Mark transactions as subscriptions to see them here.</p>}
-      </div>
+              <span className="text-sm font-bold text-muted-foreground tabular-nums">{formatUSD(total)}/mo</span>
+            </div>
+            <div className="space-y-2">
+              {subs.map(sub => (
+                <Card key={sub.name}>
+                  <CardContent className="flex items-center gap-3 py-4">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${colors.bg} ${colors.text}`}>
+                      {sub.name[0]?.toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-foreground truncate">{sub.name}</p>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="text-xs text-muted-foreground">{sub.accountName}</span>
+                        <span className="text-xs text-muted-foreground">·</span>
+                        <span className="text-xs text-muted-foreground">
+                          Last: {new Date(sub.lastDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-sm font-bold text-foreground tabular-nums">{formatCurrency(sub.lastAmount, sub.currency)}</p>
+                      {sub.currency !== 'USD' && <p className="text-[11px] text-muted-foreground tabular-nums">≈ {formatUSD(sub.lastAmountUsd)}</p>}
+                      <Badge variant="secondary" className="text-[10px] h-4 px-1.5 mt-0.5 font-medium">Monthly</Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+
+      {subscriptions.length === 0 && (
+        <div className="text-center py-12">
+          <Repeat className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
+          <p className="text-muted-foreground">No subscriptions yet.</p>
+          <p className="text-sm text-muted-foreground/70">Mark transactions as subscriptions to see them here.</p>
+        </div>
+      )}
     </div>
   );
 }
