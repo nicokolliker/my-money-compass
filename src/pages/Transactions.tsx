@@ -7,7 +7,7 @@ import { useCategories } from '@/hooks/useCategories';
 import { formatCurrency, formatUSD, TRANSACTION_TYPE_LABELS } from '@/lib/constants';
 import { getCategoryColor } from '@/lib/categoryColors';
 import { getBrandLogo, getInitialsColor, getCategoryIcon } from '@/lib/brandLogos';
-import { Search, Trash2, ArrowLeftRight, Tag, Repeat, Calendar } from 'lucide-react';
+import { Search, Trash2, ArrowLeftRight, Repeat, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -15,9 +15,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import {
-  Popover, PopoverContent, PopoverTrigger,
-} from '@/components/ui/popover';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 function formatDateGroupLabel(dateStr: string): string {
   const d = new Date(dateStr + 'T12:00:00');
@@ -31,7 +29,7 @@ function formatDateGroupLabel(dateStr: string): string {
 
 function MerchantAvatar({ tx, cat }: { tx: any; cat: any }) {
   const isTransfer = tx.type === 'transfer';
-  const name = tx.merchant || tx.description || tx.type || '';
+  const name = tx.merchant || tx.description || '';
 
   if (isTransfer) {
     return (
@@ -41,7 +39,7 @@ function MerchantAvatar({ tx, cat }: { tx: any; cat: any }) {
     );
   }
 
-  // Try brand logo first
+  // Brand logo
   const brand = getBrandLogo(name);
   if (brand) {
     return (
@@ -51,10 +49,22 @@ function MerchantAvatar({ tx, cat }: { tx: any; cat: any }) {
     );
   }
 
-  // Fallback to colored initials
-  const initial = name[0]?.toUpperCase() || '?';
-  const colors = cat?.name ? getCategoryColor(cat.name) : getInitialsColor(name);
+  // Category icon fallback
+  if (cat?.icon) {
+    const catColor = getCategoryColor(cat.name, cat.color);
+    return (
+      <div
+        className="w-10 h-10 rounded-full flex items-center justify-center text-lg"
+        style={{ backgroundColor: cat.color ? `hsl(${cat.color} / 0.15)` : undefined }}
+      >
+        {cat.icon}
+      </div>
+    );
+  }
 
+  // Initials fallback
+  const initial = name[0]?.toUpperCase() || '?';
+  const colors = getInitialsColor(name);
   return (
     <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${colors.bg} ${colors.text}`}>
       {initial}
@@ -99,24 +109,18 @@ export default function Transactions() {
   }, [transactions]);
 
   const handleDelete = async (id: string) => {
-    try {
-      await deleteTx.mutateAsync(id);
-      toast.success('Transaction deleted');
-    } catch (e: any) { toast.error(e.message); }
+    try { await deleteTx.mutateAsync(id); toast.success('Transaction deleted'); }
+    catch (e: any) { toast.error(e.message); }
   };
 
   const handleCategoryChange = async (txId: string, catId: string | null) => {
-    try {
-      await updateTx.mutateAsync({ id: txId, category_id: catId });
-      toast.success('Category updated');
-    } catch (e: any) { toast.error(e.message); }
+    try { await updateTx.mutateAsync({ id: txId, category_id: catId }); toast.success('Category updated'); }
+    catch (e: any) { toast.error(e.message); }
   };
 
   const handleToggleSubscription = async (txId: string, current: boolean) => {
-    try {
-      await updateTx.mutateAsync({ id: txId, is_subscription: !current });
-      toast.success(!current ? 'Marked as subscription' : 'Unmarked subscription');
-    } catch (e: any) { toast.error(e.message); }
+    try { await updateTx.mutateAsync({ id: txId, is_subscription: !current }); toast.success(!current ? 'Marked as recurring' : 'Unmarked'); }
+    catch (e: any) { toast.error(e.message); }
   };
 
   return (
@@ -156,7 +160,7 @@ export default function Transactions() {
               {categories?.map(c => (
                 <SelectItem key={c.id} value={c.id}>
                   <span className="flex items-center gap-1.5">
-                    <span>{getCategoryIcon(c.name, c.icon)}</span>
+                    <span>{c.icon || '📌'}</span>
                     {c.name}
                   </span>
                 </SelectItem>
@@ -166,17 +170,15 @@ export default function Transactions() {
         </div>
         {showDateFilter && (
           <div className="flex gap-2 items-center">
-            <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="h-9 rounded-xl text-xs flex-1" placeholder="From" />
+            <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="h-9 rounded-xl text-xs flex-1" />
             <span className="text-xs text-muted-foreground">to</span>
-            <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="h-9 rounded-xl text-xs flex-1" placeholder="To" />
-            {(dateFrom || dateTo) && (
-              <Button variant="ghost" size="sm" className="text-xs h-9" onClick={() => { setDateFrom(''); setDateTo(''); }}>Clear</Button>
-            )}
+            <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="h-9 rounded-xl text-xs flex-1" />
+            {(dateFrom || dateTo) && <Button variant="ghost" size="sm" className="text-xs h-9" onClick={() => { setDateFrom(''); setDateTo(''); }}>Clear</Button>}
           </div>
         )}
       </div>
 
-      {/* Transaction list */}
+      {/* List */}
       {isLoading ? (
         <div className="text-center py-8 text-muted-foreground">Loading...</div>
       ) : grouped.length === 0 ? (
@@ -189,71 +191,57 @@ export default function Transactions() {
                 <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{group.label}</span>
                 <div className="flex-1 h-px bg-border" />
               </div>
-
               <div className="space-y-1">
                 {group.txs.map(tx => {
                   const acct = (tx as any).accounts;
                   const cat = (tx as any).categories;
-                  const isTransfer = tx.type === 'transfer';
                   const isIncome = tx.type === 'income';
                   const isExpense = tx.type === 'expense';
                   const amount = Number(tx.amount);
-                  const catColor = cat?.name ? getCategoryColor(cat.name) : null;
 
                   return (
                     <div key={tx.id} className={`flex items-center gap-3 py-3 px-3 rounded-xl hover:bg-accent/60 active:bg-accent transition-colors group ${tx.is_subscription ? 'border-l-2 border-l-primary/40' : ''}`}>
                       <MerchantAvatar tx={tx} cat={cat} />
-
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-foreground truncate">
-                          {tx.merchant || tx.description || 'Untitled'}
-                        </p>
+                        <p className="text-sm font-semibold text-foreground truncate">{tx.merchant || tx.description || 'Untitled'}</p>
                         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                           <span className="text-xs text-muted-foreground">{acct?.name}</span>
 
-                          {/* Inline category change */}
+                          {/* Category pill */}
                           <Popover>
-                             <PopoverTrigger asChild>
+                            <PopoverTrigger asChild>
                               <button
                                 style={cat?.color ? { backgroundColor: `hsl(${cat.color} / 0.15)`, color: `hsl(${cat.color})` } : undefined}
-                                className={`text-[11px] font-medium px-1.5 py-0.5 rounded-full hover:ring-1 hover:ring-primary/30 transition-all ${!cat?.color ? (catColor ? `${catColor.bg} ${catColor.text}` : 'bg-muted text-muted-foreground') : ''}`}>
-                                {cat ? `${getCategoryIcon(cat.name, cat.icon)} ${cat.name}` : '+ Category'}
+                                className={`text-[11px] font-medium px-1.5 py-0.5 rounded-full hover:ring-1 hover:ring-primary/30 transition-all ${!cat?.color ? 'bg-muted text-muted-foreground' : ''}`}
+                              >
+                                {cat ? (
+                                  <span className="flex items-center gap-1">
+                                    <span>{cat.icon || '📌'}</span>
+                                    <span>{cat.name}</span>
+                                  </span>
+                                ) : '+ Category'}
                               </button>
                             </PopoverTrigger>
                             <PopoverContent className="w-48 p-1" align="start">
                               <div className="space-y-0.5 max-h-48 overflow-auto">
-                                <button
-                                  className="w-full text-left px-2 py-1.5 text-xs rounded hover:bg-accent"
-                                  onClick={() => handleCategoryChange(tx.id, null)}
-                                >
-                                  ❓ Uncategorized
+                                <button className="w-full text-left px-2 py-1.5 text-xs rounded hover:bg-accent" onClick={() => handleCategoryChange(tx.id, null)}>
+                                  📌 Uncategorized
                                 </button>
                                 {categories?.map(c => (
-                                  <button
-                                    key={c.id}
-                                    className="w-full text-left px-2 py-1.5 text-xs rounded hover:bg-accent"
-                                    onClick={() => handleCategoryChange(tx.id, c.id)}
-                                  >
-                                    {getCategoryIcon(c.name, c.icon)} {c.name}
+                                  <button key={c.id} className="w-full text-left px-2 py-1.5 text-xs rounded hover:bg-accent" onClick={() => handleCategoryChange(tx.id, c.id)}>
+                                    {c.icon || '📌'} {c.name}
                                   </button>
                                 ))}
                               </div>
                             </PopoverContent>
                           </Popover>
 
-                          {tx.is_subscription && (
-                            <Badge variant="secondary" className="text-[10px] h-4 px-1.5 font-medium">🔄 Sub</Badge>
-                          )}
+                          {tx.is_subscription && <Badge variant="secondary" className="text-[10px] h-4 px-1.5 font-medium">🔄 Recurring</Badge>}
                         </div>
                       </div>
 
-                      {/* Amount */}
                       <div className="text-right shrink-0">
-                        <p className={`text-base font-bold tabular-nums ${
-                          isIncome ? 'text-success' :
-                          isExpense ? 'text-destructive' :
-                          'text-foreground'
-                        }`}>
+                        <p className={`text-base font-bold tabular-nums ${isIncome ? 'text-success' : isExpense ? 'text-destructive' : 'text-foreground'}`}>
                           {amount > 0 ? '+' : ''}{formatCurrency(amount, tx.currency)}
                         </p>
                         {tx.currency !== 'USD' && (
@@ -261,22 +249,13 @@ export default function Transactions() {
                         )}
                       </div>
 
-                      {/* Actions */}
                       <div className="flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          title={tx.is_subscription ? 'Unmark subscription' : 'Mark as subscription'}
-                          onClick={() => handleToggleSubscription(tx.id, tx.is_subscription)}
-                        >
+                        <Button variant="ghost" size="icon" className="h-7 w-7" title={tx.is_subscription ? 'Unmark recurring' : 'Mark as recurring'} onClick={() => handleToggleSubscription(tx.id, tx.is_subscription)}>
                           <Repeat className={`h-3 w-3 ${tx.is_subscription ? 'text-primary' : 'text-muted-foreground'}`} />
                         </Button>
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-7 w-7">
-                              <Trash2 className="h-3 w-3 text-muted-foreground" />
-                            </Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7"><Trash2 className="h-3 w-3 text-muted-foreground" /></Button>
                           </AlertDialogTrigger>
                           <AlertDialogContent>
                             <AlertDialogHeader>
