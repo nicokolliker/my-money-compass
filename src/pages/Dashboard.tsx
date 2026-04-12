@@ -75,6 +75,29 @@ export default function Dashboard() {
     return { count: subs.size, total: subTotal, pct };
   }, [transactions, totalMonthSpending]);
 
+  // Recurring intelligence
+  const recurringInsights = useMemo(() => {
+    if (!recurringItems) return { monthlyTotal: 0, overdue: 0, upcoming: [] as any[], fixedPct: 0 };
+    const active = recurringItems.filter(i => i.is_active);
+    let monthlyTotal = 0;
+    active.forEach(i => {
+      const amt = Math.abs(Number(i.amount));
+      switch (i.frequency) {
+        case 'weekly': monthlyTotal += amt * 4.33; break;
+        case 'quarterly': monthlyTotal += amt / 3; break;
+        case 'yearly': monthlyTotal += amt / 12; break;
+        default: monthlyTotal += amt;
+      }
+    });
+    const overdue = active.filter(i => i.next_due_date && isBefore(new Date(i.next_due_date), new Date()) && i.status !== 'paid').length;
+    const upcoming = active
+      .filter(i => i.next_due_date)
+      .sort((a, b) => new Date(a.next_due_date!).getTime() - new Date(b.next_due_date!).getTime())
+      .slice(0, 3);
+    const fixedPct = totalMonthSpending > 0 ? (monthlyTotal / totalMonthSpending * 100) : 0;
+    return { monthlyTotal, overdue, upcoming, fixedPct };
+  }, [recurringItems, totalMonthSpending]);
+
   const byCurrency: Record<string, number> = {};
   accountBalances?.forEach(a => { byCurrency[a.currency] = (byCurrency[a.currency] || 0) + a.computed_balance; });
 
