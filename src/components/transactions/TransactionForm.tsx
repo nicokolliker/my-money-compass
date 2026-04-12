@@ -81,15 +81,18 @@ export function TransactionForm({ onSuccess, editData }: Props) {
       } else {
         const signedAmount = type === 'expense' ? -Math.abs(numAmount) : Math.abs(numAmount);
         const rate = parseFloat(fxRate);
+        const selectedMerchant = merchants?.find(m => m.id === merchantId);
         await createTx.mutateAsync({
           date,
           description,
+          merchant: selectedMerchant?.display_name || selectedMerchant?.name || null,
+          merchant_id: merchantId || null,
           amount: signedAmount,
           currency: selectedAccount!.currency,
           fx_rate: rate,
           amount_usd: selectedAccount!.currency === 'USD' ? signedAmount : signedAmount * rate,
           account_id: accountId,
-          category_id: categoryId || null,
+          category_id: categoryId || (selectedMerchant as any)?.default_category_id || null,
           type: type as 'expense' | 'income' | 'transfer' | 'adjustment',
           is_subscription: isSubscription,
         });
