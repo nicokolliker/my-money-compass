@@ -3,9 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { useWiseProfiles, useWiseBalances, useWiseSyncTransactions, useWiseSyncLog } from '@/hooks/useWiseSync';
+import { useWiseProfiles, useWiseBalances, useWiseSyncTransactions, useWiseSyncLog, type WiseSyncResult } from '@/hooks/useWiseSync';
 import { useAccounts, useCreateAccount } from '@/hooks/useAccounts';
-import { RefreshCw, CheckCircle2, AlertCircle, Loader2, Wifi } from 'lucide-react';
+import { RefreshCw, CheckCircle2, AlertCircle, Loader2, Wifi, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow } from 'date-fns';
@@ -26,6 +26,7 @@ export default function WiseTab() {
   const [balances, setBalances] = useState<WiseBalance[]>([]);
   const [connected, setConnected] = useState(false);
   const [syncing, setSyncing] = useState<string | null>(null);
+  const [syncResults, setSyncResults] = useState<Record<string, WiseSyncResult>>({});
 
   const handleConnect = async () => {
     try {
@@ -34,7 +35,6 @@ export default function WiseTab() {
       if (res.profiles?.length > 0) {
         setSelectedProfile(res.profiles[0].id);
         setConnected(true);
-        // Auto-fetch balances
         const bRes = await getBalances.mutateAsync(res.profiles[0].id);
         setBalances(bRes.balances || []);
         toast.success('Connected to Wise');
@@ -63,6 +63,7 @@ export default function WiseTab() {
       type: 'digital_wallet',
       currency,
       institution: 'Wise',
+      source: 'wise',
     });
     return res.id;
   };
@@ -72,26 +73,25 @@ export default function WiseTab() {
     setSyncing(balance.currency);
     try {
       const accountId = await findOrCreateAccount(balance.currency);
-      const end = new Date();
-      const start = new Date();
-      start.setMonth(start.getMonth() - 3);
-
       const res = await syncTx.mutateAsync({
         profileId: selectedProfile,
         balanceId: balance.id,
         accountId,
         currency: balance.currency,
-        intervalStart: start.toISOString(),
-        intervalEnd: end.toISOString(),
       });
-      toast.success(`Imported ${res.imported} new transactions (${balance.currency})`);
+      setSyncResults(prev => ({ ...prev, [balance.currency]: res }));
+      toast.success(`Imported ${res.imported} new transactions (${balance.currency}), skipped ${res.skipped} duplicates`);
     } catch (e: any) {
       toast.error(e.message);
     }
     setSyncing(null);
   };
 
-  const lastSync = syncLog?.[0];
+  const handleSyncAll = async () => {
+    for (const b of balances) {
+      await handleSync(b);
+    }
+  };
 
   return (
     <div className="space-y-4 mt-4">
@@ -99,8 +99,8 @@ export default function WiseTab() {
         <Card>
           <CardContent className="pt-6">
             <div className="flex flex-col items-center gap-4 py-8">
-              <div className="w-16 h-16 rounded-2xl bg-[#9fe870]/20 flex items-center justify-center">
-                <Wifi className="h-8 w-8 text-[#9fe870]" />
+              <div className="w-16 h-16 rounded-2xl bg-[hsl(var(--primary))]/10 flex items-center justify-center">
+                <Wifi className="h-8 w-8 text-primary" />
               </div>
               <div className="text-center">
                 <h3 className="font-semibold text-foreground">Connect to Wise</h3>
@@ -117,7 +117,6 @@ export default function WiseTab() {
         </Card>
       ) : (
         <>
-          {/* Profile selector */}
           {profiles.length > 1 && (
             <Card>
               <CardContent className="pt-4">
@@ -146,41 +145,90 @@ export default function WiseTab() {
           <Card>
             <CardHeader className="pb-2 flex flex-row items-center justify-between">
               <CardTitle className="text-sm font-medium">Wise Balances</CardTitle>
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleRefreshBalances} disabled={getBalances.isPending}>
-                <RefreshCw className={`h-3.5 w-3.5 ${getBalances.isPending ? 'animate-spin' : ''}`} />
-              </Button>
+              <div className="flex gap-1">
+                <Button variant="outline" size="sm" onClick={handleSyncAll} disabled={!!syncing}>
+                  <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${syncing ? 'animate-spin' : ''}`} />
+                  Sync All
+                </Button>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleRefreshBalances} disabled={getBalances.isPending}>
+                  <RefreshCw className={`h-3.5 w-3.5 ${getBalances.isPending ? 'animate-spin' : ''}`} />
+                </Button>
+              </div>
             </CardHeader>
-            <CardContent className="space-y-2">
-              {balances.map(b => (
-                <div key={b.id} className="flex items-center justify-between py-2.5 px-3 rounded-lg bg-accent/50">
-                  <div>
-                    <span className="font-mono font-semibold text-foreground">
-                      {b.amount.value.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                    </span>
-                    <span className="ml-1.5 text-xs text-muted-foreground">{b.currency}</span>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleSync(b)}
-                    disabled={syncing === b.currency}
-                  >
-                    {syncing === b.currency ? (
-                      <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                    ) : (
-                      <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+            <CardContent className="space-y-3">
+              {balances.map(b => {
+                const result = syncResults[b.currency];
+                return (
+                  <div key={b.id} className="rounded-lg border bg-accent/30 p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="font-mono font-semibold text-foreground">
+                          {b.amount.value.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        </span>
+                        <span className="ml-1.5 text-xs text-muted-foreground">{b.currency}</span>
+                        <Badge variant="secondary" className="ml-2 text-[10px]">Official</Badge>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleSync(b)}
+                        disabled={syncing === b.currency}
+                      >
+                        {syncing === b.currency ? (
+                          <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                        ) : (
+                          <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                        )}
+                        Sync
+                      </Button>
+                    </div>
+
+                    {/* Debug / reconciliation info */}
+                    {result && (
+                      <div className="text-xs space-y-1 border-t pt-2 text-muted-foreground">
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                          <span>Official balance:</span>
+                          <span className="font-mono text-foreground">{result.official_balance?.toFixed(2) ?? '—'}</span>
+                          <span>Sum of imported txns:</span>
+                          <span className="font-mono text-foreground">{result.sum_imported?.toFixed(2) ?? '—'}</span>
+                          <span>Transaction count:</span>
+                          <span className="font-mono text-foreground">{result.tx_count}</span>
+                          <span>Date range:</span>
+                          <span className="font-mono text-foreground">
+                            {result.date_range.start || '—'} → {result.date_range.end || '—'}
+                          </span>
+                          <span>New imported:</span>
+                          <span className="font-mono text-foreground">{result.imported}</span>
+                          <span>Skipped (dupes):</span>
+                          <span className="font-mono text-foreground">{result.skipped}</span>
+                        </div>
+
+                        {result.reconciled === false && (
+                          <div className="flex items-center gap-1.5 mt-2 text-amber-500 bg-amber-500/10 rounded-md px-2 py-1.5">
+                            <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                            <span className="text-xs font-medium">
+                              This account may be partially synced — imported total doesn't match official Wise balance
+                            </span>
+                          </div>
+                        )}
+                        {result.reconciled === true && (
+                          <div className="flex items-center gap-1.5 mt-2 text-emerald-500">
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                            <span className="text-xs">Reconciled ✓</span>
+                          </div>
+                        )}
+                      </div>
                     )}
-                    Sync
-                  </Button>
-                </div>
-              ))}
+                  </div>
+                );
+              })}
               {balances.length === 0 && (
                 <p className="text-sm text-muted-foreground text-center py-4">No balances found</p>
               )}
             </CardContent>
           </Card>
 
-          {/* Last sync info */}
+          {/* Recent syncs */}
           {syncLog && syncLog.length > 0 && (
             <Card>
               <CardHeader className="pb-2">
@@ -191,7 +239,7 @@ export default function WiseTab() {
                   <div key={log.id} className="flex items-center justify-between py-2 text-sm">
                     <div className="flex items-center gap-2">
                       {log.status === 'success' ? (
-                        <CheckCircle2 className="h-3.5 w-3.5 text-success" />
+                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
                       ) : (
                         <AlertCircle className="h-3.5 w-3.5 text-destructive" />
                       )}
