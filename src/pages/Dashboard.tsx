@@ -2,14 +2,17 @@ import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAccountBalances } from '@/hooks/useAccounts';
 import { useTransactions } from '@/hooks/useTransactions';
+import { useRecurringExpenses } from '@/hooks/useRecurringExpenses';
 import { formatUSD, formatCurrency, ASSET_TYPES, LIABILITY_TYPES } from '@/lib/constants';
 import { getCategoryColor, getCategoryHex } from '@/lib/categoryColors';
 import { getCategoryIcon } from '@/lib/brandLogos';
-import { TrendingUp, TrendingDown, ArrowUpDown, DollarSign, ArrowUp, ArrowDown } from 'lucide-react';
+import { TrendingUp, TrendingDown, ArrowUpDown, DollarSign, ArrowUp, ArrowDown, CalendarDays, Repeat, Building, AlertTriangle } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useBlueDollarRate } from '@/hooks/useBlueDollar';
+import { Badge } from '@/components/ui/badge';
+import { isBefore } from 'date-fns';
 
 export default function Dashboard() {
   const { data: accountBalances, isLoading } = useAccountBalances();
