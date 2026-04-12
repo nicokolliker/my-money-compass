@@ -53,6 +53,8 @@ export type Database = {
           logo_url: string | null
           name: string
           notes: string | null
+          official_balance: number | null
+          official_balance_updated_at: string | null
           opening_balance: number
           sort_order: number
           source: string
@@ -71,6 +73,8 @@ export type Database = {
           logo_url?: string | null
           name: string
           notes?: string | null
+          official_balance?: number | null
+          official_balance_updated_at?: string | null
           opening_balance?: number
           sort_order?: number
           source?: string
@@ -89,6 +93,8 @@ export type Database = {
           logo_url?: string | null
           name?: string
           notes?: string | null
+          official_balance?: number | null
+          official_balance_updated_at?: string | null
           opening_balance?: number
           sort_order?: number
           source?: string

@@ -1,8 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
-const PROJECT_ID = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-
 async function callWise(action: string, params: Record<string, unknown> = {}) {
   const { data, error } = await supabase.functions.invoke('wise-sync', {
     body: { action, ...params },
@@ -24,6 +22,17 @@ export function useWiseBalances() {
   });
 }
 
+export interface WiseSyncResult {
+  imported: number;
+  skipped: number;
+  total_fetched: number;
+  official_balance: number | null;
+  sum_imported: number;
+  tx_count: number;
+  date_range: { start: string | null; end: string | null };
+  reconciled: boolean | null;
+}
+
 export function useWiseSyncTransactions() {
   const qc = useQueryClient();
   return useMutation({
@@ -32,12 +41,11 @@ export function useWiseSyncTransactions() {
       balanceId: number;
       accountId: string;
       currency: string;
-      intervalStart: string;
-      intervalEnd: string;
-    }) => callWise('sync-transactions', params),
+    }): Promise<WiseSyncResult> => callWise('sync-transactions', params),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['transactions'] });
       qc.invalidateQueries({ queryKey: ['account-balances'] });
+      qc.invalidateQueries({ queryKey: ['accounts'] });
       qc.invalidateQueries({ queryKey: ['wise-sync-log'] });
     },
   });
