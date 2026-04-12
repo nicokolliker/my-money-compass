@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,10 +21,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { supabase } from '@/integrations/supabase/client';
 
 export default function Settings() {
+  const location = useLocation();
+  const initialTab = (location.state as any)?.tab || 'integrations';
+
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-bold text-foreground">Settings</h1>
-      <Tabs defaultValue="integrations">
+      <Tabs defaultValue={initialTab}>
         <TabsList className="w-full flex-wrap">
           <TabsTrigger value="integrations" className="flex-1">Integrations</TabsTrigger>
           <TabsTrigger value="merchants" className="flex-1">Merchants</TabsTrigger>

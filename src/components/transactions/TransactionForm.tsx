@@ -5,6 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAccounts } from '@/hooks/useAccounts';
 import { useCategories } from '@/hooks/useCategories';
+import { useMerchants } from '@/hooks/useMerchants';
 import { useCreateTransaction, useCreateTransfer } from '@/hooks/useTransactions';
 import { useFxRates } from '@/hooks/useFxRates';
 import { CURRENCIES, TRANSACTION_TYPE_LABELS } from '@/lib/constants';
@@ -19,6 +20,7 @@ interface Props {
 export function TransactionForm({ onSuccess, editData }: Props) {
   const { data: accounts } = useAccounts();
   const { data: categories } = useCategories();
+  const { data: merchants } = useMerchants();
   const { data: fxRates } = useFxRates();
   const createTx = useCreateTransaction();
   const createTransfer = useCreateTransfer();
@@ -26,6 +28,7 @@ export function TransactionForm({ onSuccess, editData }: Props) {
   const [type, setType] = useState<string>('expense');
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
+  const [merchantId, setMerchantId] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [accountId, setAccountId] = useState('');
   const [toAccountId, setToAccountId] = useState('');
@@ -78,15 +81,19 @@ export function TransactionForm({ onSuccess, editData }: Props) {
       } else {
         const signedAmount = type === 'expense' ? -Math.abs(numAmount) : Math.abs(numAmount);
         const rate = parseFloat(fxRate);
+        const resolvedMerchantId = merchantId && merchantId !== 'none' ? merchantId : null;
+        const selectedMerchant = resolvedMerchantId ? merchants?.find(m => m.id === resolvedMerchantId) : null;
         await createTx.mutateAsync({
           date,
           description,
+          merchant: selectedMerchant?.display_name || selectedMerchant?.name || null,
+          merchant_id: resolvedMerchantId,
           amount: signedAmount,
           currency: selectedAccount!.currency,
           fx_rate: rate,
           amount_usd: selectedAccount!.currency === 'USD' ? signedAmount : signedAmount * rate,
           account_id: accountId,
-          category_id: categoryId || null,
+          category_id: categoryId || (selectedMerchant as any)?.default_category_id || null,
           type: type as 'expense' | 'income' | 'transfer' | 'adjustment',
           is_subscription: isSubscription,
         });
@@ -190,6 +197,29 @@ export function TransactionForm({ onSuccess, editData }: Props) {
         </div>
       )}
 
+      {/* Merchant (not for transfers) */}
+      {type !== 'transfer' && (
+        <div>
+          <Label>Merchant</Label>
+          <Select value={merchantId} onValueChange={(v) => {
+            setMerchantId(v);
+            // Auto-set category from merchant default
+            if (v && !categoryId) {
+              const m = merchants?.find(m => m.id === v);
+              if (m?.default_category_id) setCategoryId(m.default_category_id);
+            }
+          }}>
+            <SelectTrigger className="mt-1"><SelectValue placeholder="Select merchant (optional)" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">No merchant</SelectItem>
+              {merchants?.map((m: any) => (
+                <SelectItem key={m.id} value={m.id}>{m.display_name || m.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
       {/* Description */}
       <div>
         <Label>Description</Label>
@@ -210,7 +240,7 @@ export function TransactionForm({ onSuccess, editData }: Props) {
             <SelectTrigger className="mt-1"><SelectValue placeholder="Select category" /></SelectTrigger>
             <SelectContent>
               {categories?.map(c => (
-                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                <SelectItem key={c.id} value={c.id}>{c.icon} {c.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>

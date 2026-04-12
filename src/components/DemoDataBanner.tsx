@@ -23,6 +23,7 @@ export function DemoDataBanner({ onCleared }: Props) {
       await supabase.from('transactions').delete().neq('id', '00000000-0000-0000-0000-000000000000');
       await supabase.from('recurring_expenses').delete().neq('id', '00000000-0000-0000-0000-000000000000');
       await supabase.from('budgets').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      await supabase.from('merchants').delete().neq('id', '00000000-0000-0000-0000-000000000000');
       await supabase.from('accounts').delete().neq('id', '00000000-0000-0000-0000-000000000000');
       await supabase.from('subcategories').delete().neq('id', '00000000-0000-0000-0000-000000000000');
       await supabase.from('categories').delete().neq('id', '00000000-0000-0000-0000-000000000000');
