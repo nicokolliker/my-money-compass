@@ -48,12 +48,14 @@ export type Database = {
           group_id: string | null
           id: string
           institution: string | null
+          integration_id: string | null
           is_active: boolean
           logo_url: string | null
           name: string
           notes: string | null
           opening_balance: number
           sort_order: number
+          source: string
           type: Database["public"]["Enums"]["account_type"]
           updated_at: string
           user_id: string | null
@@ -64,12 +66,14 @@ export type Database = {
           group_id?: string | null
           id?: string
           institution?: string | null
+          integration_id?: string | null
           is_active?: boolean
           logo_url?: string | null
           name: string
           notes?: string | null
           opening_balance?: number
           sort_order?: number
+          source?: string
           type?: Database["public"]["Enums"]["account_type"]
           updated_at?: string
           user_id?: string | null
@@ -80,12 +84,14 @@ export type Database = {
           group_id?: string | null
           id?: string
           institution?: string | null
+          integration_id?: string | null
           is_active?: boolean
           logo_url?: string | null
           name?: string
           notes?: string | null
           opening_balance?: number
           sort_order?: number
+          source?: string
           type?: Database["public"]["Enums"]["account_type"]
           updated_at?: string
           user_id?: string | null

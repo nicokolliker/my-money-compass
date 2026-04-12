@@ -16,6 +16,8 @@ import { getBrandLogo, getInitialsColor } from '@/lib/brandLogos';
 import { Plus, Trash2, CheckCircle2, AlertCircle, Clock, CalendarDays, Repeat, Building, FileText, CreditCard, TrendingUp, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, isBefore, subDays, addMonths, addYears, addWeeks } from 'date-fns';
+import { DemoDataBanner } from '@/components/DemoDataBanner';
+import { useDemoData } from '@/hooks/useDemoData';
 
 const TYPE_LABELS: Record<string, { label: string; icon: typeof Repeat }> = {
   subscription: { label: 'Subscriptions', icon: Repeat },
@@ -60,6 +62,7 @@ export default function RecurringExpenses() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'monthly' | 'yearly'>('monthly');
   const [activeTab, setActiveTab] = useState('all');
+  const { hasDemoData, onCleared: onDemoCleared } = useDemoData();
 
   const emptyForm = {
     name: '', type: 'subscription', category_id: '', account_id: '', amount: '',
@@ -177,6 +180,7 @@ export default function RecurringExpenses() {
 
   return (
     <div className="space-y-5">
+      {hasDemoData && <DemoDataBanner onCleared={onDemoCleared} />}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-foreground">Recurring Expenses</h1>
         <Dialog open={showAdd} onOpenChange={o => { setShowAdd(o); if (!o) { setEditingId(null); setForm(emptyForm); } }}>

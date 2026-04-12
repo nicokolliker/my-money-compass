@@ -1,7 +1,9 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -11,8 +13,11 @@ import { useAccountGroups, useCreateAccountGroup, useUpdateAccountGroup, useDele
 import { ACCOUNT_TYPE_LABELS, CURRENCIES, formatCurrency, formatUSD } from '@/lib/constants';
 import { getBrandLogo } from '@/lib/brandLogos';
 import { getAccountStyle } from '@/lib/accountIcons';
-import { Plus, ChevronDown, FolderPlus, Pencil, Trash2 } from 'lucide-react';
+import { Plus, ChevronDown, FolderPlus, Pencil, Trash2, Wifi, FileUp, PenLine } from 'lucide-react';
 import { toast } from 'sonner';
+import { DemoDataBanner } from '@/components/DemoDataBanner';
+import { useDemoData } from '@/hooks/useDemoData';
+import { Badge } from '@/components/ui/badge';
 
 function AccountLogo({ name, type }: { name: string; type: string }) {
   const brand = getBrandLogo(name);
@@ -32,6 +37,7 @@ function AccountLogo({ name, type }: { name: string; type: string }) {
 }
 
 export default function Accounts() {
+  const navigate = useNavigate();
   const { data: accounts, isLoading } = useAccountBalances();
   const { data: groups } = useAccountGroups();
   const createAccount = useCreateAccount();
@@ -39,6 +45,7 @@ export default function Accounts() {
   const createGroup = useCreateAccountGroup();
   const updateGroup = useUpdateAccountGroup();
   const deleteGroup = useDeleteAccountGroup();
+  const { hasDemoData, onCleared: onDemoCleared } = useDemoData();
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: '', type: 'bank' as string, institution: '', currency: 'USD', opening_balance: '0', notes: '', group_id: '' });
@@ -46,6 +53,7 @@ export default function Accounts() {
   const [showGroupForm, setShowGroupForm] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
   const [editGroupId, setEditGroupId] = useState<string | null>(null);
+  const [showAddChoice, setShowAddChoice] = useState(false);
 
   const totalNetWorth = useMemo(() => {
     if (!accounts) return 0;
@@ -128,13 +136,14 @@ export default function Accounts() {
 
   return (
     <div className="space-y-5">
+      {hasDemoData && <DemoDataBanner onCleared={onDemoCleared} />}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-foreground">Accounts</h1>
         <div className="flex gap-2">
           <Button size="sm" variant="outline" className="rounded-xl" onClick={() => { setEditGroupId(null); setNewGroupName(''); setShowGroupForm(true); }}>
             <FolderPlus className="h-4 w-4 mr-1" /> Group
           </Button>
-          <Button size="sm" className="rounded-xl" onClick={() => { setEditId(null); setForm({ name: '', type: 'bank', institution: '', currency: 'USD', opening_balance: '0', notes: '', group_id: '' }); setShowForm(true); }}>
+          <Button size="sm" className="rounded-xl" onClick={() => { setShowAddChoice(true); }}>
             <Plus className="h-4 w-4 mr-1" /> Add
           </Button>
         </div>
@@ -187,7 +196,12 @@ export default function Accounts() {
                       <button key={a.id} onClick={() => openEdit(a)} className="flex items-center gap-3 w-full py-3 text-left hover:bg-accent/50 active:bg-accent rounded-lg px-2 -mx-2 transition-colors">
                         <AccountLogo name={a.name} type={a.type} />
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-foreground truncate">{a.name}</p>
+                          <div className="flex items-center gap-1.5">
+                            <p className="text-sm font-semibold text-foreground truncate">{a.name}</p>
+                            {(a as any).source === 'wise' && <Badge variant="outline" className="text-[9px] h-4 px-1.5 shrink-0"><Wifi className="h-2.5 w-2.5 mr-0.5" />Wise</Badge>}
+                            {(a as any).source === 'csv' && <Badge variant="outline" className="text-[9px] h-4 px-1.5 shrink-0"><FileUp className="h-2.5 w-2.5 mr-0.5" />CSV</Badge>}
+                            {(a as any).source === 'manual' && <Badge variant="outline" className="text-[9px] h-4 px-1.5 shrink-0 text-muted-foreground"><PenLine className="h-2.5 w-2.5 mr-0.5" />Manual</Badge>}
+                          </div>
                           {a.institution && <p className="text-xs text-muted-foreground">{a.institution}</p>}
                         </div>
                         <div className="text-right shrink-0">
@@ -268,6 +282,39 @@ export default function Accounts() {
           </div>
         </SheetContent>
       </Sheet>
+
+      {/* Add Account Choice Dialog */}
+      <Dialog open={showAddChoice} onOpenChange={setShowAddChoice}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>Add Account</DialogTitle></DialogHeader>
+          <div className="space-y-3 pt-2">
+            <button
+              onClick={() => { setShowAddChoice(false); navigate('/settings', { state: { tab: 'integrations' } }); }}
+              className="w-full flex items-center gap-4 p-4 rounded-xl border hover:border-primary/40 hover:bg-accent/50 transition-colors text-left"
+            >
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                <Wifi className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-foreground">Connect via API</p>
+                <p className="text-xs text-muted-foreground">Sync automatically from Wise or other services</p>
+              </div>
+            </button>
+            <button
+              onClick={() => { setShowAddChoice(false); setEditId(null); setForm({ name: '', type: 'bank', institution: '', currency: 'USD', opening_balance: '0', notes: '', group_id: '' }); setShowForm(true); }}
+              className="w-full flex items-center gap-4 p-4 rounded-xl border hover:border-primary/40 hover:bg-accent/50 transition-colors text-left"
+            >
+              <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0">
+                <PenLine className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-foreground">Manual Account</p>
+                <p className="text-xs text-muted-foreground">Create manually and add transactions or import CSV</p>
+              </div>
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

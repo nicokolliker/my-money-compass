@@ -9,6 +9,8 @@ import { formatCurrency, formatUSD, TRANSACTION_TYPE_LABELS } from '@/lib/consta
 import { getCategoryColor } from '@/lib/categoryColors';
 import { getBrandLogo, getInitialsColor, getCategoryIcon } from '@/lib/brandLogos';
 import { Search, Trash2, ArrowLeftRight, Repeat, Calendar, Link2 } from 'lucide-react';
+import { DemoDataBanner } from '@/components/DemoDataBanner';
+import { useDemoData } from '@/hooks/useDemoData';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -95,6 +97,7 @@ export default function Transactions() {
   const { data: recurringItems } = useRecurringExpenses();
   const deleteTx = useDeleteTransaction();
   const updateTx = useUpdateTransaction();
+  const { hasDemoData, onCleared: onDemoCleared } = useDemoData();
 
   // Match transactions to recurring items
   const recurringMatchMap = useMemo(() => {
@@ -143,6 +146,7 @@ export default function Transactions() {
 
   return (
     <div className="space-y-5">
+      {hasDemoData && <DemoDataBanner onCleared={onDemoCleared} />}
       <h1 className="text-2xl font-bold text-foreground">Transactions</h1>
 
       {/* Filters */}
