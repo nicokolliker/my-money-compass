@@ -39,6 +39,17 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const { signOut, user } = useAuth();
+  const qc = useQueryClient();
+
+  // Invalidate all queries on auth state change (login/logout/user switch)
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
+        qc.invalidateQueries();
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [qc]);
 
   return (
     <div className="flex min-h-screen bg-background">
