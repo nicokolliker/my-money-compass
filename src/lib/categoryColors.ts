@@ -1,36 +1,38 @@
-// Consistent category color palette for pills, icons, and charts
-// These serve as FALLBACKS when DB categories don't have color set
+// Fixed category color system — consistent across charts, tags, icons
+// Maps category names to their designated colors
 
 export const CATEGORY_COLORS: Record<string, { bg: string; text: string; hex: string }> = {
-  'Food & Drink': { bg: 'bg-orange-100', text: 'text-orange-700', hex: '#f97316' },
-  'Transport': { bg: 'bg-blue-100', text: 'text-blue-700', hex: '#3b82f6' },
-  'Housing': { bg: 'bg-violet-100', text: 'text-violet-700', hex: '#8b5cf6' },
-  'Entertainment': { bg: 'bg-pink-100', text: 'text-pink-700', hex: '#ec4899' },
-  'Shopping': { bg: 'bg-amber-100', text: 'text-amber-700', hex: '#f59e0b' },
-  'Health': { bg: 'bg-emerald-100', text: 'text-emerald-700', hex: '#10b981' },
-  'Education': { bg: 'bg-cyan-100', text: 'text-cyan-700', hex: '#06b6d4' },
-  'Subscriptions': { bg: 'bg-indigo-100', text: 'text-indigo-700', hex: '#6366f1' },
-  'Travel': { bg: 'bg-teal-100', text: 'text-teal-700', hex: '#14b8a6' },
-  'Personal': { bg: 'bg-rose-100', text: 'text-rose-700', hex: '#f43f5e' },
-  'Gifts': { bg: 'bg-fuchsia-100', text: 'text-fuchsia-700', hex: '#d946ef' },
-  'Other': { bg: 'bg-slate-100', text: 'text-slate-600', hex: '#64748b' },
-  'Uncategorized': { bg: 'bg-gray-100', text: 'text-gray-600', hex: '#9ca3af' },
-  'Software': { bg: 'bg-indigo-100', text: 'text-indigo-700', hex: '#6366f1' },
-  'Utilities': { bg: 'bg-sky-100', text: 'text-sky-700', hex: '#0ea5e9' },
-  'Insurance': { bg: 'bg-lime-100', text: 'text-lime-700', hex: '#84cc16' },
-  'Groceries': { bg: 'bg-green-100', text: 'text-green-700', hex: '#22c55e' },
+  // Core categories with fixed colors per design system
+  'Food & Drink':    { bg: 'bg-red-100',     text: 'text-red-600',     hex: '#EF4444' },
+  'Food & Drinks':   { bg: 'bg-red-100',     text: 'text-red-600',     hex: '#EF4444' },
+  'Groceries':       { bg: 'bg-red-100',     text: 'text-red-600',     hex: '#EF4444' },
+  'Transport':       { bg: 'bg-blue-100',    text: 'text-blue-600',    hex: '#3B82F6' },
+  'Transportation':  { bg: 'bg-blue-100',    text: 'text-blue-600',    hex: '#3B82F6' },
+  'Shopping':        { bg: 'bg-pink-100',    text: 'text-pink-600',    hex: '#EC4899' },
+  'Health':          { bg: 'bg-green-100',   text: 'text-green-600',   hex: '#22C55E' },
+  'Healthcare':      { bg: 'bg-green-100',   text: 'text-green-600',   hex: '#22C55E' },
+  'Subscriptions':   { bg: 'bg-violet-100',  text: 'text-violet-600',  hex: '#8B5CF6' },
+  'Software':        { bg: 'bg-violet-100',  text: 'text-violet-600',  hex: '#8B5CF6' },
+  'Housing':         { bg: 'bg-orange-100',  text: 'text-orange-600',  hex: '#F97316' },
+  'Rent':            { bg: 'bg-orange-100',  text: 'text-orange-600',  hex: '#F97316' },
+  'Entertainment':   { bg: 'bg-fuchsia-100', text: 'text-fuchsia-600', hex: '#D946EF' },
+  'Education':       { bg: 'bg-cyan-100',    text: 'text-cyan-600',    hex: '#06B6D4' },
+  'Travel':          { bg: 'bg-teal-100',    text: 'text-teal-600',    hex: '#14B8A6' },
+  'Personal':        { bg: 'bg-rose-100',    text: 'text-rose-600',    hex: '#F43F5E' },
+  'Gifts':           { bg: 'bg-fuchsia-100', text: 'text-fuchsia-600', hex: '#D946EF' },
+  'Utilities':       { bg: 'bg-sky-100',     text: 'text-sky-600',     hex: '#0EA5E9' },
+  'Insurance':       { bg: 'bg-lime-100',    text: 'text-lime-600',    hex: '#84CC16' },
+  'Other':           { bg: 'bg-slate-100',   text: 'text-slate-500',   hex: '#64748B' },
+  'Uncategorized':   { bg: 'bg-gray-100',    text: 'text-gray-500',    hex: '#9CA3AF' },
 };
 
-const FALLBACK_COLORS = [
-  { bg: 'bg-slate-100', text: 'text-slate-600', hex: '#64748b' },
-  { bg: 'bg-stone-100', text: 'text-stone-600', hex: '#78716c' },
-  { bg: 'bg-zinc-100', text: 'text-zinc-600', hex: '#71717a' },
-];
+// Chart color palette — max 6 distinct colors for clean charts
+export const CHART_COLORS = ['#EF4444', '#3B82F6', '#EC4899', '#22C55E', '#8B5CF6', '#F97316'];
+
+const FALLBACK = { bg: 'bg-slate-100', text: 'text-slate-500', hex: '#64748B' };
 
 /**
  * Get category color. Prefers DB-stored HSL color, falls back to hardcoded map.
- * @param name Category name
- * @param dbColor Optional HSL color string from DB (e.g. "24, 100%, 50%")
  */
 export function getCategoryColor(name: string, dbColor?: string | null) {
   if (dbColor) {
@@ -41,11 +43,15 @@ export function getCategoryColor(name: string, dbColor?: string | null) {
       hsl: dbColor,
     };
   }
-  if (CATEGORY_COLORS[name]) return { ...CATEGORY_COLORS[name], hsl: undefined };
-  // Hash-based fallback
+  const found = CATEGORY_COLORS[name];
+  if (found) return { ...found, hsl: undefined };
+
+  // Hash-based fallback for unknown categories
   let hash = 0;
   for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  return { ...FALLBACK_COLORS[Math.abs(hash) % FALLBACK_COLORS.length], hsl: undefined };
+  const keys = Object.keys(CATEGORY_COLORS);
+  const pick = CATEGORY_COLORS[keys[Math.abs(hash) % keys.length]];
+  return { ...(pick || FALLBACK), hsl: undefined };
 }
 
 export function getCategoryHex(name: string, dbColor?: string | null): string {

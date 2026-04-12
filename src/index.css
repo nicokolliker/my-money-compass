@@ -4,72 +4,89 @@
 
 @layer base {
   :root {
-    --background: 210 20% 98%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 230 65% 52%;
+    /* Brand Blue — #4F6EF7 → hsl(228, 91%, 64%) */
+    --primary: 228 91% 64%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 220 14% 96%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+
+    /* Neutrals */
+    --background: 210 20% 98%;       /* #F9FAFB */
+    --foreground: 222 47% 11%;       /* #111827 */
+    --card: 0 0% 100%;               /* white */
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    --secondary: 220 14% 96%;        /* #F3F4F6 */
+    --secondary-foreground: 222 47% 11%;
     --muted: 220 14% 96%;
-    --muted-foreground: 215 16% 47%;
+    --muted-foreground: 218 11% 45%; /* #6B7280 */
     --accent: 220 14% 96%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 72% 51%;
+    --accent-foreground: 222 47% 11%;
+
+    /* Semantic */
+    --destructive: 0 84% 60%;        /* #EF4444 */
     --destructive-foreground: 0 0% 100%;
-    --success: 142 71% 45%;
+    --success: 142 71% 45%;          /* #22C55E */
     --success-foreground: 0 0% 100%;
-    --warning: 38 92% 50%;
+    --warning: 48 96% 53%;           /* #EAB308 */
     --warning-foreground: 0 0% 100%;
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: 230 65% 52%;
-    --radius: 0.875rem;
+
+    /* Borders & inputs */
+    --border: 220 13% 87%;           /* #D1D5DB */
+    --input: 220 13% 87%;
+    --ring: 228 91% 64%;
+
+    /* Radius */
+    --radius: 0.75rem;               /* 12px */
+
+    /* Sidebar */
     --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 230 65% 52%;
+    --sidebar-foreground: 222 47% 11%;
+    --sidebar-primary: 228 91% 64%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 220 14% 96%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-accent-foreground: 222 47% 11%;
     --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 230 65% 52%;
+    --sidebar-ring: 228 91% 64%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
+    --primary: 228 91% 68%;
+    --primary-foreground: 0 0% 100%;
+
+    --background: 222 47% 5%;
     --foreground: 210 40% 98%;
     --card: 224 50% 8%;
     --card-foreground: 210 40% 98%;
     --popover: 224 50% 8%;
     --popover-foreground: 210 40% 98%;
-    --primary: 230 65% 60%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 217.2 32.6% 17.5%;
+
+    --secondary: 217 33% 17%;
     --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 217 33% 17%;
     --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
+
+    --destructive: 0 63% 31%;
     --destructive-foreground: 210 40% 98%;
     --success: 142 71% 45%;
     --success-foreground: 0 0% 100%;
-    --warning: 38 92% 50%;
+    --warning: 48 96% 53%;
     --warning-foreground: 0 0% 100%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 230 65% 60%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 230 65% 60%;
+
+    --border: 217 33% 17%;
+    --input: 217 33% 17%;
+    --ring: 228 91% 68%;
+
+    --sidebar-background: 222 47% 5%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 228 91% 68%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 230 65% 60%;
+    --sidebar-accent: 217 33% 17%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 217 33% 17%;
+    --sidebar-ring: 228 91% 68%;
   }
 }
 
@@ -79,6 +96,7 @@
   }
   body {
     @apply bg-background text-foreground antialiased;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   }
 }
 
