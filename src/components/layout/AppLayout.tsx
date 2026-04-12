@@ -1,11 +1,12 @@
 import { ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Wallet, ArrowLeftRight, BarChart3, Settings, Repeat, BookOpen, Plus, CalendarDays, Target } from 'lucide-react';
+import { LayoutDashboard, Wallet, ArrowLeftRight, BarChart3, Settings, Repeat, BookOpen, Plus, CalendarDays, Target, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { useState } from 'react';
 import { TransactionForm } from '@/components/transactions/TransactionForm';
+import { useAuth } from '@/hooks/useAuth';
 
 const NAV_ITEMS = [
   { path: '/', label: 'Home', icon: LayoutDashboard },
