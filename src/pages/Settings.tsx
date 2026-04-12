@@ -21,7 +21,7 @@ export default function Settings() {
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-bold text-foreground">Settings</h1>
-      <Tabs defaultValue="categories">
+      <Tabs defaultValue="wise">
         <TabsList className="w-full">
           <TabsTrigger value="wise" className="flex-1">Wise</TabsTrigger>
           <TabsTrigger value="categories" className="flex-1">Categories</TabsTrigger>
