@@ -42,8 +42,10 @@ Deno.serve(async (req) => {
 
     if (action === "sync-transactions") {
       const { profileId, balanceId, accountId, currency } = body;
+      const diagnostics: string[] = [];
 
       // 1. Get official balance from Wise API
+      diagnostics.push(`Fetching balances for profile ${profileId}`);
       const balances = await wiseGet(
         `/v4/profiles/${profileId}/balances?types=STANDARD`,
         WISE_API_TOKEN
@@ -52,6 +54,7 @@ Deno.serve(async (req) => {
         (b: any) => b.id === balanceId || b.currency === currency
       );
       const officialBalance = matchedBalance?.amount?.value ?? null;
+      diagnostics.push(`Official balance for ${currency}: ${officialBalance}`);
 
       // Store official balance on the account
       if (officialBalance !== null) {
@@ -64,20 +67,28 @@ Deno.serve(async (req) => {
           .eq("id", accountId);
       }
 
-      // 2. Determine sync window — go back 2 years to catch full history
+      // 2. Determine sync window — go back 2 years
       const end = new Date();
       const start = new Date();
       start.setFullYear(start.getFullYear() - 2);
 
       // 3. Fetch ALL transactions with pagination via statement API
-      const allTransactions = await fetchAllStatementTransactions(
-        profileId,
-        balanceId,
-        currency,
-        start.toISOString(),
-        end.toISOString(),
-        WISE_API_TOKEN
+      const { transactions: allTransactions, errors: fetchErrors } =
+        await fetchAllStatementTransactions(
+          profileId,
+          balanceId,
+          currency,
+          start.toISOString(),
+          end.toISOString(),
+          WISE_API_TOKEN
+        );
+
+      diagnostics.push(
+        `Fetched ${allTransactions.length} transactions across time windows`
       );
+      if (fetchErrors.length > 0) {
+        diagnostics.push(`Fetch errors: ${fetchErrors.join("; ")}`);
+      }
 
       // 4. Get existing external_ids to deduplicate
       const { data: existingTxs } = await supabase
@@ -104,7 +115,6 @@ Deno.serve(async (req) => {
           skipped++;
           continue;
         }
-        // Mark as seen to avoid within-batch dupes
         existingIds.add(externalId);
 
         const amount = tx.amount?.value ?? 0;
@@ -161,6 +171,7 @@ Deno.serve(async (req) => {
       }
 
       // Insert in batches of 200
+      const insertErrors: string[] = [];
       for (let i = 0; i < batch.length; i += 200) {
         const chunk = batch.slice(i, i + 200);
         const { error: insertErr, data: inserted } = await supabase
@@ -170,8 +181,13 @@ Deno.serve(async (req) => {
         if (!insertErr && inserted) {
           imported += inserted.length;
         } else if (insertErr) {
+          insertErrors.push(insertErr.message);
           console.error("Batch insert error:", insertErr.message);
         }
+      }
+
+      if (insertErrors.length > 0) {
+        diagnostics.push(`Insert errors: ${insertErrors.join("; ")}`);
       }
 
       // 7. Compute sum of imported transactions for reconciliation
@@ -186,7 +202,7 @@ Deno.serve(async (req) => {
       );
 
       // 8. Get date range
-      const { data: dateRange } = await supabase
+      const { data: dateRangeStart } = await supabase
         .from("transactions")
         .select("date")
         .eq("account_id", accountId)
@@ -202,11 +218,20 @@ Deno.serve(async (req) => {
 
       const txCount = txSums?.length || 0;
 
+      // Determine sync status
+      const hasData = txCount > 0 || officialBalance !== null;
+      const hasErrors = fetchErrors.length > 0 || insertErrors.length > 0;
+      const status = !hasData && hasErrors
+        ? "failed"
+        : hasErrors
+        ? "partial"
+        : "success";
+
       // 9. Log sync
       await supabase.from("wise_sync_log").insert({
         profile_id: String(profileId),
         account_id: accountId,
-        status: "success",
+        status,
         transactions_imported: imported,
         last_transaction_date: end.toISOString().split("T")[0],
       });
@@ -219,12 +244,15 @@ Deno.serve(async (req) => {
         sum_imported: sumImported,
         tx_count: txCount,
         date_range: {
-          start: dateRange?.[0]?.date || null,
+          start: dateRangeStart?.[0]?.date || null,
           end: dateRangeEnd?.[0]?.date || null,
         },
-        reconciled: officialBalance !== null
-          ? Math.abs(officialBalance - sumImported) < 0.01
-          : null,
+        reconciled:
+          officialBalance !== null
+            ? Math.abs(officialBalance - sumImported) < 0.01
+            : null,
+        status,
+        diagnostics,
       });
     }
 
@@ -238,8 +266,8 @@ Deno.serve(async (req) => {
 
 /**
  * Fetch all statement transactions with date-window pagination.
- * The Wise statement API can return at most ~certain rows per call,
- * so we split into 3-month windows to ensure full coverage.
+ * Uses 3-month windows to ensure full coverage.
+ * IMPORTANT: endpoint is /statement.json (not /statement/json)
  */
 async function fetchAllStatementTransactions(
   profileId: number,
@@ -248,9 +276,10 @@ async function fetchAllStatementTransactions(
   intervalStart: string,
   intervalEnd: string,
   token: string
-): Promise<any[]> {
+): Promise<{ transactions: any[]; errors: string[] }> {
   const allTx: any[] = [];
   const seenIds = new Set<string>();
+  const errors: string[] = [];
 
   // Split into 3-month windows
   const start = new Date(intervalStart);
@@ -268,16 +297,21 @@ async function fetchAllStatementTransactions(
 
   for (const w of windows) {
     try {
-      const statement = await wiseGet(
-        `/v1/profiles/${profileId}/balance-statements/${balanceId}/statement/json` +
-          `?currency=${currency}` +
-          `&intervalStart=${w.s.toISOString()}` +
-          `&intervalEnd=${w.e.toISOString()}` +
-          `&type=COMPACT`,
-        token
-      );
+      // Correct endpoint: /statement.json (not /statement/json)
+      const url =
+        `/v1/profiles/${profileId}/balance-statements/${balanceId}/statement.json` +
+        `?currency=${currency}` +
+        `&intervalStart=${w.s.toISOString()}` +
+        `&intervalEnd=${w.e.toISOString()}` +
+        `&type=COMPACT`;
+
+      console.log(`Fetching: ${url}`);
+      const statement = await wiseGet(url, token);
 
       const transactions = statement.transactions || [];
+      console.log(
+        `Window ${w.s.toISOString().split("T")[0]} → ${w.e.toISOString().split("T")[0]}: ${transactions.length} txns`
+      );
       for (const tx of transactions) {
         const id = buildExternalId(tx);
         if (!seenIds.has(id)) {
@@ -286,19 +320,16 @@ async function fetchAllStatementTransactions(
         }
       }
     } catch (err) {
-      console.error(
-        `Error fetching window ${w.s.toISOString()} - ${w.e.toISOString()}:`,
-        err instanceof Error ? err.message : err
-      );
-      // Continue with next window instead of failing entirely
+      const msg = `Window ${w.s.toISOString().split("T")[0]}→${w.e.toISOString().split("T")[0]}: ${err instanceof Error ? err.message : String(err)}`;
+      console.error(msg);
+      errors.push(msg);
     }
   }
 
-  return allTx;
+  return { transactions: allTx, errors };
 }
 
 function buildExternalId(tx: any): string {
-  // Use referenceNumber first, fall back to type+date+amount for uniqueness
   if (tx.referenceNumber) return `wise_${tx.referenceNumber}`;
   const d = tx.date || "";
   const a = tx.amount?.value ?? 0;
