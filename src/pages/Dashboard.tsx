@@ -63,6 +63,8 @@ export default function Dashboard() {
     byCurrency[a.currency] = (byCurrency[a.currency] || 0) + a.computed_balance;
   });
 
+  if (isLoading) return <div className="flex items-center justify-center h-64 text-muted-foreground">Loading...</div>;
+
   return (
     <div className="space-y-5">
       <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
