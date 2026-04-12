@@ -11,8 +11,11 @@ import { useAccountGroups, useCreateAccountGroup, useUpdateAccountGroup, useDele
 import { ACCOUNT_TYPE_LABELS, CURRENCIES, formatCurrency, formatUSD } from '@/lib/constants';
 import { getBrandLogo } from '@/lib/brandLogos';
 import { getAccountStyle } from '@/lib/accountIcons';
-import { Plus, ChevronDown, FolderPlus, Pencil, Trash2 } from 'lucide-react';
+import { Plus, ChevronDown, FolderPlus, Pencil, Trash2, Wifi, FileUp, PenLine } from 'lucide-react';
 import { toast } from 'sonner';
+import { DemoDataBanner } from '@/components/DemoDataBanner';
+import { useDemoData } from '@/hooks/useDemoData';
+import { Badge } from '@/components/ui/badge';
 
 function AccountLogo({ name, type }: { name: string; type: string }) {
   const brand = getBrandLogo(name);

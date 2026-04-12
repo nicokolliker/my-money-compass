@@ -14,6 +14,7 @@ import { useBlueDollarRate } from '@/hooks/useBlueDollar';
 import { Badge } from '@/components/ui/badge';
 import { isBefore } from 'date-fns';
 import { DemoDataBanner } from '@/components/DemoDataBanner';
+import { useDemoData } from '@/hooks/useDemoData';
 
 export default function Dashboard() {
   const { data: accountBalances, isLoading } = useAccountBalances();
@@ -21,15 +22,7 @@ export default function Dashboard() {
   const { data: blueDollar } = useBlueDollarRate();
   const { data: recurringItems } = useRecurringExpenses();
 
-  const { data: profile, refetch: refetchProfile } = useQuery({
-    queryKey: ['profile-demo-flag'],
-    queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return null;
-      const { data } = await supabase.from('profiles').select('has_demo_data').eq('user_id', user.id).single();
-      return data;
-    },
-  });
+  const { hasDemoData, onCleared: onDemoCleared } = useDemoData();
 
   const { data: snapshots } = useQuery({
     queryKey: ['net-worth-snapshots'],
@@ -116,9 +109,7 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-5">
-      {profile?.has_demo_data && (
-        <DemoDataBanner onCleared={() => refetchProfile()} />
-      )}
+      {hasDemoData && <DemoDataBanner onCleared={onDemoCleared} />}
       <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
 
       {/* Net Worth */}

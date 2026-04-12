@@ -16,6 +16,8 @@ import { getBrandLogo, getInitialsColor } from '@/lib/brandLogos';
 import { Plus, Trash2, CheckCircle2, AlertCircle, Clock, CalendarDays, Repeat, Building, FileText, CreditCard, TrendingUp, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, isBefore, subDays, addMonths, addYears, addWeeks } from 'date-fns';
+import { DemoDataBanner } from '@/components/DemoDataBanner';
+import { useDemoData } from '@/hooks/useDemoData';
 
 const TYPE_LABELS: Record<string, { label: string; icon: typeof Repeat }> = {
   subscription: { label: 'Subscriptions', icon: Repeat },
