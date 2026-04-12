@@ -22,8 +22,6 @@ export default function Dashboard() {
     },
   });
 
-  if (isLoading) return <div className="flex items-center justify-center h-64 text-muted-foreground">Loading...</div>;
-
   const assets = accountBalances?.filter(a => ASSET_TYPES.includes(a.type)) || [];
   const liabilities = accountBalances?.filter(a => LIABILITY_TYPES.includes(a.type)) || [];
 
