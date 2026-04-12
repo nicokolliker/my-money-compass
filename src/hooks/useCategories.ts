@@ -5,6 +5,12 @@ import type { Tables, TablesInsert } from '@/integrations/supabase/types';
 export type Category = Tables<'categories'>;
 export type Subcategory = Tables<'subcategories'>;
 
+async function getUserId() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+  return user.id;
+}
+
 export function useCategories() {
   return useQuery({
     queryKey: ['categories'],
@@ -33,7 +39,8 @@ export function useCreateCategory() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (cat: TablesInsert<'categories'>) => {
-      const { data, error } = await supabase.from('categories').insert(cat).select().single();
+      const user_id = await getUserId();
+      const { data, error } = await supabase.from('categories').insert({ ...cat, user_id }).select().single();
       if (error) throw error;
       return data;
     },

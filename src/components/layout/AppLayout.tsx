@@ -1,11 +1,12 @@
 import { ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Wallet, ArrowLeftRight, BarChart3, Settings, Repeat, BookOpen, Plus, CalendarDays, Target } from 'lucide-react';
+import { LayoutDashboard, Wallet, ArrowLeftRight, BarChart3, Settings, Repeat, BookOpen, Plus, CalendarDays, Target, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { useState } from 'react';
 import { TransactionForm } from '@/components/transactions/TransactionForm';
+import { useAuth } from '@/hooks/useAuth';
 
 const NAV_ITEMS = [
   { path: '/', label: 'Home', icon: LayoutDashboard },
@@ -34,6 +35,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [showQuickAdd, setShowQuickAdd] = useState(false);
+  const { signOut, user } = useAuth();
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -59,9 +61,12 @@ export function AppLayout({ children }: { children: ReactNode }) {
             </button>
           ))}
         </nav>
-        <div className="p-4 border-t">
+        <div className="p-4 border-t space-y-2">
           <Button className="w-full rounded-xl h-11 shadow-soft" onClick={() => setShowQuickAdd(true)}>
             <Plus className="h-4 w-4 mr-2" /> Quick Add
+          </Button>
+          <Button variant="ghost" className="w-full rounded-xl h-9 text-muted-foreground" onClick={() => signOut()}>
+            <LogOut className="h-4 w-4 mr-2" /> Sign Out
           </Button>
         </div>
       </aside>

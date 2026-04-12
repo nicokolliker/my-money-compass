@@ -41,11 +41,18 @@ export function useAccountBalances() {
   });
 }
 
+async function getUserId() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+  return user.id;
+}
+
 export function useCreateAccount() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (account: TablesInsert<'accounts'>) => {
-      const { data, error } = await supabase.from('accounts').insert(account).select().single();
+      const user_id = await getUserId();
+      const { data, error } = await supabase.from('accounts').insert({ ...account, user_id }).select().single();
       if (error) throw error;
       return data;
     },

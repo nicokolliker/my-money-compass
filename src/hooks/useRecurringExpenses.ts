@@ -4,6 +4,12 @@ import type { Tables, TablesInsert } from '@/integrations/supabase/types';
 
 export type RecurringExpense = Tables<'recurring_expenses'>;
 
+async function getUserId() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+  return user.id;
+}
+
 export function useRecurringExpenses() {
   return useQuery({
     queryKey: ['recurring-expenses'],
@@ -22,7 +28,8 @@ export function useCreateRecurringExpense() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (item: TablesInsert<'recurring_expenses'>) => {
-      const { data, error } = await supabase.from('recurring_expenses').insert(item).select().single();
+      const user_id = await getUserId();
+      const { data, error } = await supabase.from('recurring_expenses').insert({ ...item, user_id }).select().single();
       if (error) throw error;
       return data;
     },

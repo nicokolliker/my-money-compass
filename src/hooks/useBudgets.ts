@@ -4,6 +4,12 @@ import type { Tables, TablesInsert } from '@/integrations/supabase/types';
 
 export type Budget = Tables<'budgets'>;
 
+async function getUserId() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+  return user.id;
+}
+
 export function useBudgets(month?: string) {
   return useQuery({
     queryKey: ['budgets', month],
@@ -21,7 +27,8 @@ export function useUpsertBudget() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (item: TablesInsert<'budgets'>) => {
-      const { data, error } = await supabase.from('budgets').upsert(item, { onConflict: 'category_id,month' }).select().single();
+      const user_id = await getUserId();
+      const { data, error } = await supabase.from('budgets').upsert({ ...item, user_id }, { onConflict: 'category_id,month' }).select().single();
       if (error) throw error;
       return data;
     },
