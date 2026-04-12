@@ -37,6 +37,7 @@ function AccountLogo({ name, type }: { name: string; type: string }) {
 }
 
 export default function Accounts() {
+  const navigate = useNavigate();
   const { data: accounts, isLoading } = useAccountBalances();
   const { data: groups } = useAccountGroups();
   const createAccount = useCreateAccount();
