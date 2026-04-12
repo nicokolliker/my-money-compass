@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Wallet, ArrowLeftRight, BarChart3, Settings, Repeat, BookOpen, Plus, CalendarDays, Target, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -7,6 +7,9 @@ import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { useState } from 'react';
 import { TransactionForm } from '@/components/transactions/TransactionForm';
 import { useAuth } from '@/hooks/useAuth';
+import { useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { DebugPanel } from '@/components/DebugPanel';
 
 const NAV_ITEMS = [
   { path: '/', label: 'Home', icon: LayoutDashboard },
