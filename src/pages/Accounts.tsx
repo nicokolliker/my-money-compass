@@ -50,6 +50,7 @@ export default function Accounts() {
   const [showGroupForm, setShowGroupForm] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
   const [editGroupId, setEditGroupId] = useState<string | null>(null);
+  const [showAddChoice, setShowAddChoice] = useState(false);
 
   const totalNetWorth = useMemo(() => {
     if (!accounts) return 0;
