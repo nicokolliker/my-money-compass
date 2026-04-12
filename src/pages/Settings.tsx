@@ -7,11 +7,12 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useCategories, useCreateCategory, useDeleteCategory } from '@/hooks/useCategories';
 import { useFxRates, useCreateFxRate, useDeleteFxRate } from '@/hooks/useFxRates';
+import { useBlueDollarRate, useRefreshBlueDollar } from '@/hooks/useBlueDollar';
 import { useAccounts } from '@/hooks/useAccounts';
 import { useCreateTransaction } from '@/hooks/useTransactions';
 import { useRules } from '@/hooks/useRules';
 import { CURRENCIES } from '@/lib/constants';
-import { Plus, Trash2, Upload, FileSpreadsheet } from 'lucide-react';
+import { Plus, Trash2, Upload, FileSpreadsheet, RefreshCw, DollarSign } from 'lucide-react';
 import { toast } from 'sonner';
 import WiseTab from '@/components/settings/WiseTab';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -82,6 +83,8 @@ function FxRatesTab() {
   const { data: rates } = useFxRates();
   const createRate = useCreateFxRate();
   const deleteRate = useDeleteFxRate();
+  const { data: blueDollar, isLoading: blueLoading } = useBlueDollarRate();
+  const refreshBlue = useRefreshBlueDollar();
   const [form, setForm] = useState({ from_currency: 'ARS', to_currency: 'USD', rate: '', date: new Date().toISOString().split('T')[0] });
 
   const handleAdd = async () => {
@@ -95,6 +98,51 @@ function FxRatesTab() {
 
   return (
     <div className="space-y-4 mt-4">
+      {/* Blue Dollar Card */}
+      <Card className="border-primary/20">
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <DollarSign className="h-4 w-4 text-primary" />
+              ARS/USD (Blue)
+            </CardTitle>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => refreshBlue.mutate()}
+              disabled={refreshBlue.isPending}
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${refreshBlue.isPending ? 'animate-spin' : ''}`} />
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {blueLoading ? (
+            <p className="text-sm text-muted-foreground">Loading...</p>
+          ) : blueDollar ? (
+            <div className="space-y-1">
+              <p className="text-2xl font-bold text-foreground">
+                1 USD = {blueDollar.blue_avg ? Math.round(blueDollar.blue_avg).toLocaleString() : Math.round(1 / blueDollar.rate).toLocaleString()} ARS
+              </p>
+              {blueDollar.value_buy && blueDollar.value_sell && (
+                <p className="text-xs text-muted-foreground">
+                  Buy: {blueDollar.value_buy.toLocaleString()} · Sell: {blueDollar.value_sell.toLocaleString()}
+                </p>
+              )}
+              <p className="text-[10px] text-muted-foreground">
+                Updated: {new Date(blueDollar.updated_at).toLocaleString()}
+                {blueDollar.cached && ' · cached'}
+                {blueDollar.fallback && ' · fallback'}
+              </p>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">Could not fetch rate</p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Manual Rate Entry */}
       <Card>
         <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Add Rate</CardTitle></CardHeader>
         <CardContent className="space-y-3">
