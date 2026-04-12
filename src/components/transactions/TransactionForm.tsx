@@ -81,12 +81,13 @@ export function TransactionForm({ onSuccess, editData }: Props) {
       } else {
         const signedAmount = type === 'expense' ? -Math.abs(numAmount) : Math.abs(numAmount);
         const rate = parseFloat(fxRate);
-        const selectedMerchant = merchants?.find(m => m.id === merchantId);
+        const resolvedMerchantId = merchantId && merchantId !== 'none' ? merchantId : null;
+        const selectedMerchant = resolvedMerchantId ? merchants?.find(m => m.id === resolvedMerchantId) : null;
         await createTx.mutateAsync({
           date,
           description,
           merchant: selectedMerchant?.display_name || selectedMerchant?.name || null,
-          merchant_id: merchantId || null,
+          merchant_id: resolvedMerchantId,
           amount: signedAmount,
           currency: selectedAccount!.currency,
           fx_rate: rate,
