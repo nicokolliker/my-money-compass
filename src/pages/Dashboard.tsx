@@ -53,11 +53,12 @@ export default function Dashboard() {
 
   // Top spending categories this month
   const topCategories = useMemo(() => {
-    const map: Record<string, { name: string; total: number }> = {};
+    const map: Record<string, { name: string; total: number; icon: string | null; color: string | null }> = {};
     monthExpenses.forEach(t => {
-      const cat = (t as any).categories?.name || 'Uncategorized';
-      if (!map[cat]) map[cat] = { name: cat, total: 0 };
-      map[cat].total += Math.abs(Number(t.amount_usd));
+      const cat = (t as any).categories;
+      const catName = cat?.name || 'Uncategorized';
+      if (!map[catName]) map[catName] = { name: catName, total: 0, icon: cat?.icon || null, color: cat?.color || null };
+      map[catName].total += Math.abs(Number(t.amount_usd));
     });
     return Object.values(map).sort((a, b) => b.total - a.total).slice(0, 5);
   }, [monthExpenses]);
