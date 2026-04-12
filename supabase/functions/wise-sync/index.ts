@@ -67,28 +67,40 @@ Deno.serve(async (req) => {
           .eq("id", accountId);
       }
 
-      // 2. Determine sync window — go back 2 years
-      const end = new Date();
-      const start = new Date();
-      start.setFullYear(start.getFullYear() - 2);
+      // 2. Try statement API first, fall back to activities API
+      let allTransactions: any[] = [];
+      let fetchErrors: string[] = [];
 
-      // 3. Fetch ALL transactions with pagination via statement API
-      const { transactions: allTransactions, errors: fetchErrors } =
-        await fetchAllStatementTransactions(
-          profileId,
-          balanceId,
-          currency,
-          start.toISOString(),
-          end.toISOString(),
-          WISE_API_TOKEN
+      // Try balance statement first
+      try {
+        const stmtResult = await fetchStatementTransactions(
+          profileId, balanceId, currency, WISE_API_TOKEN
         );
-
-      diagnostics.push(
-        `Fetched ${allTransactions.length} transactions across time windows`
-      );
-      if (fetchErrors.length > 0) {
-        diagnostics.push(`Fetch errors: ${fetchErrors.join("; ")}`);
+        allTransactions = stmtResult.transactions;
+        fetchErrors = stmtResult.errors;
+        diagnostics.push(`Statement API: ${allTransactions.length} transactions, ${fetchErrors.length} errors`);
+      } catch (e) {
+        diagnostics.push(`Statement API failed: ${e instanceof Error ? e.message : String(e)}`);
       }
+
+      // If statement API failed (403 = missing scope), use activities API
+      if (allTransactions.length === 0 && fetchErrors.some(e => e.includes("403"))) {
+        diagnostics.push("Falling back to Activities API...");
+        try {
+          const actResult = await fetchActivitiesTransactions(
+            profileId, currency, WISE_API_TOKEN
+          );
+          allTransactions = actResult.transactions;
+          fetchErrors = actResult.errors;
+          diagnostics.push(`Activities API: ${allTransactions.length} transactions`);
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          diagnostics.push(`Activities API failed: ${msg}`);
+          fetchErrors.push(msg);
+        }
+      }
+
+      diagnostics.push(`Total fetched: ${allTransactions.length}`);
 
       // 4. Get existing external_ids to deduplicate
       const { data: existingTxs } = await supabase
@@ -104,7 +116,7 @@ Deno.serve(async (req) => {
       // 5. Get rules for auto-categorization
       const rules = await getRules(supabase);
 
-      // 6. Import new transactions in batches
+      // 6. Import new transactions
       let imported = 0;
       let skipped = 0;
       const batch: any[] = [];
@@ -120,8 +132,7 @@ Deno.serve(async (req) => {
         const amount = tx.amount?.value ?? 0;
         const txCurrency = tx.amount?.currency ?? currency;
         const fxRate = tx.exchangeDetails?.rate ?? 1;
-        const amountUsd =
-          txCurrency === "USD" ? amount : amount * fxRate;
+        const amountUsd = txCurrency === "USD" ? amount : amount * fxRate;
 
         const description =
           tx.details?.description ||
@@ -185,12 +196,11 @@ Deno.serve(async (req) => {
           console.error("Batch insert error:", insertErr.message);
         }
       }
-
       if (insertErrors.length > 0) {
         diagnostics.push(`Insert errors: ${insertErrors.join("; ")}`);
       }
 
-      // 7. Compute sum of imported transactions for reconciliation
+      // 7. Compute sum & date range
       const { data: txSums } = await supabase
         .from("transactions")
         .select("amount")
@@ -201,7 +211,6 @@ Deno.serve(async (req) => {
         0
       );
 
-      // 8. Get date range
       const { data: dateRangeStart } = await supabase
         .from("transactions")
         .select("date")
@@ -218,22 +227,16 @@ Deno.serve(async (req) => {
 
       const txCount = txSums?.length || 0;
 
-      // Determine sync status
       const hasData = txCount > 0 || officialBalance !== null;
       const hasErrors = fetchErrors.length > 0 || insertErrors.length > 0;
-      const status = !hasData && hasErrors
-        ? "failed"
-        : hasErrors
-        ? "partial"
-        : "success";
+      const status = !hasData && hasErrors ? "failed" : hasErrors ? "partial" : "success";
 
-      // 9. Log sync
       await supabase.from("wise_sync_log").insert({
         profile_id: String(profileId),
         account_id: accountId,
         status,
         transactions_imported: imported,
-        last_transaction_date: end.toISOString().split("T")[0],
+        last_transaction_date: new Date().toISOString().split("T")[0],
       });
 
       return json({
@@ -265,27 +268,23 @@ Deno.serve(async (req) => {
 });
 
 /**
- * Fetch all statement transactions with date-window pagination.
- * Uses 3-month windows to ensure full coverage.
- * IMPORTANT: endpoint is /statement.json (not /statement/json)
+ * Try statement API with 3-month windows
  */
-async function fetchAllStatementTransactions(
+async function fetchStatementTransactions(
   profileId: number,
   balanceId: number,
   currency: string,
-  intervalStart: string,
-  intervalEnd: string,
   token: string
 ): Promise<{ transactions: any[]; errors: string[] }> {
   const allTx: any[] = [];
   const seenIds = new Set<string>();
   const errors: string[] = [];
 
-  // Split into 3-month windows
-  const start = new Date(intervalStart);
-  const end = new Date(intervalEnd);
-  const windows: { s: Date; e: Date }[] = [];
+  const end = new Date();
+  const start = new Date();
+  start.setFullYear(start.getFullYear() - 2);
 
+  const windows: { s: Date; e: Date }[] = [];
   let cursor = new Date(start);
   while (cursor < end) {
     const windowEnd = new Date(cursor);
@@ -297,7 +296,6 @@ async function fetchAllStatementTransactions(
 
   for (const w of windows) {
     try {
-      // Correct endpoint: /statement.json (not /statement/json)
       const url =
         `/v1/profiles/${profileId}/balance-statements/${balanceId}/statement.json` +
         `?currency=${currency}` +
@@ -305,13 +303,8 @@ async function fetchAllStatementTransactions(
         `&intervalEnd=${w.e.toISOString()}` +
         `&type=COMPACT`;
 
-      console.log(`Fetching: ${url}`);
       const statement = await wiseGet(url, token);
-
       const transactions = statement.transactions || [];
-      console.log(
-        `Window ${w.s.toISOString().split("T")[0]} → ${w.e.toISOString().split("T")[0]}: ${transactions.length} txns`
-      );
       for (const tx of transactions) {
         const id = buildExternalId(tx);
         if (!seenIds.has(id)) {
@@ -321,12 +314,108 @@ async function fetchAllStatementTransactions(
       }
     } catch (err) {
       const msg = `Window ${w.s.toISOString().split("T")[0]}→${w.e.toISOString().split("T")[0]}: ${err instanceof Error ? err.message : String(err)}`;
-      console.error(msg);
       errors.push(msg);
     }
   }
 
   return { transactions: allTx, errors };
+}
+
+/**
+ * Fetch transactions via Activities API with cursor pagination.
+ * Filters by currency via the balance's activities.
+ */
+async function fetchActivitiesTransactions(
+  profileId: number,
+  currency: string,
+  token: string
+): Promise<{ transactions: any[]; errors: string[] }> {
+  const allTx: any[] = [];
+  const seenIds = new Set<string>();
+  const errors: string[] = [];
+
+  const since = new Date();
+  since.setFullYear(since.getFullYear() - 2);
+
+  let nextCursor: string | null = null;
+  let pageCount = 0;
+  const maxPages = 50; // safety limit
+
+  do {
+    try {
+      let url = `/v1/profiles/${profileId}/activities?size=100&since=${since.toISOString()}`;
+      if (nextCursor) {
+        url += `&nextCursor=${encodeURIComponent(nextCursor)}`;
+      }
+
+      const response = await wiseGet(url, token);
+      const activities = response.activities || [];
+      pageCount++;
+      console.log(`Activities page ${pageCount}: ${activities.length} items`);
+
+      for (const activity of activities) {
+        // Filter to monetary activities for our currency
+        if (!isMonetaryActivity(activity)) continue;
+
+        const txCurrency = activity.primaryAmount?.currency ||
+          activity.amount?.currency;
+        if (txCurrency && txCurrency !== currency) continue;
+
+        // Convert activity to our transaction format
+        const tx = activityToTransaction(activity);
+        if (!tx) continue;
+
+        const id = buildExternalId(tx);
+        if (!seenIds.has(id)) {
+          seenIds.add(id);
+          allTx.push(tx);
+        }
+      }
+
+      nextCursor = response.cursor || null;
+    } catch (err) {
+      const msg = `Activities page ${pageCount + 1}: ${err instanceof Error ? err.message : String(err)}`;
+      errors.push(msg);
+      break;
+    }
+  } while (nextCursor && pageCount < maxPages);
+
+  return { transactions: allTx, errors };
+}
+
+function isMonetaryActivity(activity: any): boolean {
+  const monetaryTypes = [
+    "CARD_TRANSACTION", "BALANCE_TRANSACTION", "TRANSFER",
+    "BALANCE_DEPOSIT", "AUTO_CONVERSION", "BALANCE_CASHBACK",
+    "BALANCE_INTEREST", "BALANCE_ASSET_FEE", "BALANCE_HOLD_FEE",
+    "ACQUIRING_PAYMENT",
+  ];
+  return monetaryTypes.includes(activity.type);
+}
+
+function activityToTransaction(activity: any): any | null {
+  const amount = activity.primaryAmount || activity.amount;
+  if (!amount) return null;
+
+  const isCredit = amount.value > 0;
+  return {
+    referenceNumber: activity.id,
+    date: activity.createdOn || activity.updatedOn,
+    amount: {
+      value: amount.value,
+      currency: amount.currency,
+    },
+    type: isCredit ? "CREDIT" : "DEBIT",
+    details: {
+      description: activity.title?.message || activity.description || activity.type,
+      type: activity.type,
+      merchant: activity.merchant || null,
+      senderName: activity.senderName || null,
+      recipientName: activity.recipient?.name || null,
+      paymentReference: activity.paymentReference || null,
+    },
+    exchangeDetails: activity.exchangeDetails || null,
+  };
 }
 
 function buildExternalId(tx: any): string {
