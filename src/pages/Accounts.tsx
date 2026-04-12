@@ -42,6 +42,7 @@ export default function Accounts() {
   const createGroup = useCreateAccountGroup();
   const updateGroup = useUpdateAccountGroup();
   const deleteGroup = useDeleteAccountGroup();
+  const { hasDemoData, onCleared: onDemoCleared } = useDemoData();
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: '', type: 'bank' as string, institution: '', currency: 'USD', opening_balance: '0', notes: '', group_id: '' });

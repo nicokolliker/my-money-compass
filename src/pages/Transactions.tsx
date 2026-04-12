@@ -97,6 +97,7 @@ export default function Transactions() {
   const { data: recurringItems } = useRecurringExpenses();
   const deleteTx = useDeleteTransaction();
   const updateTx = useUpdateTransaction();
+  const { hasDemoData, onCleared: onDemoCleared } = useDemoData();
 
   // Match transactions to recurring items
   const recurringMatchMap = useMemo(() => {

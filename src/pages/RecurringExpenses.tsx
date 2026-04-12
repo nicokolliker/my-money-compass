@@ -62,6 +62,7 @@ export default function RecurringExpenses() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'monthly' | 'yearly'>('monthly');
   const [activeTab, setActiveTab] = useState('all');
+  const { hasDemoData, onCleared: onDemoCleared } = useDemoData();
 
   const emptyForm = {
     name: '', type: 'subscription', category_id: '', account_id: '', amount: '',
