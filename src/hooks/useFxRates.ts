@@ -4,6 +4,12 @@ import type { Tables, TablesInsert } from '@/integrations/supabase/types';
 
 export type FxRate = Tables<'fx_rates'>;
 
+async function getUserId() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+  return user.id;
+}
+
 export function useFxRates() {
   return useQuery({
     queryKey: ['fx-rates'],
@@ -26,7 +32,8 @@ export function useCreateFxRate() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (rate: TablesInsert<'fx_rates'>) => {
-      const { data, error } = await supabase.from('fx_rates').insert(rate).select().single();
+      const user_id = await getUserId();
+      const { data, error } = await supabase.from('fx_rates').insert({ ...rate, user_id }).select().single();
       if (error) throw error;
       return data;
     },

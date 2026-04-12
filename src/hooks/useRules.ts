@@ -4,6 +4,12 @@ import type { Tables, TablesInsert } from '@/integrations/supabase/types';
 
 export type Rule = Tables<'rules'>;
 
+async function getUserId() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+  return user.id;
+}
+
 export function useRules() {
   return useQuery({
     queryKey: ['rules'],
@@ -19,7 +25,8 @@ export function useCreateRule() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (rule: TablesInsert<'rules'>) => {
-      const { data, error } = await supabase.from('rules').insert(rule).select().single();
+      const user_id = await getUserId();
+      const { data, error } = await supabase.from('rules').insert({ ...rule, user_id }).select().single();
       if (error) throw error;
       return data;
     },

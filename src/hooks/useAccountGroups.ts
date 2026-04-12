@@ -4,6 +4,12 @@ import type { Tables, TablesInsert } from '@/integrations/supabase/types';
 
 export type AccountGroup = Tables<'account_groups'>;
 
+async function getUserId() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+  return user.id;
+}
+
 export function useAccountGroups() {
   return useQuery({
     queryKey: ['account-groups'],
@@ -19,7 +25,8 @@ export function useCreateAccountGroup() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (group: TablesInsert<'account_groups'>) => {
-      const { data, error } = await supabase.from('account_groups').insert(group).select().single();
+      const user_id = await getUserId();
+      const { data, error } = await supabase.from('account_groups').insert({ ...group, user_id }).select().single();
       if (error) throw error;
       return data;
     },

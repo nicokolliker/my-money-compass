@@ -4,6 +4,12 @@ import type { Tables, TablesInsert } from '@/integrations/supabase/types';
 
 export type Transaction = Tables<'transactions'>;
 
+async function getUserId() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+  return user.id;
+}
+
 export function useTransactions(filters?: { accountId?: string; categoryId?: string; type?: string; search?: string; dateFrom?: string; dateTo?: string }) {
   return useQuery({
     queryKey: ['transactions', filters],
@@ -26,7 +32,8 @@ export function useCreateTransaction() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (tx: TablesInsert<'transactions'>) => {
-      const { data, error } = await supabase.from('transactions').insert(tx).select().single();
+      const user_id = await getUserId();
+      const { data, error } = await supabase.from('transactions').insert({ ...tx, user_id }).select().single();
       if (error) throw error;
       return data;
     },
@@ -38,6 +45,7 @@ export function useCreateTransfer() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (params: { fromAccountId: string; toAccountId: string; amount: number; fromCurrency: string; toCurrency: string; fxRate: number; toAmount: number; date: string; description?: string }) => {
+      const user_id = await getUserId();
       const { data: fromTx, error: e1 } = await supabase.from('transactions').insert({
         date: params.date,
         description: params.description || `Transfer to account`,
@@ -47,6 +55,7 @@ export function useCreateTransfer() {
         amount_usd: params.fromCurrency === 'USD' ? -params.amount : -params.amount * params.fxRate,
         account_id: params.fromAccountId,
         type: 'transfer' as const,
+        user_id,
       }).select().single();
       if (e1) throw e1;
 
@@ -60,6 +69,7 @@ export function useCreateTransfer() {
         account_id: params.toAccountId,
         type: 'transfer' as const,
         linked_transfer_id: fromTx.id,
+        user_id,
       }).select().single();
       if (e2) throw e2;
 
