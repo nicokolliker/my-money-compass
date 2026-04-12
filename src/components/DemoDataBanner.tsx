@@ -17,18 +17,19 @@ export function DemoDataBanner({ onCleared }: Props) {
   const clearDemoData = async () => {
     setClearing(true);
     try {
+      const dummy = '00000000-0000-0000-0000-000000000000';
       // Delete in dependency order
-      await supabase.from('transaction_tags').delete().neq('transaction_id', '00000000-0000-0000-0000-000000000000');
-      await supabase.from('transaction_splits').delete().neq('transaction_id', '00000000-0000-0000-0000-000000000000');
-      await supabase.from('transactions').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      await supabase.from('recurring_expenses').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      await supabase.from('budgets').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      await supabase.from('merchants').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      await supabase.from('accounts').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      await supabase.from('subcategories').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      await supabase.from('categories').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      await supabase.from('transaction_tags').delete().neq('transaction_id', dummy);
+      await supabase.from('transaction_splits').delete().neq('transaction_id', dummy);
+      await supabase.from('transactions').delete().neq('id', dummy);
+      await supabase.from('recurring_expenses').delete().neq('id', dummy);
+      await supabase.from('budgets').delete().neq('id', dummy);
+      await supabase.from('merchants').delete().neq('id', dummy);
+      await supabase.from('accounts').delete().neq('id', dummy);
+      await supabase.from('subcategories').delete().neq('id', dummy);
+      await supabase.from('categories').delete().neq('id', dummy);
+      await supabase.from('account_groups').delete().neq('id', dummy);
 
-      // Mark demo data as cleared
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         await supabase.from('profiles').update({ has_demo_data: false }).eq('user_id', user.id);

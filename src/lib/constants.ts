@@ -30,7 +30,7 @@ export const TRANSACTION_TYPE_LABELS: Record<string, string> = {
 export const LIABILITY_TYPES = ['debt', 'credit_card'];
 export const ASSET_TYPES = ['bank', 'digital_wallet', 'cash', 'receivable', 'investment', 'manual'];
 
-export const CURRENCIES = ['USD', 'ARS', 'EUR', 'GBP', 'BRL'];
+export const CURRENCIES = ['USD', 'ARS', 'EUR', 'GBP', 'BRL', 'MXN'];
 
 export const formatCurrency = (amount: number, currency = 'USD'): string => {
   return new Intl.NumberFormat('en-US', {
