@@ -138,6 +138,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
           <TransactionForm onSuccess={() => setShowQuickAdd(false)} />
         </SheetContent>
       </Sheet>
+      {/* Debug Panel (temporary) */}
+      <DebugPanel />
     </div>
   );
 }
