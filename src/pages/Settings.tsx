@@ -206,6 +206,10 @@ function ImportTab() {
           }
         }
 
+        const user_id_res = await supabase.auth.getUser();
+        const user_id = user_id_res.data.user?.id;
+        if (!user_id) throw new Error('Not authenticated');
+
         await createTx.mutateAsync({
           date,
           description,
@@ -219,6 +223,7 @@ function ImportTab() {
           type: amount < 0 ? 'expense' : 'income',
           is_subscription: isSub,
           raw_imported_description: description,
+          user_id,
         });
         imported++;
       }
