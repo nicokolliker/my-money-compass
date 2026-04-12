@@ -116,6 +116,9 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-5">
+      {profile?.has_demo_data && (
+        <DemoDataBanner onCleared={() => refetchProfile()} />
+      )}
       <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
 
       {/* Net Worth */}
