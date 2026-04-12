@@ -192,7 +192,12 @@ export default function Accounts() {
                       <button key={a.id} onClick={() => openEdit(a)} className="flex items-center gap-3 w-full py-3 text-left hover:bg-accent/50 active:bg-accent rounded-lg px-2 -mx-2 transition-colors">
                         <AccountLogo name={a.name} type={a.type} />
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-foreground truncate">{a.name}</p>
+                          <div className="flex items-center gap-1.5">
+                            <p className="text-sm font-semibold text-foreground truncate">{a.name}</p>
+                            {(a as any).source === 'wise' && <Badge variant="outline" className="text-[9px] h-4 px-1.5 shrink-0"><Wifi className="h-2.5 w-2.5 mr-0.5" />Wise</Badge>}
+                            {(a as any).source === 'csv' && <Badge variant="outline" className="text-[9px] h-4 px-1.5 shrink-0"><FileUp className="h-2.5 w-2.5 mr-0.5" />CSV</Badge>}
+                            {(a as any).source === 'manual' && <Badge variant="outline" className="text-[9px] h-4 px-1.5 shrink-0 text-muted-foreground"><PenLine className="h-2.5 w-2.5 mr-0.5" />Manual</Badge>}
+                          </div>
                           {a.institution && <p className="text-xs text-muted-foreground">{a.institution}</p>}
                         </div>
                         <div className="text-right shrink-0">
