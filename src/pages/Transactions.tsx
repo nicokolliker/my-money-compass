@@ -146,6 +146,7 @@ export default function Transactions() {
 
   return (
     <div className="space-y-5">
+      {hasDemoData && <DemoDataBanner onCleared={onDemoCleared} />}
       <h1 className="text-2xl font-bold text-foreground">Transactions</h1>
 
       {/* Filters */}

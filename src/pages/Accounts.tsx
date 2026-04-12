@@ -132,6 +132,7 @@ export default function Accounts() {
 
   return (
     <div className="space-y-5">
+      {hasDemoData && <DemoDataBanner onCleared={onDemoCleared} />}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-foreground">Accounts</h1>
         <div className="flex gap-2">
