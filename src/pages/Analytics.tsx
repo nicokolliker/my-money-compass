@@ -1,24 +1,21 @@
 import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useAccounts } from '@/hooks/useAccounts';
 import { useCategories } from '@/hooks/useCategories';
 import { formatUSD } from '@/lib/constants';
-import { getCategoryColor, getCategoryHex } from '@/lib/categoryColors';
+import { getCategoryHex } from '@/lib/categoryColors';
 import { getCategoryIcon, getBrandLogo, getInitialsColor } from '@/lib/brandLogos';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { ArrowUp, ArrowDown } from 'lucide-react';
 
 type Period = 'this_month' | 'last_month' | 'last_3' | 'ytd' | 'all';
 
-function getPeriodDates(period: Period): { from: string; to: string; prevFrom: string; prevTo: string } {
+function getPeriodDates(period: Period) {
   const now = new Date();
-  const y = now.getFullYear();
-  const m = now.getMonth();
+  const y = now.getFullYear(), m = now.getMonth();
   const today = now.toISOString().split('T')[0];
-
   switch (period) {
     case 'this_month': {
       const from = `${y}-${String(m + 1).padStart(2, '0')}-01`;
@@ -55,39 +52,22 @@ export default function Analytics() {
   const { data: allTransactions, isLoading } = useTransactions();
   const { data: accounts } = useAccounts();
   const { data: categories } = useCategories();
-
   const [period, setPeriod] = useState<Period>('this_month');
   const [accountFilter, setAccountFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
 
   const dates = useMemo(() => getPeriodDates(period), [period]);
 
-  // Build category lookup for DB icon/color
-  const catMap = useMemo(() => {
-    const m: Record<string, { icon: string | null; color: string | null }> = {};
-    categories?.forEach(c => { m[c.name] = { icon: c.icon, color: c.color }; });
-    return m;
-  }, [categories]);
-
-  const transactions = useMemo(() => {
-    if (!allTransactions) return [];
-    return allTransactions.filter(t => {
-      if (t.date < dates.from || t.date > dates.to) return false;
+  const filterTx = (txs: any[], from: string, to: string) =>
+    txs.filter(t => {
+      if (t.date < from || t.date > to) return false;
       if (accountFilter !== 'all' && t.account_id !== accountFilter) return false;
       if (categoryFilter !== 'all' && t.category_id !== categoryFilter) return false;
       return true;
     });
-  }, [allTransactions, dates, accountFilter, categoryFilter]);
 
-  const prevTransactions = useMemo(() => {
-    if (!allTransactions) return [];
-    return allTransactions.filter(t => {
-      if (t.date < dates.prevFrom || t.date >= dates.prevTo) return false;
-      if (accountFilter !== 'all' && t.account_id !== accountFilter) return false;
-      if (categoryFilter !== 'all' && t.category_id !== categoryFilter) return false;
-      return true;
-    });
-  }, [allTransactions, dates, accountFilter, categoryFilter]);
+  const transactions = useMemo(() => filterTx(allTransactions || [], dates.from, dates.to), [allTransactions, dates, accountFilter, categoryFilter]);
+  const prevTransactions = useMemo(() => filterTx(allTransactions || [], dates.prevFrom, dates.prevTo), [allTransactions, dates, accountFilter, categoryFilter]);
 
   const expenses = useMemo(() => transactions.filter(t => t.type === 'expense'), [transactions]);
   const incomes = useMemo(() => transactions.filter(t => t.type === 'income'), [transactions]);
@@ -107,26 +87,24 @@ export default function Analytics() {
   const totalExpenses = Math.abs(expenses.reduce((s, t) => s + Number(t.amount_usd), 0));
   const prevTotalExpenses = Math.abs(prevExpenses.reduce((s, t) => s + Number(t.amount_usd), 0));
   const momChange = prevTotalExpenses > 0 ? ((totalExpenses - prevTotalExpenses) / prevTotalExpenses * 100) : 0;
+  const incomeTotal = incomes.reduce((s, t) => s + Number(t.amount_usd), 0);
+  const savingsRate = incomeTotal > 0 ? ((incomeTotal - totalExpenses) / incomeTotal * 100) : 0;
+
+  const subExpenses = Math.abs(expenses.filter(t => t.is_subscription).reduce((s, t) => s + Number(t.amount_usd), 0));
+  const fixedPct = totalExpenses > 0 ? (subExpenses / totalExpenses * 100) : 0;
 
   const monthly = useMemo(() => {
     if (!allTransactions) return [];
     const expMap: Record<string, number> = {};
     const incMap: Record<string, number> = {};
-    allTransactions.filter(t => {
-      if (accountFilter !== 'all' && t.account_id !== accountFilter) return false;
-      if (categoryFilter !== 'all' && t.category_id !== categoryFilter) return false;
-      return true;
-    }).forEach(t => {
+    filterTx(allTransactions, '2000-01-01', '2099-12-31').forEach(t => {
       const month = t.date.substring(0, 7);
       if (t.type === 'expense') expMap[month] = (expMap[month] || 0) + Math.abs(Number(t.amount_usd));
       if (t.type === 'income') incMap[month] = (incMap[month] || 0) + Number(t.amount_usd);
     });
     const months = new Set([...Object.keys(expMap), ...Object.keys(incMap)]);
     return Array.from(months).sort().slice(-12).map(month => ({
-      month,
-      expenses: expMap[month] || 0,
-      income: incMap[month] || 0,
-      savings: (incMap[month] || 0) - (expMap[month] || 0),
+      month, expenses: expMap[month] || 0, income: incMap[month] || 0,
     }));
   }, [allTransactions, accountFilter, categoryFilter]);
 
@@ -139,12 +117,7 @@ export default function Analytics() {
     return Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, total]) => ({ name, total }));
   }, [expenses]);
 
-  const incomeTotal = incomes.reduce((s, t) => s + Number(t.amount_usd), 0);
-  const savingsRate = incomeTotal > 0 ? ((incomeTotal - totalExpenses) / incomeTotal * 100) : 0;
   const maxMerchant = topMerchants[0]?.total || 1;
-
-  const subExpenses = Math.abs(expenses.filter(t => t.is_subscription).reduce((s, t) => s + Number(t.amount_usd), 0));
-  const fixedPct = totalExpenses > 0 ? (subExpenses / totalExpenses * 100) : 0;
 
   if (isLoading) return <div className="flex items-center justify-center h-64 text-muted-foreground">Loading...</div>;
 
@@ -178,7 +151,7 @@ export default function Analytics() {
             {categories?.map(c => (
               <SelectItem key={c.id} value={c.id}>
                 <span className="flex items-center gap-1.5">
-                  <span>{getCategoryIcon(c.name, c.icon)}</span>
+                  <span>{c.icon || '📌'}</span>
                   {c.name}
                 </span>
               </SelectItem>
@@ -187,7 +160,7 @@ export default function Analytics() {
         </Select>
       </div>
 
-      {/* Income vs Expenses + Savings */}
+      {/* Summary Cards */}
       <div className="grid grid-cols-3 gap-3">
         <Card className="border-success/20">
           <CardContent className="pt-4 pb-4">
@@ -219,20 +192,16 @@ export default function Analytics() {
       <Card>
         <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Fixed vs Variable</CardTitle></CardHeader>
         <CardContent>
-          <div className="flex items-center gap-3">
-            <div className="flex-1">
-              <div className="flex justify-between text-xs mb-1">
-                <span className="text-muted-foreground">Subscriptions (Fixed)</span>
-                <span className="font-bold">{fixedPct.toFixed(0)}%</span>
-              </div>
-              <div className="w-full h-3 bg-muted rounded-full overflow-hidden">
-                <div className="h-full rounded-full bg-primary transition-all duration-500" style={{ width: `${fixedPct}%` }} />
-              </div>
-              <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
-                <span>{formatUSD(subExpenses)}</span>
-                <span>{formatUSD(totalExpenses - subExpenses)} variable</span>
-              </div>
-            </div>
+          <div className="flex justify-between text-xs mb-1">
+            <span className="text-muted-foreground">Subscriptions (Fixed)</span>
+            <span className="font-bold">{fixedPct.toFixed(0)}%</span>
+          </div>
+          <div className="w-full h-3 bg-muted rounded-full overflow-hidden">
+            <div className="h-full rounded-full bg-primary transition-all duration-500" style={{ width: `${fixedPct}%` }} />
+          </div>
+          <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
+            <span>{formatUSD(subExpenses)}</span>
+            <span>{formatUSD(totalExpenses - subExpenses)} variable</span>
           </div>
         </CardContent>
       </Card>
@@ -259,31 +228,31 @@ export default function Analytics() {
         </CardContent>
       </Card>
 
-      {/* Category Breakdown */}
+      {/* By Category */}
       <Card>
         <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">By Category</CardTitle></CardHeader>
         <CardContent>
-          <div className="h-56">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={byCategory}
-                  dataKey="total"
-                  nameKey="name"
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={50}
-                  outerRadius={85}
-                  paddingAngle={2}
-                  label={({ name, percent }) => `${getCategoryIcon(name, catMap[name]?.icon)} ${(percent * 100).toFixed(0)}%`}
-                  labelLine={false}
-                >
-                  {byCategory.map(c => <Cell key={c.name} fill={getCategoryHex(c.name, c.color)} />)}
-                </Pie>
-                <Tooltip formatter={(v: number) => formatUSD(v)} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
+          {byCategory.length > 0 && (
+            <div className="h-56">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={byCategory}
+                    dataKey="total"
+                    nameKey="name"
+                    cx="50%" cy="50%"
+                    innerRadius={50} outerRadius={85}
+                    paddingAngle={2}
+                    label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`}
+                    labelLine={false}
+                  >
+                    {byCategory.map(c => <Cell key={c.name} fill={getCategoryHex(c.name, c.color)} />)}
+                  </Pie>
+                  <Tooltip formatter={(v: number) => formatUSD(v)} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          )}
           <div className="space-y-2 mt-4">
             {byCategory.map(c => {
               const pct = totalExpenses > 0 ? (c.total / totalExpenses * 100) : 0;
@@ -312,9 +281,7 @@ export default function Analytics() {
             return (
               <div key={m.name} className="flex items-center gap-3">
                 {brand ? (
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm ${brand.bg}`}>
-                    {brand.icon}
-                  </div>
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm ${brand.bg}`}>{brand.icon}</div>
                 ) : (
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${initials.bg} ${initials.text}`}>
                     {m.name[0]?.toUpperCase()}
