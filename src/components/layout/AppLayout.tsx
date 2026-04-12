@@ -35,6 +35,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [showQuickAdd, setShowQuickAdd] = useState(false);
+  const { signOut, user } = useAuth();
 
   return (
     <div className="flex min-h-screen bg-background">
