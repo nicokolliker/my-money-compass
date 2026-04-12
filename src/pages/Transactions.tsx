@@ -32,7 +32,8 @@ function formatDateGroupLabel(dateStr: string): string {
 
 function MerchantAvatar({ tx, cat }: { tx: any; cat: any }) {
   const isTransfer = tx.type === 'transfer';
-  const name = tx.merchant || tx.description || '';
+  const merchantData = (tx as any).merchants;
+  const name = merchantData?.display_name || merchantData?.name || tx.merchant || tx.description || '';
 
   if (isTransfer) {
     return (
@@ -40,6 +41,11 @@ function MerchantAvatar({ tx, cat }: { tx: any; cat: any }) {
         <ArrowLeftRight className="h-4 w-4 text-muted-foreground" />
       </div>
     );
+  }
+
+  // Custom logo from merchant record
+  if (merchantData?.logo_url) {
+    return <img src={merchantData.logo_url} alt={name} className="w-10 h-10 rounded-full object-cover" />;
   }
 
   // Brand logo
@@ -54,7 +60,6 @@ function MerchantAvatar({ tx, cat }: { tx: any; cat: any }) {
 
   // Category icon fallback
   if (cat?.icon) {
-    const catColor = getCategoryColor(cat.name, cat.color);
     return (
       <div
         className="w-10 h-10 rounded-full flex items-center justify-center text-lg"
