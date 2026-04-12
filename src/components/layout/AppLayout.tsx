@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Wallet, ArrowLeftRight, BarChart3, Settings, Repeat, BookOpen, Plus } from 'lucide-react';
+import { LayoutDashboard, Wallet, ArrowLeftRight, BarChart3, Settings, Repeat, BookOpen, Plus, CalendarDays, Target } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
@@ -12,9 +12,22 @@ const NAV_ITEMS = [
   { path: '/accounts', label: 'Accounts', icon: Wallet },
   { path: '/transactions', label: 'Activity', icon: ArrowLeftRight },
   { path: '/analytics', label: 'Analytics', icon: BarChart3 },
-  { path: '/subscriptions', label: 'Subs', icon: Repeat },
+  { path: '/recurring', label: 'Recurring', icon: Repeat },
+  { path: '/calendar', label: 'Calendar', icon: CalendarDays },
+  { path: '/budget', label: 'Budget', icon: Target },
   { path: '/rules', label: 'Rules', icon: BookOpen },
   { path: '/settings', label: 'Settings', icon: Settings },
+];
+
+const MOBILE_TOP = [
+  { path: '/', label: 'Home', icon: LayoutDashboard },
+  { path: '/accounts', label: 'Accounts', icon: Wallet },
+  { path: '/transactions', label: 'Activity', icon: ArrowLeftRight },
+];
+
+const MOBILE_BOTTOM = [
+  { path: '/recurring', label: 'Recurring', icon: Repeat },
+  { path: '/analytics', label: 'Analytics', icon: BarChart3 },
 ];
 
 export function AppLayout({ children }: { children: ReactNode }) {
@@ -63,7 +76,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
       {/* Mobile bottom nav */}
       <nav className="lg:hidden fixed bottom-0 inset-x-0 bg-card/95 backdrop-blur-md border-t z-50 safe-area-bottom">
         <div className="flex items-center justify-around h-16">
-          {NAV_ITEMS.slice(0, 3).map(item => (
+          {MOBILE_TOP.map(item => (
             <button
               key={item.path}
               onClick={() => navigate(item.path)}
@@ -84,7 +97,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
           >
             <Plus className="h-6 w-6" />
           </button>
-          {NAV_ITEMS.slice(3, 5).map(item => (
+          {MOBILE_BOTTOM.map(item => (
             <button
               key={item.path}
               onClick={() => navigate(item.path)}
