@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAccountBalances } from '@/hooks/useAccounts';
 import { useTransactions } from '@/hooks/useTransactions';
@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useBlueDollarRate } from '@/hooks/useBlueDollar';
 import { Badge } from '@/components/ui/badge';
 import { isBefore } from 'date-fns';
+import { DemoDataBanner } from '@/components/DemoDataBanner';
 
 export default function Dashboard() {
   const { data: accountBalances, isLoading } = useAccountBalances();
