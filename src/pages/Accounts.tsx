@@ -139,7 +139,7 @@ export default function Accounts() {
           <Button size="sm" variant="outline" className="rounded-xl" onClick={() => { setEditGroupId(null); setNewGroupName(''); setShowGroupForm(true); }}>
             <FolderPlus className="h-4 w-4 mr-1" /> Group
           </Button>
-          <Button size="sm" className="rounded-xl" onClick={() => { setEditId(null); setForm({ name: '', type: 'bank', institution: '', currency: 'USD', opening_balance: '0', notes: '', group_id: '' }); setShowForm(true); }}>
+          <Button size="sm" className="rounded-xl" onClick={() => { setShowAddChoice(true); }}>
             <Plus className="h-4 w-4 mr-1" /> Add
           </Button>
         </div>
