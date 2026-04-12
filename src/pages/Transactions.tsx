@@ -32,7 +32,8 @@ function formatDateGroupLabel(dateStr: string): string {
 
 function MerchantAvatar({ tx, cat }: { tx: any; cat: any }) {
   const isTransfer = tx.type === 'transfer';
-  const name = tx.merchant || tx.description || '';
+  const merchantData = (tx as any).merchants;
+  const name = merchantData?.display_name || merchantData?.name || tx.merchant || tx.description || '';
 
   if (isTransfer) {
     return (
@@ -40,6 +41,11 @@ function MerchantAvatar({ tx, cat }: { tx: any; cat: any }) {
         <ArrowLeftRight className="h-4 w-4 text-muted-foreground" />
       </div>
     );
+  }
+
+  // Custom logo from merchant record
+  if (merchantData?.logo_url) {
+    return <img src={merchantData.logo_url} alt={name} className="w-10 h-10 rounded-full object-cover" />;
   }
 
   // Brand logo
@@ -54,7 +60,6 @@ function MerchantAvatar({ tx, cat }: { tx: any; cat: any }) {
 
   // Category icon fallback
   if (cat?.icon) {
-    const catColor = getCategoryColor(cat.name, cat.color);
     return (
       <div
         className="w-10 h-10 rounded-full flex items-center justify-center text-lg"
@@ -225,7 +230,7 @@ export default function Transactions() {
                     <div key={tx.id} className={`flex items-center gap-3 py-3 px-3 rounded-xl hover:bg-accent/60 active:bg-accent transition-colors group ${tx.is_subscription ? 'border-l-2 border-l-primary/40' : ''}`}>
                       <MerchantAvatar tx={tx} cat={cat} />
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-foreground truncate">{tx.merchant || tx.description || 'Untitled'}</p>
+                        <p className="text-sm font-semibold text-foreground truncate">{(tx as any).merchants?.display_name || tx.merchant || tx.description || 'Untitled'}</p>
                         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                           <span className="text-xs text-muted-foreground">{acct?.name}</span>
 

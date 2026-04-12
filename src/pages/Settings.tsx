@@ -15,6 +15,7 @@ import { Plus, Trash2, Upload, FileSpreadsheet, RefreshCw, DollarSign } from 'lu
 import { toast } from 'sonner';
 import IntegrationsTab from '@/components/settings/IntegrationsTab';
 import CategoriesTab from '@/components/settings/CategoriesTab';
+import MerchantsTab from '@/components/settings/MerchantsTab';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -23,13 +24,15 @@ export default function Settings() {
     <div className="space-y-4">
       <h1 className="text-2xl font-bold text-foreground">Settings</h1>
       <Tabs defaultValue="integrations">
-        <TabsList className="w-full">
+        <TabsList className="w-full flex-wrap">
           <TabsTrigger value="integrations" className="flex-1">Integrations</TabsTrigger>
+          <TabsTrigger value="merchants" className="flex-1">Merchants</TabsTrigger>
           <TabsTrigger value="categories" className="flex-1">Categories</TabsTrigger>
           <TabsTrigger value="fx" className="flex-1">FX Rates</TabsTrigger>
           <TabsTrigger value="import" className="flex-1">Import</TabsTrigger>
         </TabsList>
         <TabsContent value="integrations"><IntegrationsTab /></TabsContent>
+        <TabsContent value="merchants"><MerchantsTab /></TabsContent>
         <TabsContent value="categories"><CategoriesTab /></TabsContent>
         <TabsContent value="fx"><FxRatesTab /></TabsContent>
         <TabsContent value="import"><ImportTab /></TabsContent>
