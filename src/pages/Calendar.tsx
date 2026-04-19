@@ -2,10 +2,10 @@ import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { useRecurringInstances, useRefreshRecurringTracking, useMarkInstancePaid } from '@/hooks/useRecurringInstances';
+import { useDerivedInstances, useRefreshRecurringTracking, useMarkInstancePaid } from '@/hooks/useRecurringInstances';
 import { useFxRates } from '@/hooks/useFxRates';
 import { formatCurrency, formatUSD } from '@/lib/constants';
-import { toUSD, isPaidStatus, type FxRateRow } from '@/lib/money';
+import { toUSD, isDerivedPaid, type FxRateRow } from '@/lib/money';
 import { getBrandLogo, getInitialsColor } from '@/lib/brandLogos';
 import {
   ChevronLeft, ChevronRight, CalendarDays, AlertCircle, CreditCard, RefreshCw, CheckCircle2,
@@ -19,7 +19,7 @@ export default function CalendarPage() {
   const monthStart = startOfMonth(currentMonth).toISOString().split('T')[0];
   const monthEnd = endOfMonth(currentMonth).toISOString().split('T')[0];
 
-  const { data: instances, isLoading } = useRecurringInstances({ from: monthStart, to: monthEnd });
+  const { data: instances, isLoading } = useDerivedInstances({ from: monthStart, to: monthEnd });
   const { data: fxRates } = useFxRates();
   const refresh = useRefreshRecurringTracking();
   const markPaid = useMarkInstancePaid();
@@ -29,9 +29,10 @@ export default function CalendarPage() {
     return instances.map(i => ({
       ...i,
       dueDate: new Date(i.expected_date + 'T12:00:00'),
-      isPaid: isPaidStatus(i.status),
-      isOverdue: i.status === 'overdue',
-      isDueSoon: i.status === 'due_soon',
+      isPaid: isDerivedPaid(i.derived),
+      isMissing: i.derived === 'missing',
+      isNeedsReview: i.derived === 'needs_review',
+      isUpcoming: i.derived === 'upcoming',
     })).sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime());
   }, [instances]);
 
@@ -56,7 +57,7 @@ export default function CalendarPage() {
   const totalUpcoming = items
     .filter(i => !i.isPaid)
     .reduce((s, i) => s + toUSD(Number(i.expected_amount), i.expected_currency, fxRates as FxRateRow[] | undefined), 0);
-  const overdueCount = items.filter(i => i.isOverdue).length;
+  const missingCount = items.filter(i => i.isMissing).length;
   const paidCount = items.filter(i => i.isPaid).length;
 
   const handleRefresh = async () => {
@@ -96,12 +97,12 @@ export default function CalendarPage() {
         </Card>
         <Card>
           <CardContent className="pt-4 pb-4 flex items-center gap-3">
-            <div className={`w-9 h-9 rounded-full flex items-center justify-center ${overdueCount > 0 ? 'bg-destructive/10' : 'bg-muted'}`}>
-              <AlertCircle className={`h-4 w-4 ${overdueCount > 0 ? 'text-destructive' : 'text-muted-foreground'}`} />
+            <div className={`w-9 h-9 rounded-full flex items-center justify-center ${missingCount > 0 ? 'bg-destructive/10' : 'bg-muted'}`}>
+              <AlertCircle className={`h-4 w-4 ${missingCount > 0 ? 'text-destructive' : 'text-muted-foreground'}`} />
             </div>
             <div>
-              <p className="text-[10px] text-muted-foreground">Overdue</p>
-              <p className="text-lg font-bold text-foreground">{overdueCount}</p>
+              <p className="text-[10px] text-muted-foreground">Missing</p>
+              <p className="text-lg font-bold text-foreground">{missingCount}</p>
             </div>
           </CardContent>
         </Card>
@@ -139,8 +140,8 @@ export default function CalendarPage() {
             return (
               <Card key={item.id} className={
                 item.isPaid ? 'border-success/30 opacity-75' :
-                item.isOverdue ? 'border-destructive/30' :
-                item.isDueSoon ? 'border-amber-500/30' : ''
+                item.isMissing ? 'border-destructive/30' :
+                item.isNeedsReview ? 'border-amber-500/30' : ''
               }>
                 <CardContent className="flex items-center gap-3 py-3.5">
                   <div className="text-center shrink-0 w-12">
@@ -166,13 +167,13 @@ export default function CalendarPage() {
                     <p className="text-sm font-bold text-foreground tabular-nums">{formatCurrency(Number(item.expected_amount), item.expected_currency)}</p>
                     {item.expected_currency !== 'USD' && <p className="text-[10px] text-muted-foreground">~{formatUSD(toUSD(Number(item.expected_amount), item.expected_currency, fxRates as FxRateRow[] | undefined))}</p>}
                     {item.isPaid ? (
-                      <Badge className="text-[9px] h-4 px-1.5 bg-success text-success-foreground">{item.status === 'matched' ? 'Matched' : 'Paid'}</Badge>
-                    ) : item.isOverdue ? (
-                      <Badge variant="destructive" className="text-[9px] h-4 px-1.5">Overdue</Badge>
-                    ) : item.isDueSoon ? (
-                      <Badge variant="secondary" className="text-[9px] h-4 px-1.5">In {Math.max(daysUntil, 0)}d</Badge>
+                      <Badge className="text-[9px] h-4 px-1.5 bg-success text-success-foreground">{item.derived === 'matched' ? 'Matched' : 'Paid'}</Badge>
+                    ) : item.isMissing ? (
+                      <Badge variant="destructive" className="text-[9px] h-4 px-1.5">Missing</Badge>
+                    ) : item.isNeedsReview ? (
+                      <Badge variant="secondary" className="text-[9px] h-4 px-1.5">Review</Badge>
                     ) : (
-                      <span className="text-[10px] text-muted-foreground">{daysUntil}d away</span>
+                      <span className="text-[10px] text-muted-foreground">{daysUntil >= 0 ? `${daysUntil}d away` : 'Today'}</span>
                     )}
                   </div>
                 </CardContent>
@@ -212,8 +213,8 @@ export default function CalendarPage() {
                         {events.slice(0, 2).map((e: any) => (
                           <div
                             key={e.id}
-                            className={`w-1.5 h-1.5 rounded-full ${e.isPaid ? 'bg-success' : e.isOverdue ? 'bg-destructive' : e.isDueSoon ? 'bg-amber-500' : 'bg-muted-foreground'}`}
-                            title={`${(e as any).recurring_expenses?.name} · ${e.status}`}
+                            className={`w-1.5 h-1.5 rounded-full ${e.isPaid ? 'bg-success' : e.isMissing ? 'bg-destructive' : e.isNeedsReview ? 'bg-amber-500' : 'bg-muted-foreground'}`}
+                            title={`${(e as any).recurring_expenses?.name} · ${e.derived}`}
                           />
                         ))}
                         {events.length > 2 && <span className="text-[8px] text-muted-foreground">+{events.length - 2}</span>}
@@ -225,9 +226,9 @@ export default function CalendarPage() {
             </div>
             <div className="flex items-center gap-4 mt-3 pt-3 border-t justify-center">
               <div className="flex items-center gap-1 text-[10px] text-muted-foreground"><div className="w-2 h-2 rounded-full bg-success" /> Paid</div>
-              <div className="flex items-center gap-1 text-[10px] text-muted-foreground"><div className="w-2 h-2 rounded-full bg-amber-500" /> Due soon</div>
-              <div className="flex items-center gap-1 text-[10px] text-muted-foreground"><div className="w-2 h-2 rounded-full bg-destructive" /> Overdue</div>
-              <div className="flex items-center gap-1 text-[10px] text-muted-foreground"><div className="w-2 h-2 rounded-full bg-muted-foreground" /> Expected</div>
+              <div className="flex items-center gap-1 text-[10px] text-muted-foreground"><div className="w-2 h-2 rounded-full bg-amber-500" /> Needs review</div>
+              <div className="flex items-center gap-1 text-[10px] text-muted-foreground"><div className="w-2 h-2 rounded-full bg-destructive" /> Missing</div>
+              <div className="flex items-center gap-1 text-[10px] text-muted-foreground"><div className="w-2 h-2 rounded-full bg-muted-foreground" /> Upcoming</div>
             </div>
           </CardContent>
         </Card>

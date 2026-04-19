@@ -9,11 +9,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useRecurringExpenses, useCreateRecurringExpense, useUpdateRecurringExpense, useDeleteRecurringExpense } from '@/hooks/useRecurringExpenses';
 import { useTransactions } from '@/hooks/useTransactions';
-import { useRecurringInstances } from '@/hooks/useRecurringInstances';
+import { useDerivedInstances } from '@/hooks/useRecurringInstances';
 import { useCategories } from '@/hooks/useCategories';
 import { useAccounts } from '@/hooks/useAccounts';
 import { formatCurrency, formatUSD } from '@/lib/constants';
-import { toMonthlyAmount, isPaidStatus } from '@/lib/money';
+import { toMonthlyAmount, isDerivedPaid } from '@/lib/money';
 import { getBrandLogo, getInitialsColor } from '@/lib/brandLogos';
 import { Plus, Trash2, CheckCircle2, AlertCircle, Clock, CalendarDays, Repeat, Building, FileText, CreditCard, TrendingUp, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
@@ -49,7 +49,7 @@ function getNextDate(current: Date, frequency: string): Date {
 export default function RecurringExpenses() {
   const { data: items, isLoading } = useRecurringExpenses();
   const { data: transactions } = useTransactions();
-  const { data: instances } = useRecurringInstances();
+  const { data: instances } = useDerivedInstances();
   const { data: categories } = useCategories();
   const { data: accounts } = useAccounts();
   const createItem = useCreateRecurringExpense();
@@ -71,10 +71,9 @@ export default function RecurringExpenses() {
   const reconciled = useMemo(() => {
     if (!items || !instances) return {};
     const map: Record<string, { matched: boolean; txId?: string; txDate?: string; txAmount?: number; diff?: number; status?: string }> = {};
-    // For each recurring item, find its most recent paid/matched instance
     items.forEach(item => {
       const itemInstances = instances
-        .filter(i => i.recurring_id === item.id && isPaidStatus(i.status))
+        .filter(i => i.recurring_id === item.id && isDerivedPaid(i.derived))
         .sort((a, b) => (b.expected_date > a.expected_date ? 1 : -1));
       const last = itemInstances[0];
       if (last && last.matched_transaction_id && (last as any).transactions) {
@@ -87,10 +86,10 @@ export default function RecurringExpenses() {
           txDate: tx.date,
           txAmount: txAmt,
           diff: txAmt - expected,
-          status: last.status,
+          status: last.derived,
         };
       } else if (last) {
-        map[item.id] = { matched: true, status: last.status }; // paid_manual w/o tx
+        map[item.id] = { matched: true, status: last.derived };
       } else {
         map[item.id] = { matched: false };
       }
@@ -114,8 +113,8 @@ export default function RecurringExpenses() {
       if (i.type === 'subscription') subMonthly += m;
       else fixedMonthly += m;
     });
-    // Overdue derived from canonical instances
-    const overdue = (instances || []).filter(i => i.status === 'overdue').length;
+    // "Overdue" label = derived `missing` state
+    const overdue = (instances || []).filter(i => i.derived === 'missing').length;
     return { monthly, yearly: monthly * 12, active: active.length, overdue, subMonthly, fixedMonthly };
   }, [items, instances]);
 

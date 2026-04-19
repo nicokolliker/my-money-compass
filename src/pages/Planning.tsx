@@ -3,25 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { useRecurringInstances, useRefreshRecurringTracking } from '@/hooks/useRecurringInstances';
+import { useDerivedInstances, useRefreshRecurringTracking } from '@/hooks/useRecurringInstances';
 import { useTransactions } from '@/hooks/useTransactions';
-import { useAccountBalances } from '@/hooks/useAccounts';
+import { useNetWorth } from '@/hooks/useNetWorth';
 import { useFxRates } from '@/hooks/useFxRates';
-import { formatUSD, formatCurrency, ASSET_TYPES } from '@/lib/constants';
-import { toUSD, isPaidStatus, type FxRateRow } from '@/lib/money';
-import { Repeat, TrendingUp, TrendingDown, Wallet, AlertCircle, CheckCircle2, Clock, RefreshCw, CalendarDays } from 'lucide-react';
+import { formatUSD, formatCurrency } from '@/lib/constants';
+import { toUSD, isDerivedPaid, DERIVED_STATE_META, TONE_CLASS, type FxRateRow, type DerivedInstanceState } from '@/lib/money';
+import { Repeat, TrendingUp, Wallet, AlertCircle, CheckCircle2, Clock, RefreshCw, CalendarDays } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, addMonths } from 'date-fns';
 import { toast } from 'sonner';
-
-const STATUS_META: Record<string, { label: string; cls: string; icon: any }> = {
-  matched:     { label: 'Matched',    cls: 'bg-success/10 text-success border-success/30',           icon: CheckCircle2 },
-  paid_manual: { label: 'Paid',       cls: 'bg-success/10 text-success border-success/30',           icon: CheckCircle2 },
-  due_soon:    { label: 'Due soon',   cls: 'bg-amber-500/10 text-amber-600 border-amber-500/30',     icon: Clock },
-  overdue:     { label: 'Overdue',    cls: 'bg-destructive/10 text-destructive border-destructive/30', icon: AlertCircle },
-  expected:    { label: 'Expected',   cls: 'bg-muted text-muted-foreground border-border',           icon: Clock },
-  mismatch:    { label: 'Mismatch',   cls: 'bg-amber-500/10 text-amber-600 border-amber-500/30',     icon: AlertCircle },
-  skipped:     { label: 'Skipped',    cls: 'bg-muted text-muted-foreground border-border',           icon: Clock },
-};
 
 export default function Planning() {
   const navigate = useNavigate();
@@ -30,9 +20,9 @@ export default function Planning() {
   const monthEnd = endOfMonth(new Date()).toISOString().split('T')[0];
   const nextMonthEnd = endOfMonth(addMonths(new Date(), 1)).toISOString().split('T')[0];
 
-  const { data: instances, isLoading } = useRecurringInstances({ from: monthStart, to: nextMonthEnd });
+  const { data: instances, isLoading } = useDerivedInstances({ from: monthStart, to: nextMonthEnd });
   const { data: transactions } = useTransactions();
-  const { data: balances } = useAccountBalances();
+  const { liquidCashUsd } = useNetWorth();
   const { data: fxRates } = useFxRates();
 
   const monthIncome = useMemo(() => {
@@ -52,21 +42,16 @@ export default function Planning() {
     [monthInstances, fxRates]
   );
 
-  const liquidCash = useMemo(() => {
-    if (!balances) return 0;
-    return balances
-      .filter(a => ASSET_TYPES.includes(a.type))
-      .reduce((s, a) => s + (a.currency === 'USD' ? a.computed_balance : a.computed_balance_usd), 0);
-  }, [balances]);
+  const liquidCash = liquidCashUsd;
 
-  const overdue = monthInstances.filter(i => i.status === 'overdue');
-  const dueSoon = monthInstances.filter(i => i.status === 'due_soon');
-  const expected = monthInstances.filter(i => i.status === 'expected');
-  const paid = monthInstances.filter(i => isPaidStatus(i.status));
+  const missing = monthInstances.filter(i => i.derived === 'missing');
+  const needsReview = monthInstances.filter(i => i.derived === 'needs_review');
+  const upcomingMonth = monthInstances.filter(i => i.derived === 'upcoming');
+  const paid = monthInstances.filter(i => isDerivedPaid(i.derived));
 
   const upcoming = useMemo(
     () => (instances || [])
-      .filter(i => i.expected_date >= monthStart && (i.status === 'expected' || i.status === 'due_soon' || i.status === 'overdue'))
+      .filter(i => i.expected_date >= monthStart && (i.derived === 'upcoming' || i.derived === 'missing' || i.derived === 'needs_review'))
       .slice(0, 8),
     [instances, monthStart]
   );
@@ -119,9 +104,9 @@ export default function Planning() {
       {/* Status grid */}
       <div className="grid grid-cols-4 gap-2">
         {[
-          { label: 'Overdue', count: overdue.length, cls: 'text-destructive', icon: AlertCircle },
-          { label: 'Due soon', count: dueSoon.length, cls: 'text-amber-600', icon: Clock },
-          { label: 'Expected', count: expected.length, cls: 'text-muted-foreground', icon: Clock },
+          { label: 'Missing', count: missing.length, cls: 'text-destructive', icon: AlertCircle },
+          { label: 'Review', count: needsReview.length, cls: 'text-amber-600', icon: Clock },
+          { label: 'Upcoming', count: upcomingMonth.length, cls: 'text-muted-foreground', icon: Clock },
           { label: 'Paid', count: paid.length, cls: 'text-success', icon: CheckCircle2 },
         ].map(s => (
           <Card key={s.label}>
@@ -135,7 +120,7 @@ export default function Planning() {
       </div>
 
       {/* Needs attention */}
-      {(overdue.length > 0 || dueSoon.length > 0) && (
+      {(missing.length > 0 || needsReview.length > 0) && (
         <Card className="border-amber-500/30">
           <CardHeader className="pb-2 flex flex-row items-center justify-between">
             <CardTitle className="text-sm font-semibold flex items-center gap-2">
@@ -144,8 +129,9 @@ export default function Planning() {
             <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => navigate('/recurring')}>View all</Button>
           </CardHeader>
           <CardContent className="space-y-2">
-            {[...overdue, ...dueSoon].slice(0, 5).map(i => {
-              const meta = STATUS_META[i.status];
+            {[...missing, ...needsReview].slice(0, 5).map(i => {
+              const meta = DERIVED_STATE_META[i.derived];
+              const cls = TONE_CLASS[meta.tone];
               const r = (i as any).recurring_expenses;
               return (
                 <div key={i.id} className="flex items-center gap-3 py-1.5">
@@ -159,7 +145,7 @@ export default function Planning() {
                   </div>
                   <div className="text-right shrink-0">
                     <p className="text-sm font-semibold tabular-nums">{formatCurrency(Number(i.expected_amount), i.expected_currency)}</p>
-                    <Badge variant="outline" className={`text-[9px] h-4 px-1.5 ${meta.cls}`}>{meta.label}</Badge>
+                    <Badge variant="outline" className={`text-[9px] h-4 px-1.5 ${cls}`}>{meta.label}</Badge>
                   </div>
                 </div>
               );
@@ -182,7 +168,8 @@ export default function Planning() {
           )}
           {upcoming.map(i => {
             const r = (i as any).recurring_expenses;
-            const meta = STATUS_META[i.status];
+            const meta = DERIVED_STATE_META[i.derived];
+            const cls = TONE_CLASS[meta.tone];
             return (
               <div key={i.id} className="flex items-center gap-3 py-1.5">
                 <span className="text-base">{r?.categories?.icon || '📌'}</span>
@@ -192,7 +179,7 @@ export default function Planning() {
                 </div>
                 <div className="text-right shrink-0">
                   <p className="text-sm font-semibold tabular-nums">{formatCurrency(Number(i.expected_amount), i.expected_currency)}</p>
-                  <Badge variant="outline" className={`text-[9px] h-4 px-1.5 ${meta.cls}`}>{meta.label}</Badge>
+                  <Badge variant="outline" className={`text-[9px] h-4 px-1.5 ${cls}`}>{meta.label}</Badge>
                 </div>
               </div>
             );
