@@ -356,7 +356,7 @@ export default function RecurringExpenses() {
           const statusKey = isOverdue ? 'overdue' : (rec?.matched ? 'paid' : item.status);
           const st = STATUS_CONFIG[statusKey] || STATUS_CONFIG.expected;
           const StIcon = st.icon;
-          const monthlyAmt = toMonthly(Math.abs(Number(item.amount)), item.frequency);
+          const monthlyAmt = toMonthlyAmount(Math.abs(Number(item.amount)), item.frequency);
 
           return (
             <Card key={item.id} className={isOverdue ? 'border-destructive/30' : rec?.matched ? 'border-success/30' : ''}>
