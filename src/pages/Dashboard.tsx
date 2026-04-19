@@ -15,7 +15,8 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useBlueDollarRate } from '@/hooks/useBlueDollar';
 import { Badge } from '@/components/ui/badge';
-import { isBefore } from 'date-fns';
+import { isBefore, format } from 'date-fns';
+import { RecurringStatusBadge } from '@/components/recurring/RecurringStatusBadge';
 import { DemoDataBanner } from '@/components/DemoDataBanner';
 import { useDemoData } from '@/hooks/useDemoData';
 
