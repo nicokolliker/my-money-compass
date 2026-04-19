@@ -7,37 +7,49 @@
     /* Brand Blue — #4F6EF7 → hsl(228, 91%, 64%) */
     --primary: 228 91% 64%;
     --primary-foreground: 0 0% 100%;
+    --primary-glow: 250 95% 76%;
 
     /* Neutrals */
-    --background: 210 20% 98%;       /* #F9FAFB */
-    --foreground: 222 47% 11%;       /* #111827 */
-    --card: 0 0% 100%;               /* white */
+    --background: 220 30% 97%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
     --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
 
-    --secondary: 220 14% 96%;        /* #F3F4F6 */
+    --secondary: 220 14% 96%;
     --secondary-foreground: 222 47% 11%;
     --muted: 220 14% 96%;
-    --muted-foreground: 218 11% 45%; /* #6B7280 */
+    --muted-foreground: 218 11% 45%;
     --accent: 220 14% 96%;
     --accent-foreground: 222 47% 11%;
 
     /* Semantic */
-    --destructive: 0 84% 60%;        /* #EF4444 */
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    --success: 142 71% 45%;          /* #22C55E */
+    --success: 142 71% 45%;
     --success-foreground: 0 0% 100%;
-    --warning: 48 96% 53%;           /* #EAB308 */
+    --warning: 48 96% 53%;
     --warning-foreground: 0 0% 100%;
 
     /* Borders & inputs */
-    --border: 220 13% 87%;           /* #D1D5DB */
+    --border: 220 13% 90%;
     --input: 220 13% 87%;
     --ring: 228 91% 64%;
 
     /* Radius */
-    --radius: 0.75rem;               /* 12px */
+    --radius: 0.875rem;
+
+    /* Glass system */
+    --glass-bg: 0 0% 100%;
+    --glass-border: 220 20% 90%;
+    --glass-opacity: 0.65;
+
+    /* Layered gradient background */
+    --gradient-app: radial-gradient(ellipse 80% 60% at 0% 0%, hsl(228 91% 64% / 0.10), transparent 60%),
+                    radial-gradient(ellipse 70% 50% at 100% 0%, hsl(250 95% 76% / 0.10), transparent 55%),
+                    radial-gradient(ellipse 90% 60% at 50% 100%, hsl(200 95% 70% / 0.06), transparent 60%),
+                    linear-gradient(180deg, hsl(220 40% 98%), hsl(220 30% 96%));
 
     /* Sidebar */
     --sidebar-background: 0 0% 100%;
@@ -53,6 +65,7 @@
   .dark {
     --primary: 228 91% 68%;
     --primary-foreground: 0 0% 100%;
+    --primary-glow: 250 95% 76%;
 
     --background: 222 47% 5%;
     --foreground: 210 40% 98%;
@@ -75,9 +88,17 @@
     --warning: 48 96% 53%;
     --warning-foreground: 0 0% 100%;
 
-    --border: 217 33% 17%;
+    --border: 217 33% 20%;
     --input: 217 33% 17%;
     --ring: 228 91% 68%;
+
+    --glass-bg: 224 50% 10%;
+    --glass-border: 217 33% 22%;
+    --glass-opacity: 0.55;
+
+    --gradient-app: radial-gradient(ellipse 80% 60% at 0% 0%, hsl(228 91% 64% / 0.18), transparent 60%),
+                    radial-gradient(ellipse 70% 50% at 100% 0%, hsl(250 95% 76% / 0.14), transparent 55%),
+                    linear-gradient(180deg, hsl(222 47% 6%), hsl(222 47% 4%));
 
     --sidebar-background: 222 47% 5%;
     --sidebar-foreground: 210 40% 98%;
@@ -94,9 +115,45 @@
   * {
     @apply border-border;
   }
-  body {
-    @apply bg-background text-foreground antialiased;
+  html, body {
+    @apply text-foreground antialiased;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-feature-settings: "cv11", "ss01";
+  }
+  body {
+    background: var(--gradient-app);
+    background-attachment: fixed;
+    min-height: 100vh;
+  }
+
+  h1, h2, h3, h4 {
+    letter-spacing: -0.02em;
+  }
+}
+
+@layer components {
+  /* Glass panel — for chrome (sidebar, header, sheets) */
+  .glass-panel {
+    background-color: hsl(var(--glass-bg) / var(--glass-opacity));
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    border: 1px solid hsl(var(--glass-border) / 0.6);
+  }
+
+  /* Semi-solid card — for key data widgets */
+  .card-elevated {
+    background-color: hsl(var(--card) / 0.85);
+    backdrop-filter: saturate(160%) blur(8px);
+    -webkit-backdrop-filter: saturate(160%) blur(8px);
+    border: 1px solid hsl(var(--border) / 0.8);
+    box-shadow: 0 1px 2px hsl(220 30% 20% / 0.04), 0 8px 24px -8px hsl(220 40% 30% / 0.08);
+  }
+
+  /* Solid card — for tables and dense content */
+  .card-solid {
+    background-color: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    box-shadow: 0 1px 2px hsl(220 30% 20% / 0.04);
   }
 }
 
@@ -104,3 +161,9 @@
 .safe-area-bottom {
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
+
+/* Subtle scrollbar */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 8px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.4); background-clip: padding-box; border: 2px solid transparent; }

@@ -102,13 +102,16 @@ export function AppLayout({ children }: { children: ReactNode }) {
   );
 
   return (
-    <div className="flex min-h-screen bg-background">
-      {/* Desktop sidebar */}
-      <aside className="hidden lg:flex lg:w-60 lg:flex-col lg:fixed lg:inset-y-0 border-r bg-card/80 backdrop-blur-sm">
-        <div className="flex h-16 items-center px-5 border-b">
-          <h1 className="text-lg font-bold text-foreground tracking-tight">💰 FinTrack</h1>
-        </div>
-        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+    <div className="flex min-h-screen">
+      {/* Desktop sidebar — glass */}
+      <aside className="hidden lg:flex lg:w-64 lg:flex-col lg:fixed lg:inset-y-0 lg:p-3 z-30">
+        <div className="flex flex-col h-full glass-panel rounded-2xl shadow-[0_8px_32px_-8px_hsl(220_40%_30%_/_0.12)]">
+          <div className="flex h-16 items-center px-5 border-b border-border/40">
+            <h1 className="text-base font-bold tracking-tight bg-gradient-to-r from-primary to-[hsl(var(--primary-glow))] bg-clip-text text-transparent">
+              FinTrack
+            </h1>
+          </div>
+          <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
           {NAV.map(entry => {
             if (isLeaf(entry)) return renderLeaf(entry);
             const open = openGroups[entry.label];
@@ -134,26 +137,27 @@ export function AppLayout({ children }: { children: ReactNode }) {
               </div>
             );
           })}
-        </nav>
-        <div className="p-4 border-t space-y-2">
-          <Button className="w-full rounded-xl h-11 shadow-soft" onClick={() => setShowQuickAdd(true)}>
-            <Plus className="h-4 w-4 mr-2" /> Quick Add
-          </Button>
-          <Button variant="ghost" className="w-full rounded-xl h-9 text-muted-foreground" onClick={() => signOut()}>
-            <LogOut className="h-4 w-4 mr-2" /> Sign Out
-          </Button>
+          </nav>
+          <div className="p-3 border-t border-border/40 space-y-2">
+            <Button className="w-full rounded-xl h-11 shadow-[0_4px_16px_-4px_hsl(var(--primary)/0.5)]" onClick={() => setShowQuickAdd(true)}>
+              <Plus className="h-4 w-4 mr-2" /> Quick Add
+            </Button>
+            <Button variant="ghost" className="w-full rounded-xl h-9 text-muted-foreground hover:text-foreground" onClick={() => signOut()}>
+              <LogOut className="h-4 w-4 mr-2" /> Sign Out
+            </Button>
+          </div>
         </div>
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 lg:ml-60 pb-24 lg:pb-0">
-        <div className="max-w-2xl mx-auto px-4 py-5 lg:py-8">
+      <main className="flex-1 lg:ml-64 pb-24 lg:pb-0">
+        <div className="max-w-3xl mx-auto px-4 py-6 lg:px-8 lg:py-10">
           {children}
         </div>
       </main>
 
-      {/* Mobile bottom nav */}
-      <nav className="lg:hidden fixed bottom-0 inset-x-0 bg-card/95 backdrop-blur-md border-t z-50 safe-area-bottom">
+      {/* Mobile bottom nav — glass */}
+      <nav className="lg:hidden fixed bottom-0 inset-x-0 glass-panel border-t border-border/50 z-50 safe-area-bottom">
         <div className="flex items-center justify-around h-16">
           {MOBILE_TOP.map(item => (
             <button
