@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import {
   useDerivedInstances,
   useRefreshRecurringTracking,
@@ -10,15 +9,16 @@ import {
   type DerivedRecurringInstance,
 } from '@/hooks/useRecurringInstances';
 import { formatCurrency, formatUSD } from '@/lib/constants';
-import { toUSD, DERIVED_STATE_META, TONE_CLASS, isDerivedPaid, type FxRateRow, type DerivedInstanceState } from '@/lib/money';
+import { toUSD, isDerivedPaid, type FxRateRow, type DerivedInstanceState } from '@/lib/money';
 import { useFxRates } from '@/hooks/useFxRates';
 import { format, startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns';
 import {
   ChevronLeft, ChevronRight, RefreshCw, CheckCircle2, Clock,
-  Link2, X,
+  Link2, X, CreditCard, Wallet,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import ManualMatchDialog from './ManualMatchDialog';
+import { RecurringStatusBadge } from './RecurringStatusBadge';
 
 const FILTERS: { v: 'all' | DerivedInstanceState; label: string }[] = [
   { v: 'all', label: 'All' },
