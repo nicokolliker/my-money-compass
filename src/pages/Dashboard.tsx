@@ -15,7 +15,8 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useBlueDollarRate } from '@/hooks/useBlueDollar';
 import { Badge } from '@/components/ui/badge';
-import { isBefore } from 'date-fns';
+import { isBefore, format } from 'date-fns';
+import { RecurringStatusBadge } from '@/components/recurring/RecurringStatusBadge';
 import { DemoDataBanner } from '@/components/DemoDataBanner';
 import { useDemoData } from '@/hooks/useDemoData';
 
@@ -77,7 +78,7 @@ export default function Dashboard() {
     return { count: subs.size, total: subTotal, pct };
   }, [transactions, totalMonthSpending]);
 
-  // Recurring intelligence
+  // Recurring intelligence — uses canonical derived instance state
   const recurringInsights = useMemo(() => {
     if (!recurringItems) return { monthlyTotal: 0, overdue: 0, upcoming: [] as any[], fixedPct: 0 };
     const active = recurringItems.filter(i => i.is_active);
@@ -85,12 +86,12 @@ export default function Dashboard() {
     active.forEach(i => {
       monthlyTotal += toMonthlyAmount(Math.abs(Number(i.amount)), i.frequency);
     });
-    // "Overdue" UI label = derived `missing` state from canonical recurring_instances
     const overdue = (instances || []).filter(i => i.derived === 'missing').length;
-    const upcoming = active
-      .filter(i => i.next_due_date)
-      .sort((a, b) => new Date(a.next_due_date!).getTime() - new Date(b.next_due_date!).getTime())
-      .slice(0, 3);
+    // Use canonical instances for upcoming list — single source of truth
+    const upcoming = (instances || [])
+      .filter(i => i.derived === 'upcoming' || i.derived === 'needs_review' || i.derived === 'missing')
+      .sort((a, b) => (a.expected_date > b.expected_date ? 1 : -1))
+      .slice(0, 4);
     const fixedPct = totalMonthSpending > 0 ? (monthlyTotal / totalMonthSpending * 100) : 0;
     return { monthlyTotal, overdue, upcoming, fixedPct };
   }, [recurringItems, instances, totalMonthSpending]);
@@ -206,25 +207,23 @@ export default function Dashboard() {
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold flex items-center gap-2"><CalendarDays className="h-4 w-4 text-muted-foreground" /> Upcoming Payments</CardTitle></CardHeader>
           <CardContent className="space-y-2">
-            {recurringInsights.upcoming.map((item: any) => {
-              const cat = item.categories;
-              const acc = item.accounts;
-              const dueDate = item.next_due_date ? new Date(item.next_due_date + 'T12:00:00') : null;
-              const daysUntil = dueDate ? Math.ceil((dueDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null;
+            {recurringInsights.upcoming.map((inst: any) => {
+              const r = inst.recurring_expenses;
+              const cat = r?.categories;
+              const pm = r?.payment_methods;
+              const dueDate = new Date(inst.expected_date + 'T12:00:00');
               return (
-                <div key={item.id} className="flex items-center gap-3 py-1.5">
+                <div key={inst.id} className="flex items-center gap-3 py-1.5">
                   <span className="text-lg">{cat?.icon || '📌'}</span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">{item.name}</p>
-                    <p className="text-[10px] text-muted-foreground">{acc?.name || ''}</p>
+                    <p className="text-sm font-medium text-foreground truncate">{r?.name || 'Recurring'}</p>
+                    <p className="text-[10px] text-muted-foreground truncate">
+                      {format(dueDate, 'MMM d')}{pm ? ` · ${pm.name}` : ''}
+                    </p>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="text-sm font-semibold text-foreground tabular-nums">{formatCurrency(Math.abs(Number(item.amount)), item.currency)}</p>
-                    {daysUntil !== null && (
-                      <Badge variant={daysUntil < 0 ? 'destructive' : daysUntil <= 3 ? 'secondary' : 'outline'} className="text-[9px] h-4 px-1.5">
-                        {daysUntil < 0 ? 'Overdue' : daysUntil === 0 ? 'Today' : `${daysUntil}d`}
-                      </Badge>
-                    )}
+                    <p className="text-sm font-semibold text-foreground tabular-nums">{formatCurrency(Math.abs(Number(inst.expected_amount)), inst.expected_currency)}</p>
+                    <RecurringStatusBadge state={inst.derived} />
                   </div>
                 </div>
               );

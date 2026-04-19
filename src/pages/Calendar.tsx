@@ -1,14 +1,14 @@
 import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { useDerivedInstances, useRefreshRecurringTracking, useMarkInstancePaid } from '@/hooks/useRecurringInstances';
 import { useFxRates } from '@/hooks/useFxRates';
 import { formatCurrency, formatUSD } from '@/lib/constants';
 import { toUSD, isDerivedPaid, type FxRateRow } from '@/lib/money';
 import { getBrandLogo, getInitialsColor } from '@/lib/brandLogos';
+import { RecurringStatusBadge } from '@/components/recurring/RecurringStatusBadge';
 import {
-  ChevronLeft, ChevronRight, CalendarDays, AlertCircle, CreditCard, RefreshCw, CheckCircle2,
+  ChevronLeft, ChevronRight, CalendarDays, AlertCircle, CreditCard, Wallet, RefreshCw, CheckCircle2,
 } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isToday, addMonths, subMonths, getDay } from 'date-fns';
 import { toast } from 'sonner';
@@ -135,11 +135,13 @@ export default function CalendarPage() {
             const initials = getInitialsColor(name);
             const cat = r?.categories;
             const acc = r?.accounts;
+            const pm = r?.payment_methods;
+            const usd = toUSD(Number(item.expected_amount), item.expected_currency, fxRates as FxRateRow[] | undefined);
             const daysUntil = Math.ceil((item.dueDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
 
             return (
               <Card key={item.id} className={
-                item.isPaid ? 'border-success/30 opacity-75' :
+                item.isPaid ? 'border-success/30 opacity-90' :
                 item.isMissing ? 'border-destructive/30' :
                 item.isNeedsReview ? 'border-amber-500/30' : ''
               }>
@@ -158,22 +160,18 @@ export default function CalendarPage() {
                   )}
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-foreground truncate">{name}</p>
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground flex-wrap">
                       {cat && <span>{cat.icon} {cat.name}</span>}
-                      {acc && <><span>·</span><span className="flex items-center gap-0.5"><CreditCard className="h-3 w-3" />{acc.name}</span></>}
+                      {pm && <><span>·</span><span className="flex items-center gap-0.5"><CreditCard className="h-3 w-3" />{pm.name}</span></>}
+                      {acc && <><span>·</span><span className="flex items-center gap-0.5"><Wallet className="h-3 w-3" />{acc.name}</span></>}
                     </div>
                   </div>
-                  <div className="text-right shrink-0">
+                  <div className="text-right shrink-0 space-y-0.5">
                     <p className="text-sm font-bold text-foreground tabular-nums">{formatCurrency(Number(item.expected_amount), item.expected_currency)}</p>
-                    {item.expected_currency !== 'USD' && <p className="text-[10px] text-muted-foreground">~{formatUSD(toUSD(Number(item.expected_amount), item.expected_currency, fxRates as FxRateRow[] | undefined))}</p>}
-                    {item.isPaid ? (
-                      <Badge className="text-[9px] h-4 px-1.5 bg-success text-success-foreground">{item.derived === 'matched' ? 'Matched' : 'Paid'}</Badge>
-                    ) : item.isMissing ? (
-                      <Badge variant="destructive" className="text-[9px] h-4 px-1.5">Missing</Badge>
-                    ) : item.isNeedsReview ? (
-                      <Badge variant="secondary" className="text-[9px] h-4 px-1.5">Review</Badge>
-                    ) : (
-                      <span className="text-[10px] text-muted-foreground">{daysUntil >= 0 ? `${daysUntil}d away` : 'Today'}</span>
+                    {item.expected_currency !== 'USD' && <p className="text-[10px] text-muted-foreground tabular-nums">~{formatUSD(usd)}</p>}
+                    <RecurringStatusBadge state={item.derived} />
+                    {!item.isPaid && !item.isMissing && (
+                      <p className="text-[10px] text-muted-foreground">{daysUntil > 0 ? `${daysUntil}d away` : daysUntil === 0 ? 'Today' : `${Math.abs(daysUntil)}d overdue`}</p>
                     )}
                   </div>
                 </CardContent>
