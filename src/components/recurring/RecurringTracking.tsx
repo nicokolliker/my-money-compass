@@ -30,6 +30,7 @@ export default function RecurringTracking() {
   const monthEnd = endOfMonth(month).toISOString().split('T')[0];
 
   const { data: instances, isLoading } = useRecurringInstances({ from: monthStart, to: monthEnd });
+  const { data: fxRates } = useFxRates();
   const refresh = useRefreshRecurringTracking();
   const markPaid = useMarkInstancePaid();
   const unmatch = useUnmatchInstance();
@@ -37,8 +38,8 @@ export default function RecurringTracking() {
   const filtered = useMemo(() => {
     if (!instances) return [];
     if (filter === 'all') return instances;
-    if (filter === 'paid') return instances.filter(i => i.status === 'matched' || i.status === 'paid_manual');
-    if (filter === 'pending') return instances.filter(i => ['expected', 'due_soon', 'overdue'].includes(i.status));
+    if (filter === 'paid') return instances.filter(i => isPaidStatus(i.status));
+    if (filter === 'pending') return instances.filter(i => ['expected', 'due_soon', 'overdue', 'needs_review'].includes(i.status));
     return instances.filter(i => i.status === filter);
   }, [instances, filter]);
 
@@ -46,16 +47,14 @@ export default function RecurringTracking() {
     if (!instances) return { expected: 0, paid: 0, pending: 0, overdue: 0 };
     let expected = 0, paid = 0, pending = 0, overdue = 0;
     instances.forEach(i => {
-      const usd = i.expected_currency === 'USD'
-        ? Number(i.expected_amount)
-        : Number(i.expected_amount) * (i.expected_currency === 'ARS' ? 0.000833 : 1.08);
+      const usd = toUSD(Number(i.expected_amount), i.expected_currency, fxRates as FxRateRow[] | undefined);
       expected += usd;
-      if (i.status === 'matched' || i.status === 'paid_manual') paid += usd;
+      if (isPaidStatus(i.status)) paid += usd;
       else if (i.status === 'overdue') { overdue += usd; pending += usd; }
       else pending += usd;
     });
     return { expected, paid, pending, overdue };
-  }, [instances]);
+  }, [instances, fxRates]);
 
   const handleRefresh = async () => {
     try {
