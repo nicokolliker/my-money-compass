@@ -10,6 +10,8 @@ import {
   useUnmatchInstance,
 } from '@/hooks/useRecurringInstances';
 import { formatCurrency, formatUSD } from '@/lib/constants';
+import { toUSD, INSTANCE_STATUS_META, TONE_CLASS, isPaidStatus, type FxRateRow } from '@/lib/money';
+import { useFxRates } from '@/hooks/useFxRates';
 import { format, startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns';
 import {
   ChevronLeft, ChevronRight, RefreshCw, CheckCircle2, AlertCircle, Clock,
@@ -17,15 +19,9 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-const STATUS_META: Record<string, { label: string; cls: string }> = {
-  matched:     { label: 'Matched',  cls: 'bg-success/10 text-success border-success/30' },
-  paid_manual: { label: 'Paid',     cls: 'bg-success/10 text-success border-success/30' },
-  due_soon:    { label: 'Due soon', cls: 'bg-amber-500/10 text-amber-600 border-amber-500/30' },
-  overdue:     { label: 'Overdue',  cls: 'bg-destructive/10 text-destructive border-destructive/30' },
-  expected:    { label: 'Expected', cls: 'bg-muted text-muted-foreground border-border' },
-  mismatch:    { label: 'Mismatch', cls: 'bg-amber-500/10 text-amber-600 border-amber-500/30' },
-  skipped:     { label: 'Skipped',  cls: 'bg-muted text-muted-foreground border-border' },
-};
+const STATUS_META = Object.fromEntries(
+  Object.entries(INSTANCE_STATUS_META).map(([k, v]) => [k, { label: v.label, cls: TONE_CLASS[v.tone] }])
+) as Record<string, { label: string; cls: string }>;
 
 export default function RecurringTracking() {
   const [month, setMonth] = useState(new Date());
