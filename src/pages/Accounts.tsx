@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useAccountBalances, useCreateAccount, useUpdateAccount } from '@/hooks/useAccounts';
 import { useAccountGroups, useCreateAccountGroup, useUpdateAccountGroup, useDeleteAccountGroup } from '@/hooks/useAccountGroups';
+import { useNetWorth } from '@/hooks/useNetWorth';
 import { ACCOUNT_TYPE_LABELS, CURRENCIES, formatCurrency, formatUSD } from '@/lib/constants';
 import { getBrandLogo } from '@/lib/brandLogos';
 import { getAccountStyle } from '@/lib/accountIcons';
@@ -46,6 +47,7 @@ export default function Accounts() {
   const updateGroup = useUpdateAccountGroup();
   const deleteGroup = useDeleteAccountGroup();
   const { hasDemoData, onCleared: onDemoCleared } = useDemoData();
+  const { netWorthUsd: totalNetWorth } = useNetWorth();
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: '', type: 'bank' as string, institution: '', currency: 'USD', opening_balance: '0', notes: '', group_id: '' });
@@ -55,11 +57,6 @@ export default function Accounts() {
   const [editGroupId, setEditGroupId] = useState<string | null>(null);
   const [showAddChoice, setShowAddChoice] = useState(false);
   const [showPostCreate, setShowPostCreate] = useState(false);
-
-  const totalNetWorth = useMemo(() => {
-    if (!accounts) return 0;
-    return accounts.reduce((s, a) => s + (a.currency === 'USD' ? a.computed_balance : a.computed_balance_usd), 0);
-  }, [accounts]);
 
   const sections = useMemo(() => {
     if (!accounts) return [];
@@ -158,7 +155,7 @@ export default function Accounts() {
       </Card>
 
       {sections.map(section => {
-        const sectionTotal = section.accounts.reduce((s, a) => s + (a.currency === 'USD' ? a.computed_balance : a.computed_balance_usd), 0);
+        const sectionTotal = section.accounts.reduce((s, a) => s + a.computed_balance_usd, 0);
         const isOpen = !collapsed[section.key];
 
         return (
@@ -190,7 +187,7 @@ export default function Accounts() {
                   {section.accounts.length === 0 ? (
                     <p className="text-sm text-muted-foreground py-4 text-center">No accounts in this group</p>
                   ) : section.accounts.map(a => {
-                    const balUsd = a.currency === 'USD' ? a.computed_balance : a.computed_balance_usd;
+                    const balUsd = a.computed_balance_usd;
                     const pct = totalNetWorth !== 0 ? (balUsd / totalNetWorth * 100) : 0;
                     return (
                       <button key={a.id} onClick={() => openEdit(a)} className="flex items-center gap-3 w-full py-3 text-left hover:bg-accent/50 active:bg-accent rounded-lg px-2 -mx-2 transition-colors">

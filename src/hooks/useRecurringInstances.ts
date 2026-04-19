@@ -89,10 +89,17 @@ export function useRefreshRecurringTracking() {
       return data as { generated: number; matched: number };
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['recurring-instances'] });
-      qc.invalidateQueries({ queryKey: ['recurring-expenses'] });
+      invalidateRecurringQueries(qc);
     },
   });
+}
+
+/** Invalidate every query key that depends on instance state. */
+function invalidateRecurringQueries(qc: ReturnType<typeof useQueryClient>) {
+  qc.invalidateQueries({ queryKey: ['recurring-instances'] });
+  qc.invalidateQueries({ queryKey: ['recurring-expenses'] });
+  qc.invalidateQueries({ queryKey: ['transaction-recurring-map'] });
+  qc.invalidateQueries({ queryKey: ['transactions'] });
 }
 
 export function useMarkInstancePaid() {
@@ -108,7 +115,7 @@ export function useMarkInstancePaid() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['recurring-instances'] }),
+    onSuccess: () => invalidateRecurringQueries(qc),
   });
 }
 
@@ -122,7 +129,7 @@ export function useUnmatchInstance() {
         .eq('id', id);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['recurring-instances'] }),
+    onSuccess: () => invalidateRecurringQueries(qc),
   });
 }
 
@@ -141,6 +148,6 @@ export function useLinkInstanceToTransaction() {
         .eq('id', id);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['recurring-instances'] }),
+    onSuccess: () => invalidateRecurringQueries(qc),
   });
 }

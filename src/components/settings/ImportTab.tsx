@@ -10,12 +10,18 @@ import { useAccounts } from '@/hooks/useAccounts';
 import { useCreateTransaction, useTransactions } from '@/hooks/useTransactions';
 import { useRules } from '@/hooks/useRules';
 import { useFxRates } from '@/hooks/useFxRates';
+import { useMerchants } from '@/hooks/useMerchants';
 import { useRefreshRecurringTracking } from '@/hooks/useRecurringInstances';
 import { toUSD, type FxRateRow } from '@/lib/money';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { supabase } from '@/integrations/supabase/client';
 import { Upload, FileSpreadsheet, AlertTriangle, CheckCircle2, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
+
+/** Normalize a name for case-insensitive matching against merchants. */
+function normalizeMerchantKey(s: string): string {
+  return s.trim().toLowerCase().replace(/\s+/g, ' ');
+}
 
 type ImportStep = 'upload' | 'map' | 'preview' | 'result';
 type RowStatus = 'new' | 'duplicate' | 'skipped';
@@ -36,6 +42,7 @@ export default function ImportTab() {
   const createTx = useCreateTransaction();
   const { data: rules } = useRules();
   const { data: fxRates } = useFxRates();
+  const { data: merchants } = useMerchants();
   const refreshRecurring = useRefreshRecurringTracking();
   const [file, setFile] = useState<File | null>(null);
   const [csvData, setCsvData] = useState<string[][]>([]);
@@ -45,7 +52,7 @@ export default function ImportTab() {
   const [importing, setImporting] = useState(false);
   const [step, setStep] = useState<ImportStep>('upload');
   const [parsedRows, setParsedRows] = useState<ParsedRow[]>([]);
-  const [importResult, setImportResult] = useState({ imported: 0, skipped: 0, duplicates: 0 });
+  const [importResult, setImportResult] = useState({ imported: 0, skipped: 0, duplicates: 0, merchantsMatched: 0 });
 
   // Fetch existing transactions for duplicate detection
   const { data: existingTxs } = useTransactions({ accountId: accountId || undefined });
@@ -111,16 +118,27 @@ export default function ImportTab() {
     if (!accountId) return;
     setImporting(true);
     const account = accounts?.find(a => a.id === accountId);
-    let imported = 0, skipped = 0, duplicates = 0;
+    let imported = 0, skipped = 0, duplicates = 0, merchantsMatched = 0;
+
+    // Build merchant lookup once
+    const merchantByKey = new Map<string, { id: string; default_category_id: string | null }>();
+    (merchants || []).forEach((m: any) => {
+      merchantByKey.set(normalizeMerchantKey(m.name), { id: m.id, default_category_id: m.default_category_id });
+      if (m.display_name) merchantByKey.set(normalizeMerchantKey(m.display_name), { id: m.id, default_category_id: m.default_category_id });
+    });
 
     try {
       const selectedRows = parsedRows.filter(r => r.selected && r.status !== 'skipped');
+      const user_id_res = await supabase.auth.getUser();
+      const user_id = user_id_res.data.user?.id;
+      if (!user_id) throw new Error('Not authenticated');
 
       for (const row of selectedRows) {
         const currency = account?.currency || 'USD';
         const amountUsd = toUSD(row.amount, currency, fxRates as FxRateRow[] | undefined);
         const fxRate = row.amount !== 0 ? amountUsd / row.amount : 1;
 
+        // 1. Apply rules first (rules win for category/subscription)
         let categoryId: string | null = null;
         let isSub = false;
         if (rules) {
@@ -135,14 +153,35 @@ export default function ImportTab() {
           }
         }
 
-        const user_id_res = await supabase.auth.getUser();
-        const user_id = user_id_res.data.user?.id;
-        if (!user_id) throw new Error('Not authenticated');
+        // 2. Merchant normalization — match by name OR display_name (case-insensitive).
+        //    If matched: attach merchant_id; inherit default_category_id only if no rule set one.
+        let merchantId: string | null = null;
+        const merchantText = (row.merchant || row.description || '').trim();
+        if (merchantText) {
+          const key = normalizeMerchantKey(merchantText);
+          const direct = merchantByKey.get(key);
+          // Try exact, then "starts-with" against merchant name (handles "NETFLIX 1234" → Netflix)
+          let hit = direct;
+          if (!hit) {
+            for (const [mk, mv] of merchantByKey) {
+              if (mk.length >= 3 && (key.includes(mk) || mk.includes(key))) {
+                hit = mv;
+                break;
+              }
+            }
+          }
+          if (hit) {
+            merchantId = hit.id;
+            merchantsMatched++;
+            if (!categoryId && hit.default_category_id) categoryId = hit.default_category_id;
+          }
+        }
 
         await createTx.mutateAsync({
           date: row.date || new Date().toISOString().split('T')[0],
           description: row.description,
           merchant: row.merchant || null,
+          merchant_id: merchantId,
           amount: row.amount,
           currency,
           fx_rate: fxRate,
@@ -169,9 +208,9 @@ export default function ImportTab() {
         matchedCount = r.matched || 0;
       } catch {/* non-fatal */}
 
-      setImportResult({ imported, skipped, duplicates });
+      setImportResult({ imported, skipped, duplicates, merchantsMatched });
       setStep('result');
-      toast.success(`Imported ${imported} · ${matchedCount} matched to recurring`);
+      toast.success(`Imported ${imported} · ${merchantsMatched} merchants linked · ${matchedCount} matched to recurring`);
     } catch (e: any) { toast.error(e.message); }
     setImporting(false);
   };
@@ -324,8 +363,9 @@ export default function ImportTab() {
               <CheckCircle2 className="h-12 w-12 text-success" />
               <div className="text-center">
                 <p className="text-lg font-semibold text-foreground">Import Complete</p>
-                <div className="flex gap-3 justify-center mt-2">
+                <div className="flex gap-3 justify-center mt-2 flex-wrap">
                   <span className="text-sm text-foreground font-medium">{importResult.imported} imported</span>
+                  {importResult.merchantsMatched > 0 && <span className="text-sm text-primary">{importResult.merchantsMatched} merchants linked</span>}
                   {importResult.duplicates > 0 && <span className="text-sm text-amber-600">{importResult.duplicates} duplicates skipped</span>}
                   {importResult.skipped > 0 && <span className="text-sm text-muted-foreground">{importResult.skipped} invalid rows</span>}
                 </div>
