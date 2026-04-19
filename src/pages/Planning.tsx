@@ -33,6 +33,7 @@ export default function Planning() {
   const { data: instances, isLoading } = useRecurringInstances({ from: monthStart, to: nextMonthEnd });
   const { data: transactions } = useTransactions();
   const { data: balances } = useAccountBalances();
+  const { data: fxRates } = useFxRates();
 
   const monthIncome = useMemo(() => {
     if (!transactions) return 0;
@@ -47,13 +48,8 @@ export default function Planning() {
   );
 
   const expectedRecurring = useMemo(
-    () => monthInstances.reduce((s, i) => {
-      const usd = i.expected_currency === 'USD'
-        ? Number(i.expected_amount)
-        : Number(i.expected_amount) * (i.expected_currency === 'ARS' ? 0.000833 : 1.08);
-      return s + usd;
-    }, 0),
-    [monthInstances]
+    () => monthInstances.reduce((s, i) => s + toUSD(Number(i.expected_amount), i.expected_currency, fxRates as FxRateRow[] | undefined), 0),
+    [monthInstances, fxRates]
   );
 
   const liquidCash = useMemo(() => {
@@ -66,7 +62,7 @@ export default function Planning() {
   const overdue = monthInstances.filter(i => i.status === 'overdue');
   const dueSoon = monthInstances.filter(i => i.status === 'due_soon');
   const expected = monthInstances.filter(i => i.status === 'expected');
-  const paid = monthInstances.filter(i => i.status === 'matched' || i.status === 'paid_manual');
+  const paid = monthInstances.filter(i => isPaidStatus(i.status));
 
   const upcoming = useMemo(
     () => (instances || [])
