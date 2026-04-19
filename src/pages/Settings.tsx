@@ -17,9 +17,9 @@ import ImportTab from '@/components/settings/ImportTab';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useState } from 'react';
 
-export default function Settings() {
+export default function Settings({ initialTab: propInitialTab }: { initialTab?: string } = {}) {
   const location = useLocation();
-  const initialTab = (location.state as any)?.tab || 'integrations';
+  const initialTab = propInitialTab || (location.state as any)?.tab || 'integrations';
 
   return (
     <div className="space-y-4">

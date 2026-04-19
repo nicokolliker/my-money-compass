@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 import { format, isBefore, subDays, addMonths, addYears, addWeeks } from 'date-fns';
 import { DemoDataBanner } from '@/components/DemoDataBanner';
 import { useDemoData } from '@/hooks/useDemoData';
+import RecurringTracking from '@/components/recurring/RecurringTracking';
 
 const TYPE_LABELS: Record<string, { label: string; icon: typeof Repeat }> = {
   subscription: { label: 'Subscriptions', icon: Repeat },
@@ -176,13 +177,15 @@ export default function RecurringExpenses() {
     } catch (e: any) { toast.error(e.message); }
   };
 
+  const [topTab, setTopTab] = useState<'library' | 'tracking'>('library');
+
   if (isLoading) return <div className="flex items-center justify-center h-64 text-muted-foreground">Loading...</div>;
 
   return (
     <div className="space-y-5">
       {hasDemoData && <DemoDataBanner onCleared={onDemoCleared} />}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-foreground">Recurring Expenses</h1>
+        <h1 className="text-2xl font-bold text-foreground">Recurring</h1>
         <Dialog open={showAdd} onOpenChange={o => { setShowAdd(o); if (!o) { setEditingId(null); setForm(emptyForm); } }}>
           <DialogTrigger asChild>
             <Button size="sm"><Plus className="h-4 w-4 mr-1" /> Add</Button>
@@ -254,6 +257,16 @@ export default function RecurringExpenses() {
           </DialogContent>
         </Dialog>
       </div>
+
+      <Tabs value={topTab} onValueChange={(v) => setTopTab(v as any)}>
+        <TabsList className="w-full">
+          <TabsTrigger value="library" className="flex-1">Library</TabsTrigger>
+          <TabsTrigger value="tracking" className="flex-1">Tracking (Expected vs Actual)</TabsTrigger>
+        </TabsList>
+        <TabsContent value="tracking" className="mt-4">
+          <RecurringTracking />
+        </TabsContent>
+        <TabsContent value="library" className="mt-4 space-y-5">
 
       {/* View toggle */}
       <div className="flex items-center gap-2">
@@ -410,6 +423,8 @@ export default function RecurringExpenses() {
           );
         })}
       </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

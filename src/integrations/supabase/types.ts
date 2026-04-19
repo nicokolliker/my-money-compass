@@ -489,6 +489,72 @@ export type Database = {
           },
         ]
       }
+      recurring_instances: {
+        Row: {
+          created_at: string
+          expected_account_id: string | null
+          expected_amount: number
+          expected_currency: string
+          expected_date: string
+          id: string
+          match_confidence: number | null
+          matched_at: string | null
+          matched_transaction_id: string | null
+          notes: string | null
+          recurring_id: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expected_account_id?: string | null
+          expected_amount?: number
+          expected_currency?: string
+          expected_date: string
+          id?: string
+          match_confidence?: number | null
+          matched_at?: string | null
+          matched_transaction_id?: string | null
+          notes?: string | null
+          recurring_id: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expected_account_id?: string | null
+          expected_amount?: number
+          expected_currency?: string
+          expected_date?: string
+          id?: string
+          match_confidence?: number | null
+          matched_at?: string | null
+          matched_transaction_id?: string | null
+          notes?: string | null
+          recurring_id?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recurring_instances_matched_transaction_id_fkey"
+            columns: ["matched_transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recurring_instances_recurring_id_fkey"
+            columns: ["recurring_id"]
+            isOneToOne: false
+            referencedRelation: "recurring_expenses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rules: {
         Row: {
           category_id: string | null
@@ -840,6 +906,19 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      generate_recurring_instances: {
+        Args: {
+          p_months_ahead?: number
+          p_months_back?: number
+          p_user_id: string
+        }
+        Returns: number
+      }
+      match_recurring_instances: {
+        Args: { p_user_id: string }
+        Returns: number
+      }
+      refresh_recurring_tracking: { Args: { p_user_id: string }; Returns: Json }
       seed_demo_data: { Args: { p_user_id: string }; Returns: undefined }
     }
     Enums: {
