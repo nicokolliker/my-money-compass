@@ -356,17 +356,18 @@ export default function RecurringExpenses() {
         {filtered.map(item => {
           const cat = (item as any).categories;
           const acc = (item as any).accounts;
+          const pm = (item as any).payment_methods;
           const brand = getBrandLogo(item.name);
           const initials = getInitialsColor(item.name);
           const rec = reconciled[item.id];
-          const isOverdue = item.next_due_date && isBefore(new Date(item.next_due_date), new Date()) && item.status !== 'paid';
-          const statusKey = isOverdue ? 'overdue' : (rec?.matched ? 'paid' : item.status);
-          const st = STATUS_CONFIG[statusKey] || STATUS_CONFIG.expected;
-          const StIcon = st.icon;
+          const derived: DerivedInstanceState = rec?.derived || 'upcoming';
+          const isPaid = isDerivedPaid(derived);
+          const isMissing = derived === 'missing';
           const monthlyAmt = toMonthlyAmount(Math.abs(Number(item.amount)), item.frequency);
+          const usd = toUSD(Math.abs(Number(item.amount)), item.currency, fxRates as FxRateRow[] | undefined);
 
           return (
-            <Card key={item.id} className={isOverdue ? 'border-destructive/30' : rec?.matched ? 'border-success/30' : ''}>
+            <Card key={item.id} className={isMissing ? 'border-destructive/30' : isPaid ? 'border-success/30' : derived === 'needs_review' ? 'border-amber-500/30' : ''}>
               <CardContent className="flex items-center gap-3 py-3.5">
                 {brand ? (
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg ${brand.bg}`}>{brand.icon}</div>
@@ -380,29 +381,28 @@ export default function RecurringExpenses() {
                   </div>
                 )}
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <p className="text-sm font-semibold text-foreground truncate">{item.name}</p>
-                    <Badge variant={st.variant} className="text-[9px] h-4 px-1.5 flex items-center gap-0.5 shrink-0">
-                      <StIcon className="h-2.5 w-2.5" />{st.label}
-                    </Badge>
+                    <RecurringStatusBadge state={derived} />
                   </div>
                   <div className="flex items-center gap-1.5 mt-0.5 flex-wrap text-xs text-muted-foreground">
                     {cat && <span>{cat.icon} {cat.name}</span>}
-                    {acc && <><span>·</span><span className="flex items-center gap-0.5"><CreditCard className="h-3 w-3" />{acc.name}</span></>}
+                    {pm && <><span>·</span><span className="flex items-center gap-0.5"><CreditCard className="h-3 w-3" />{pm.name}</span></>}
+                    {acc && <><span>·</span><span className="flex items-center gap-0.5"><Wallet className="h-3 w-3" />{acc.name}</span></>}
                     {item.next_due_date && <><span>·</span><span className="flex items-center gap-0.5"><CalendarDays className="h-3 w-3" />Due {format(new Date(item.next_due_date + 'T12:00:00'), 'MMM d')}</span></>}
                   </div>
                   {/* Reconciliation info */}
-                  {rec?.matched && (
+                  {isPaid && rec?.txDate && (
                     <p className="text-[10px] text-success mt-0.5 flex items-center gap-1">
-                      <CheckCircle2 className="h-3 w-3" /> Matched {rec.txDate && format(new Date(rec.txDate + 'T12:00:00'), 'MMM d')} · {formatCurrency(rec.txAmount!, item.currency)}
-                      {rec.diff !== undefined && rec.diff !== 0 && (
+                      <CheckCircle2 className="h-3 w-3" /> Matched {format(new Date(rec.txDate + 'T12:00:00'), 'MMM d')} · {formatCurrency(rec.txAmount!, item.currency)}
+                      {rec.diff !== undefined && Math.abs(rec.diff) > 0.01 && (
                         <span className={rec.diff > 0 ? 'text-destructive' : 'text-success'}>
                           ({rec.diff > 0 ? '+' : ''}{formatCurrency(rec.diff, item.currency)})
                         </span>
                       )}
                     </p>
                   )}
-                  {!rec?.matched && isOverdue && (
+                  {isMissing && (
                     <p className="text-[10px] text-destructive mt-0.5">No matching transaction found</p>
                   )}
                 </div>
@@ -411,13 +411,13 @@ export default function RecurringExpenses() {
                     {formatCurrency(Math.abs(Number(item.amount)), item.currency)}
                   </p>
                   {item.currency !== 'USD' && (
-                    <p className="text-[10px] text-muted-foreground tabular-nums">~{formatUSD(monthlyAmt)}/mo</p>
+                    <p className="text-[10px] text-muted-foreground tabular-nums">~{formatUSD(usd)}</p>
                   )}
                   <Badge variant="secondary" className="text-[10px] h-4 px-1.5 capitalize">{item.frequency}</Badge>
                 </div>
               </CardContent>
               <div className="px-4 pb-3 flex gap-2">
-                {(isOverdue || item.status === 'expected' || item.status !== 'paid') && (
+                {!isPaid && (
                   <Button size="sm" variant="outline" className="flex-1 h-7 text-xs" onClick={() => handleConfirmPaid(item)}>
                     <CheckCircle2 className="h-3 w-3 mr-1" /> Mark Paid
                   </Button>
