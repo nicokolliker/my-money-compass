@@ -49,6 +49,7 @@ function getNextDate(current: Date, frequency: string): Date {
 export default function RecurringExpenses() {
   const { data: items, isLoading } = useRecurringExpenses();
   const { data: transactions } = useTransactions();
+  const { data: instances } = useRecurringInstances();
   const { data: categories } = useCategories();
   const { data: accounts } = useAccounts();
   const createItem = useCreateRecurringExpense();
@@ -66,30 +67,36 @@ export default function RecurringExpenses() {
   };
   const [form, setForm] = useState(emptyForm);
 
-  // Reconciliation
+  // Reconciliation — derived from canonical recurring_instances (no client-side fuzzy matching)
   const reconciled = useMemo(() => {
-    if (!items || !transactions) return {};
-    const map: Record<string, { matched: boolean; txId?: string; txDate?: string; txAmount?: number; diff?: number }> = {};
+    if (!items || !instances) return {};
+    const map: Record<string, { matched: boolean; txId?: string; txDate?: string; txAmount?: number; diff?: number; status?: string }> = {};
+    // For each recurring item, find its most recent paid/matched instance
     items.forEach(item => {
-      const name = (item.name || '').toLowerCase();
-      const recent = transactions.filter(t => {
-        if (t.type !== 'expense') return false;
-        const desc = (t.description || '').toLowerCase();
-        const merchant = (t.merchant || '').toLowerCase();
-        return desc.includes(name) || merchant.includes(name) || name.includes(merchant);
-      });
-      const lastPeriod = subDays(new Date(), 45);
-      const match = recent.find(t => new Date(t.date) >= lastPeriod);
-      if (match) {
-        const txAmt = Math.abs(Number(match.amount));
+      const itemInstances = instances
+        .filter(i => i.recurring_id === item.id && isPaidStatus(i.status))
+        .sort((a, b) => (b.expected_date > a.expected_date ? 1 : -1));
+      const last = itemInstances[0];
+      if (last && last.matched_transaction_id && (last as any).transactions) {
+        const tx = (last as any).transactions;
+        const txAmt = Math.abs(Number(tx.amount));
         const expected = Math.abs(Number(item.amount));
-        map[item.id] = { matched: true, txId: match.id, txDate: match.date, txAmount: txAmt, diff: txAmt - expected };
+        map[item.id] = {
+          matched: true,
+          txId: tx.id,
+          txDate: tx.date,
+          txAmount: txAmt,
+          diff: txAmt - expected,
+          status: last.status,
+        };
+      } else if (last) {
+        map[item.id] = { matched: true, status: last.status }; // paid_manual w/o tx
       } else {
         map[item.id] = { matched: false };
       }
     });
     return map;
-  }, [items, transactions]);
+  }, [items, instances]);
 
   const filtered = useMemo(() => {
     if (!items) return [];
@@ -102,14 +109,15 @@ export default function RecurringExpenses() {
     const active = items.filter(i => i.is_active);
     let monthly = 0, subMonthly = 0, fixedMonthly = 0;
     active.forEach(i => {
-      const m = toMonthly(Math.abs(Number(i.amount)), i.frequency);
+      const m = toMonthlyAmount(Math.abs(Number(i.amount)), i.frequency);
       monthly += m;
       if (i.type === 'subscription') subMonthly += m;
       else fixedMonthly += m;
     });
-    const overdue = active.filter(i => i.next_due_date && isBefore(new Date(i.next_due_date), new Date()) && i.status !== 'paid').length;
+    // Overdue derived from canonical instances
+    const overdue = (instances || []).filter(i => i.status === 'overdue').length;
     return { monthly, yearly: monthly * 12, active: active.length, overdue, subMonthly, fixedMonthly };
-  }, [items]);
+  }, [items, instances]);
 
   const monthIncome = useMemo(() => {
     if (!transactions) return 0;
