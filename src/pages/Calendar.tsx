@@ -1,50 +1,36 @@
-import { useState, useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { useRecurringExpenses } from '@/hooks/useRecurringExpenses';
-import { useTransactions } from '@/hooks/useTransactions';
+import { useRecurringInstances, useRefreshRecurringTracking, useMarkInstancePaid } from '@/hooks/useRecurringInstances';
 import { formatCurrency, formatUSD } from '@/lib/constants';
 import { getBrandLogo, getInitialsColor } from '@/lib/brandLogos';
-import { ChevronLeft, ChevronRight, CalendarDays, AlertCircle, CreditCard } from 'lucide-react';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isToday, isBefore, addMonths, subMonths, getDay, subDays } from 'date-fns';
+import {
+  ChevronLeft, ChevronRight, CalendarDays, AlertCircle, CreditCard, RefreshCw, CheckCircle2,
+} from 'lucide-react';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isToday, addMonths, subMonths, getDay } from 'date-fns';
+import { toast } from 'sonner';
 
 export default function CalendarPage() {
-  const { data: items, isLoading } = useRecurringExpenses();
-  const { data: transactions } = useTransactions();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [view, setView] = useState<'calendar' | 'timeline'>('timeline');
+  const monthStart = startOfMonth(currentMonth).toISOString().split('T')[0];
+  const monthEnd = endOfMonth(currentMonth).toISOString().split('T')[0];
 
-  // Reconcile to determine paid status
-  const reconciled = useMemo(() => {
-    if (!items || !transactions) return {};
-    const map: Record<string, boolean> = {};
-    items.forEach(item => {
-      const name = (item.name || '').toLowerCase();
-      const match = transactions.some(t => {
-        if (t.type !== 'expense') return false;
-        const desc = (t.description || '').toLowerCase();
-        const merchant = (t.merchant || '').toLowerCase();
-        return (desc.includes(name) || merchant.includes(name)) && new Date(t.date) >= subDays(new Date(), 45);
-      });
-      map[item.id] = match || item.status === 'paid';
-    });
-    return map;
-  }, [items, transactions]);
+  const { data: instances, isLoading } = useRecurringInstances({ from: monthStart, to: monthEnd });
+  const refresh = useRefreshRecurringTracking();
+  const markPaid = useMarkInstancePaid();
 
-  const upcoming = useMemo(() => {
-    if (!items) return [];
-    const now = new Date();
-    return items
-      .filter(i => i.is_active && i.next_due_date)
-      .map(i => ({
-        ...i,
-        dueDate: new Date(i.next_due_date + 'T12:00:00'),
-        isOverdue: isBefore(new Date(i.next_due_date + 'T12:00:00'), now) && !reconciled[i.id],
-        isPaid: reconciled[i.id] || false,
-      }))
-      .sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime());
-  }, [items, reconciled]);
+  const items = useMemo(() => {
+    if (!instances) return [];
+    return instances.map(i => ({
+      ...i,
+      dueDate: new Date(i.expected_date + 'T12:00:00'),
+      isPaid: i.status === 'matched' || i.status === 'paid_manual',
+      isOverdue: i.status === 'overdue',
+      isDueSoon: i.status === 'due_soon',
+    })).sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime());
+  }, [instances]);
 
   const calendarDays = useMemo(() => {
     const start = startOfMonth(currentMonth);
@@ -55,19 +41,27 @@ export default function CalendarPage() {
   }, [currentMonth]);
 
   const dayEvents = useMemo(() => {
-    if (!items) return {};
-    const map: Record<string, typeof upcoming> = {};
-    upcoming.forEach(item => {
-      const d = item.next_due_date!;
+    const map: Record<string, typeof items> = {};
+    items.forEach(item => {
+      const d = item.expected_date;
       if (!map[d]) map[d] = [];
-      map[d].push(item as any);
+      map[d].push(item);
     });
     return map;
-  }, [upcoming, items]);
+  }, [items]);
 
-  const totalUpcoming = upcoming.reduce((s, i) => s + Math.abs(Number(i.amount)), 0);
-  const overdueCount = upcoming.filter(i => i.isOverdue).length;
-  const paidCount = upcoming.filter(i => i.isPaid).length;
+  const totalUpcoming = items
+    .filter(i => !i.isPaid)
+    .reduce((s, i) => s + (i.expected_currency === 'USD' ? Number(i.expected_amount) : Number(i.expected_amount) * (i.expected_currency === 'ARS' ? 0.000833 : 1.08)), 0);
+  const overdueCount = items.filter(i => i.isOverdue).length;
+  const paidCount = items.filter(i => i.isPaid).length;
+
+  const handleRefresh = async () => {
+    try {
+      const r = await refresh.mutateAsync();
+      toast.success(`Refreshed: ${r.matched} matched`);
+    } catch (e: any) { toast.error(e.message); }
+  };
 
   if (isLoading) return <div className="flex items-center justify-center h-64 text-muted-foreground">Loading...</div>;
 
@@ -75,9 +69,14 @@ export default function CalendarPage() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-foreground">Payments Calendar</h1>
-        <div className="flex rounded-xl overflow-hidden border">
-          <Button variant={view === 'timeline' ? 'secondary' : 'ghost'} size="sm" className="rounded-none h-8 text-xs" onClick={() => setView('timeline')}>Timeline</Button>
-          <Button variant={view === 'calendar' ? 'secondary' : 'ghost'} size="sm" className="rounded-none h-8 text-xs" onClick={() => setView('calendar')}>Calendar</Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refresh.isPending}>
+            <RefreshCw className={`h-3.5 w-3.5 ${refresh.isPending ? 'animate-spin' : ''}`} />
+          </Button>
+          <div className="flex rounded-xl overflow-hidden border">
+            <Button variant={view === 'timeline' ? 'secondary' : 'ghost'} size="sm" className="rounded-none h-8 text-xs" onClick={() => setView('timeline')}>Timeline</Button>
+            <Button variant={view === 'calendar' ? 'secondary' : 'ghost'} size="sm" className="rounded-none h-8 text-xs" onClick={() => setView('calendar')}>Calendar</Button>
+          </div>
         </div>
       </div>
 
@@ -106,7 +105,7 @@ export default function CalendarPage() {
         <Card>
           <CardContent className="pt-4 pb-4 flex items-center gap-3">
             <div className="w-9 h-9 rounded-full bg-success/10 flex items-center justify-center">
-              <CalendarDays className="h-4 w-4 text-success" />
+              <CheckCircle2 className="h-4 w-4 text-success" />
             </div>
             <div>
               <p className="text-[10px] text-muted-foreground">Paid</p>
@@ -118,21 +117,28 @@ export default function CalendarPage() {
 
       {view === 'timeline' ? (
         <div className="space-y-2">
-          {upcoming.length === 0 && (
+          {items.length === 0 && (
             <div className="text-center py-12 text-muted-foreground">
               <CalendarDays className="h-10 w-10 mx-auto mb-3 opacity-40" />
-              <p>No upcoming payments</p>
+              <p>No expected payments this month</p>
+              <Button variant="outline" size="sm" className="mt-3" onClick={handleRefresh}>Generate instances</Button>
             </div>
           )}
-          {upcoming.map(item => {
-            const brand = getBrandLogo(item.name);
-            const initials = getInitialsColor(item.name);
-            const cat = (item as any).categories;
-            const acc = (item as any).accounts;
+          {items.map(item => {
+            const r = (item as any).recurring_expenses;
+            const name = r?.name || 'Recurring';
+            const brand = getBrandLogo(name);
+            const initials = getInitialsColor(name);
+            const cat = r?.categories;
+            const acc = r?.accounts;
             const daysUntil = Math.ceil((item.dueDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
 
             return (
-              <Card key={item.id} className={item.isPaid ? 'border-success/30 opacity-75' : item.isOverdue ? 'border-destructive/30' : daysUntil <= 3 ? 'border-amber-500/30' : ''}>
+              <Card key={item.id} className={
+                item.isPaid ? 'border-success/30 opacity-75' :
+                item.isOverdue ? 'border-destructive/30' :
+                item.isDueSoon ? 'border-amber-500/30' : ''
+              }>
                 <CardContent className="flex items-center gap-3 py-3.5">
                   <div className="text-center shrink-0 w-12">
                     <p className="text-[10px] text-muted-foreground uppercase">{format(item.dueDate, 'MMM')}</p>
@@ -143,30 +149,38 @@ export default function CalendarPage() {
                     <div className={`w-9 h-9 rounded-full flex items-center justify-center text-base ${brand.bg}`}>{brand.icon}</div>
                   ) : (
                     <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold ${initials.bg} ${initials.text}`}>
-                      {item.name[0]?.toUpperCase()}
+                      {name[0]?.toUpperCase()}
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-foreground truncate">{item.name}</p>
+                    <p className="text-sm font-semibold text-foreground truncate">{name}</p>
                     <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                       {cat && <span>{cat.icon} {cat.name}</span>}
                       {acc && <><span>·</span><span className="flex items-center gap-0.5"><CreditCard className="h-3 w-3" />{acc.name}</span></>}
                     </div>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="text-sm font-bold text-foreground tabular-nums">{formatCurrency(Math.abs(Number(item.amount)), item.currency)}</p>
-                    {item.currency !== 'USD' && <p className="text-[10px] text-muted-foreground">~{formatUSD(Math.abs(Number(item.amount)))}</p>}
+                    <p className="text-sm font-bold text-foreground tabular-nums">{formatCurrency(Number(item.expected_amount), item.expected_currency)}</p>
+                    {item.expected_currency !== 'USD' && <p className="text-[10px] text-muted-foreground">~{formatUSD(Number(item.expected_amount) * (item.expected_currency === 'ARS' ? 0.000833 : 1.08))}</p>}
                     {item.isPaid ? (
-                      <Badge className="text-[9px] h-4 px-1.5 bg-success text-success-foreground">Paid</Badge>
+                      <Badge className="text-[9px] h-4 px-1.5 bg-success text-success-foreground">{item.status === 'matched' ? 'Matched' : 'Paid'}</Badge>
                     ) : item.isOverdue ? (
                       <Badge variant="destructive" className="text-[9px] h-4 px-1.5">Overdue</Badge>
-                    ) : daysUntil <= 3 ? (
-                      <Badge variant="secondary" className="text-[9px] h-4 px-1.5">In {daysUntil}d</Badge>
+                    ) : item.isDueSoon ? (
+                      <Badge variant="secondary" className="text-[9px] h-4 px-1.5">In {Math.max(daysUntil, 0)}d</Badge>
                     ) : (
                       <span className="text-[10px] text-muted-foreground">{daysUntil}d away</span>
                     )}
                   </div>
                 </CardContent>
+                {!item.isPaid && (
+                  <div className="px-4 pb-3">
+                    <Button size="sm" variant="outline" className="h-7 text-xs"
+                      onClick={() => markPaid.mutateAsync(item.id).then(() => toast.success('Marked paid'))}>
+                      <CheckCircle2 className="h-3 w-3 mr-1" /> Mark paid
+                    </Button>
+                  </div>
+                )}
               </Card>
             );
           })}
@@ -187,9 +201,6 @@ export default function CalendarPage() {
               {calendarDays.days.map(day => {
                 const key = format(day, 'yyyy-MM-dd');
                 const events = dayEvents[key] || [];
-                const hasOverdue = events.some((e: any) => e.isOverdue);
-                const hasPaid = events.some((e: any) => e.isPaid);
-                const hasUpcoming = events.some((e: any) => !e.isPaid && !e.isOverdue);
                 return (
                   <div key={key} className={`min-h-[3rem] p-0.5 rounded-lg text-center ${isToday(day) ? 'bg-primary/10 ring-1 ring-primary/30' : ''}`}>
                     <p className={`text-xs ${isToday(day) ? 'font-bold text-primary' : 'text-foreground'}`}>{format(day, 'd')}</p>
@@ -198,8 +209,8 @@ export default function CalendarPage() {
                         {events.slice(0, 2).map((e: any) => (
                           <div
                             key={e.id}
-                            className={`w-1.5 h-1.5 rounded-full ${e.isPaid ? 'bg-success' : e.isOverdue ? 'bg-destructive' : 'bg-amber-500'}`}
-                            title={`${e.name} - ${e.isPaid ? 'Paid' : e.isOverdue ? 'Overdue' : 'Upcoming'}`}
+                            className={`w-1.5 h-1.5 rounded-full ${e.isPaid ? 'bg-success' : e.isOverdue ? 'bg-destructive' : e.isDueSoon ? 'bg-amber-500' : 'bg-muted-foreground'}`}
+                            title={`${(e as any).recurring_expenses?.name} · ${e.status}`}
                           />
                         ))}
                         {events.length > 2 && <span className="text-[8px] text-muted-foreground">+{events.length - 2}</span>}
@@ -209,11 +220,11 @@ export default function CalendarPage() {
                 );
               })}
             </div>
-            {/* Legend */}
             <div className="flex items-center gap-4 mt-3 pt-3 border-t justify-center">
               <div className="flex items-center gap-1 text-[10px] text-muted-foreground"><div className="w-2 h-2 rounded-full bg-success" /> Paid</div>
-              <div className="flex items-center gap-1 text-[10px] text-muted-foreground"><div className="w-2 h-2 rounded-full bg-amber-500" /> Upcoming</div>
+              <div className="flex items-center gap-1 text-[10px] text-muted-foreground"><div className="w-2 h-2 rounded-full bg-amber-500" /> Due soon</div>
               <div className="flex items-center gap-1 text-[10px] text-muted-foreground"><div className="w-2 h-2 rounded-full bg-destructive" /> Overdue</div>
+              <div className="flex items-center gap-1 text-[10px] text-muted-foreground"><div className="w-2 h-2 rounded-full bg-muted-foreground" /> Expected</div>
             </div>
           </CardContent>
         </Card>
