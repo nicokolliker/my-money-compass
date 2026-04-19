@@ -10,6 +10,8 @@ import {
   useUnmatchInstance,
 } from '@/hooks/useRecurringInstances';
 import { formatCurrency, formatUSD } from '@/lib/constants';
+import { toUSD, INSTANCE_STATUS_META, TONE_CLASS, isPaidStatus, type FxRateRow } from '@/lib/money';
+import { useFxRates } from '@/hooks/useFxRates';
 import { format, startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns';
 import {
   ChevronLeft, ChevronRight, RefreshCw, CheckCircle2, AlertCircle, Clock,
@@ -17,15 +19,9 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-const STATUS_META: Record<string, { label: string; cls: string }> = {
-  matched:     { label: 'Matched',  cls: 'bg-success/10 text-success border-success/30' },
-  paid_manual: { label: 'Paid',     cls: 'bg-success/10 text-success border-success/30' },
-  due_soon:    { label: 'Due soon', cls: 'bg-amber-500/10 text-amber-600 border-amber-500/30' },
-  overdue:     { label: 'Overdue',  cls: 'bg-destructive/10 text-destructive border-destructive/30' },
-  expected:    { label: 'Expected', cls: 'bg-muted text-muted-foreground border-border' },
-  mismatch:    { label: 'Mismatch', cls: 'bg-amber-500/10 text-amber-600 border-amber-500/30' },
-  skipped:     { label: 'Skipped',  cls: 'bg-muted text-muted-foreground border-border' },
-};
+const STATUS_META = Object.fromEntries(
+  Object.entries(INSTANCE_STATUS_META).map(([k, v]) => [k, { label: v.label, cls: TONE_CLASS[v.tone] }])
+) as Record<string, { label: string; cls: string }>;
 
 export default function RecurringTracking() {
   const [month, setMonth] = useState(new Date());
@@ -34,6 +30,7 @@ export default function RecurringTracking() {
   const monthEnd = endOfMonth(month).toISOString().split('T')[0];
 
   const { data: instances, isLoading } = useRecurringInstances({ from: monthStart, to: monthEnd });
+  const { data: fxRates } = useFxRates();
   const refresh = useRefreshRecurringTracking();
   const markPaid = useMarkInstancePaid();
   const unmatch = useUnmatchInstance();
@@ -41,8 +38,8 @@ export default function RecurringTracking() {
   const filtered = useMemo(() => {
     if (!instances) return [];
     if (filter === 'all') return instances;
-    if (filter === 'paid') return instances.filter(i => i.status === 'matched' || i.status === 'paid_manual');
-    if (filter === 'pending') return instances.filter(i => ['expected', 'due_soon', 'overdue'].includes(i.status));
+    if (filter === 'paid') return instances.filter(i => isPaidStatus(i.status));
+    if (filter === 'pending') return instances.filter(i => ['expected', 'due_soon', 'overdue', 'needs_review'].includes(i.status));
     return instances.filter(i => i.status === filter);
   }, [instances, filter]);
 
@@ -50,16 +47,14 @@ export default function RecurringTracking() {
     if (!instances) return { expected: 0, paid: 0, pending: 0, overdue: 0 };
     let expected = 0, paid = 0, pending = 0, overdue = 0;
     instances.forEach(i => {
-      const usd = i.expected_currency === 'USD'
-        ? Number(i.expected_amount)
-        : Number(i.expected_amount) * (i.expected_currency === 'ARS' ? 0.000833 : 1.08);
+      const usd = toUSD(Number(i.expected_amount), i.expected_currency, fxRates as FxRateRow[] | undefined);
       expected += usd;
-      if (i.status === 'matched' || i.status === 'paid_manual') paid += usd;
+      if (isPaidStatus(i.status)) paid += usd;
       else if (i.status === 'overdue') { overdue += usd; pending += usd; }
       else pending += usd;
     });
     return { expected, paid, pending, overdue };
-  }, [instances]);
+  }, [instances, fxRates]);
 
   const handleRefresh = async () => {
     try {

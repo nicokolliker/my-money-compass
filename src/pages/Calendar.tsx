@@ -3,7 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useRecurringInstances, useRefreshRecurringTracking, useMarkInstancePaid } from '@/hooks/useRecurringInstances';
+import { useFxRates } from '@/hooks/useFxRates';
 import { formatCurrency, formatUSD } from '@/lib/constants';
+import { toUSD, isPaidStatus, type FxRateRow } from '@/lib/money';
 import { getBrandLogo, getInitialsColor } from '@/lib/brandLogos';
 import {
   ChevronLeft, ChevronRight, CalendarDays, AlertCircle, CreditCard, RefreshCw, CheckCircle2,
@@ -18,6 +20,7 @@ export default function CalendarPage() {
   const monthEnd = endOfMonth(currentMonth).toISOString().split('T')[0];
 
   const { data: instances, isLoading } = useRecurringInstances({ from: monthStart, to: monthEnd });
+  const { data: fxRates } = useFxRates();
   const refresh = useRefreshRecurringTracking();
   const markPaid = useMarkInstancePaid();
 
@@ -26,7 +29,7 @@ export default function CalendarPage() {
     return instances.map(i => ({
       ...i,
       dueDate: new Date(i.expected_date + 'T12:00:00'),
-      isPaid: i.status === 'matched' || i.status === 'paid_manual',
+      isPaid: isPaidStatus(i.status),
       isOverdue: i.status === 'overdue',
       isDueSoon: i.status === 'due_soon',
     })).sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime());
@@ -52,7 +55,7 @@ export default function CalendarPage() {
 
   const totalUpcoming = items
     .filter(i => !i.isPaid)
-    .reduce((s, i) => s + (i.expected_currency === 'USD' ? Number(i.expected_amount) : Number(i.expected_amount) * (i.expected_currency === 'ARS' ? 0.000833 : 1.08)), 0);
+    .reduce((s, i) => s + toUSD(Number(i.expected_amount), i.expected_currency, fxRates as FxRateRow[] | undefined), 0);
   const overdueCount = items.filter(i => i.isOverdue).length;
   const paidCount = items.filter(i => i.isPaid).length;
 
@@ -161,7 +164,7 @@ export default function CalendarPage() {
                   </div>
                   <div className="text-right shrink-0">
                     <p className="text-sm font-bold text-foreground tabular-nums">{formatCurrency(Number(item.expected_amount), item.expected_currency)}</p>
-                    {item.expected_currency !== 'USD' && <p className="text-[10px] text-muted-foreground">~{formatUSD(Number(item.expected_amount) * (item.expected_currency === 'ARS' ? 0.000833 : 1.08))}</p>}
+                    {item.expected_currency !== 'USD' && <p className="text-[10px] text-muted-foreground">~{formatUSD(toUSD(Number(item.expected_amount), item.expected_currency, fxRates as FxRateRow[] | undefined))}</p>}
                     {item.isPaid ? (
                       <Badge className="text-[9px] h-4 px-1.5 bg-success text-success-foreground">{item.status === 'matched' ? 'Matched' : 'Paid'}</Badge>
                     ) : item.isOverdue ? (

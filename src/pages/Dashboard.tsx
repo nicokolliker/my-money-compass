@@ -3,7 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAccountBalances } from '@/hooks/useAccounts';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useRecurringExpenses } from '@/hooks/useRecurringExpenses';
+import { useRecurringInstances } from '@/hooks/useRecurringInstances';
 import { formatUSD, formatCurrency, ASSET_TYPES, LIABILITY_TYPES } from '@/lib/constants';
+import { toMonthlyAmount } from '@/lib/money';
 import { getCategoryColor, getCategoryHex } from '@/lib/categoryColors';
 import { getCategoryIcon } from '@/lib/brandLogos';
 import { TrendingUp, TrendingDown, ArrowUpDown, DollarSign, ArrowUp, ArrowDown, CalendarDays, Repeat, Building, AlertTriangle } from 'lucide-react';
@@ -21,6 +23,7 @@ export default function Dashboard() {
   const { data: transactions } = useTransactions();
   const { data: blueDollar } = useBlueDollarRate();
   const { data: recurringItems } = useRecurringExpenses();
+  const { data: instances } = useRecurringInstances();
 
   const { hasDemoData, onCleared: onDemoCleared } = useDemoData();
 
@@ -85,22 +88,17 @@ export default function Dashboard() {
     const active = recurringItems.filter(i => i.is_active);
     let monthlyTotal = 0;
     active.forEach(i => {
-      const amt = Math.abs(Number(i.amount));
-      switch (i.frequency) {
-        case 'weekly': monthlyTotal += amt * 4.33; break;
-        case 'quarterly': monthlyTotal += amt / 3; break;
-        case 'yearly': monthlyTotal += amt / 12; break;
-        default: monthlyTotal += amt;
-      }
+      monthlyTotal += toMonthlyAmount(Math.abs(Number(i.amount)), i.frequency);
     });
-    const overdue = active.filter(i => i.next_due_date && isBefore(new Date(i.next_due_date), new Date()) && i.status !== 'paid').length;
+    // Overdue derived from canonical recurring_instances
+    const overdue = (instances || []).filter(i => i.status === 'overdue').length;
     const upcoming = active
       .filter(i => i.next_due_date)
       .sort((a, b) => new Date(a.next_due_date!).getTime() - new Date(b.next_due_date!).getTime())
       .slice(0, 3);
     const fixedPct = totalMonthSpending > 0 ? (monthlyTotal / totalMonthSpending * 100) : 0;
     return { monthlyTotal, overdue, upcoming, fixedPct };
-  }, [recurringItems, totalMonthSpending]);
+  }, [recurringItems, instances, totalMonthSpending]);
 
   const byCurrency: Record<string, number> = {};
   accountBalances?.forEach(a => { byCurrency[a.currency] = (byCurrency[a.currency] || 0) + a.computed_balance; });

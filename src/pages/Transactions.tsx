@@ -4,7 +4,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useTransactions, useDeleteTransaction, useUpdateTransaction } from '@/hooks/useTransactions';
 import { useAccounts } from '@/hooks/useAccounts';
 import { useCategories } from '@/hooks/useCategories';
-import { useRecurringExpenses } from '@/hooks/useRecurringExpenses';
+import { useTransactionRecurringMap } from '@/hooks/useTransactionRecurringMap';
 import { formatCurrency, formatUSD, TRANSACTION_TYPE_LABELS } from '@/lib/constants';
 import { getCategoryColor } from '@/lib/categoryColors';
 import { getBrandLogo, getInitialsColor, getCategoryIcon } from '@/lib/brandLogos';
@@ -99,26 +99,10 @@ export default function Transactions() {
   });
   const { data: accounts } = useAccounts();
   const { data: categories } = useCategories();
-  const { data: recurringItems } = useRecurringExpenses();
+  const { data: recurringMatchMap = {} } = useTransactionRecurringMap();
   const deleteTx = useDeleteTransaction();
   const updateTx = useUpdateTransaction();
   const { hasDemoData, onCleared: onDemoCleared } = useDemoData();
-
-  // Match transactions to recurring items
-  const recurringMatchMap = useMemo(() => {
-    if (!transactions || !recurringItems) return {};
-    const map: Record<string, string> = {};
-    transactions.forEach(tx => {
-      const desc = (tx.description || '').toLowerCase();
-      const merchant = (tx.merchant || '').toLowerCase();
-      const match = recurringItems.find(r => {
-        const name = r.name.toLowerCase();
-        return desc.includes(name) || merchant.includes(name) || name.includes(merchant);
-      });
-      if (match) map[tx.id] = match.name;
-    });
-    return map;
-  }, [transactions, recurringItems]);
 
   const grouped = useMemo(() => {
     if (!transactions) return [];
@@ -266,7 +250,7 @@ export default function Transactions() {
                           {tx.is_subscription && <Badge variant="secondary" className="text-[10px] h-4 px-1.5 font-medium">🔄 Recurring</Badge>}
                           {recurringMatchMap[tx.id] && (
                             <Badge variant="outline" className="text-[10px] h-4 px-1.5 font-medium flex items-center gap-0.5">
-                              <Link2 className="h-2.5 w-2.5" /> {recurringMatchMap[tx.id]}
+                              <Link2 className="h-2.5 w-2.5" /> {recurringMatchMap[tx.id].recurring_name}
                             </Badge>
                           )}
                         </div>
