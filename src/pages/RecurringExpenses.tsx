@@ -54,6 +54,7 @@ export default function RecurringExpenses() {
   const { data: instances } = useDerivedInstances();
   const { data: categories } = useCategories();
   const { data: accounts } = useAccounts();
+  const { data: fxRates } = useFxRates();
   const createItem = useCreateRecurringExpense();
   const updateItem = useUpdateRecurringExpense();
   const deleteItem = useDeleteRecurringExpense();
@@ -69,32 +70,37 @@ export default function RecurringExpenses() {
   };
   const [form, setForm] = useState(emptyForm);
 
-  // Reconciliation — derived from canonical recurring_instances (no client-side fuzzy matching)
+  // Per-item derived state from canonical recurring_instances.
+  // Picks the most relevant instance: latest paid/matched OR nearest upcoming/missing.
   const reconciled = useMemo(() => {
     if (!items || !instances) return {};
-    const map: Record<string, { matched: boolean; txId?: string; txDate?: string; txAmount?: number; diff?: number; status?: string }> = {};
+    const map: Record<string, {
+      derived: DerivedInstanceState;
+      txId?: string;
+      txDate?: string;
+      txAmount?: number;
+      diff?: number;
+    }> = {};
     items.forEach(item => {
-      const itemInstances = instances
-        .filter(i => i.recurring_id === item.id && isDerivedPaid(i.derived))
-        .sort((a, b) => (b.expected_date > a.expected_date ? 1 : -1));
-      const last = itemInstances[0];
-      if (last && last.matched_transaction_id && (last as any).transactions) {
-        const tx = (last as any).transactions;
-        const txAmt = Math.abs(Number(tx.amount));
-        const expected = Math.abs(Number(item.amount));
-        map[item.id] = {
-          matched: true,
-          txId: tx.id,
-          txDate: tx.date,
-          txAmount: txAmt,
-          diff: txAmt - expected,
-          status: last.derived,
-        };
-      } else if (last) {
-        map[item.id] = { matched: true, status: last.derived };
-      } else {
-        map[item.id] = { matched: false };
-      }
+      const own = instances.filter(i => i.recurring_id === item.id);
+      // Prefer latest paid; else nearest upcoming/needs_review; else most recent missing.
+      const paid = own.filter(i => isDerivedPaid(i.derived))
+        .sort((a, b) => (b.expected_date > a.expected_date ? 1 : -1))[0];
+      const upcoming = own.filter(i => i.derived === 'upcoming' || i.derived === 'needs_review')
+        .sort((a, b) => (a.expected_date > b.expected_date ? 1 : -1))[0];
+      const missing = own.filter(i => i.derived === 'missing')
+        .sort((a, b) => (b.expected_date > a.expected_date ? 1 : -1))[0];
+      const pick = paid || upcoming || missing;
+      if (!pick) { map[item.id] = { derived: 'upcoming' }; return; }
+      const tx = (pick as any).transactions;
+      const expected = Math.abs(Number(item.amount));
+      map[item.id] = {
+        derived: pick.derived,
+        txId: tx?.id,
+        txDate: tx?.date,
+        txAmount: tx ? Math.abs(Number(tx.amount)) : undefined,
+        diff: tx ? Math.abs(Number(tx.amount)) - expected : undefined,
+      };
     });
     return map;
   }, [items, instances]);
