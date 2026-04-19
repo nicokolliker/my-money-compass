@@ -2,34 +2,41 @@ import { useMemo, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
-  useRecurringInstances,
+  useDerivedInstances,
   useRefreshRecurringTracking,
   useMarkInstancePaid,
   useUnmatchInstance,
+  type DerivedRecurringInstance,
 } from '@/hooks/useRecurringInstances';
 import { formatCurrency, formatUSD } from '@/lib/constants';
-import { toUSD, INSTANCE_STATUS_META, TONE_CLASS, isPaidStatus, type FxRateRow } from '@/lib/money';
+import { toUSD, DERIVED_STATE_META, TONE_CLASS, isDerivedPaid, type FxRateRow, type DerivedInstanceState } from '@/lib/money';
 import { useFxRates } from '@/hooks/useFxRates';
 import { format, startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns';
 import {
-  ChevronLeft, ChevronRight, RefreshCw, CheckCircle2, AlertCircle, Clock,
-  Link2, X, ArrowUpDown,
+  ChevronLeft, ChevronRight, RefreshCw, CheckCircle2, Clock,
+  Link2, X,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import ManualMatchDialog from './ManualMatchDialog';
 
-const STATUS_META = Object.fromEntries(
-  Object.entries(INSTANCE_STATUS_META).map(([k, v]) => [k, { label: v.label, cls: TONE_CLASS[v.tone] }])
-) as Record<string, { label: string; cls: string }>;
+const FILTERS: { v: 'all' | DerivedInstanceState; label: string }[] = [
+  { v: 'all', label: 'All' },
+  { v: 'upcoming', label: 'Upcoming' },
+  { v: 'needs_review', label: 'Needs review' },
+  { v: 'missing', label: 'Missing' },
+  { v: 'matched', label: 'Matched' },
+  { v: 'paid_manual', label: 'Paid' },
+];
 
 export default function RecurringTracking() {
   const [month, setMonth] = useState(new Date());
-  const [filter, setFilter] = useState<string>('all');
+  const [filter, setFilter] = useState<'all' | DerivedInstanceState>('all');
+  const [linkTarget, setLinkTarget] = useState<DerivedRecurringInstance | null>(null);
   const monthStart = startOfMonth(month).toISOString().split('T')[0];
   const monthEnd = endOfMonth(month).toISOString().split('T')[0];
 
-  const { data: instances, isLoading } = useRecurringInstances({ from: monthStart, to: monthEnd });
+  const { data: instances, isLoading } = useDerivedInstances({ from: monthStart, to: monthEnd });
   const { data: fxRates } = useFxRates();
   const refresh = useRefreshRecurringTracking();
   const markPaid = useMarkInstancePaid();
@@ -38,22 +45,23 @@ export default function RecurringTracking() {
   const filtered = useMemo(() => {
     if (!instances) return [];
     if (filter === 'all') return instances;
-    if (filter === 'paid') return instances.filter(i => isPaidStatus(i.status));
-    if (filter === 'pending') return instances.filter(i => ['expected', 'due_soon', 'overdue', 'needs_review'].includes(i.status));
-    return instances.filter(i => i.status === filter);
+    return instances.filter(i => i.derived === filter);
   }, [instances, filter]);
 
   const totals = useMemo(() => {
-    if (!instances) return { expected: 0, paid: 0, pending: 0, overdue: 0 };
-    let expected = 0, paid = 0, pending = 0, overdue = 0;
-    instances.forEach(i => {
+    const t = { expected: 0, paid: 0, upcoming: 0, missing: 0, needsReview: 0, matched: 0 };
+    (instances || []).forEach(i => {
       const usd = toUSD(Number(i.expected_amount), i.expected_currency, fxRates as FxRateRow[] | undefined);
-      expected += usd;
-      if (isPaidStatus(i.status)) paid += usd;
-      else if (i.status === 'overdue') { overdue += usd; pending += usd; }
-      else pending += usd;
+      t.expected += usd;
+      if (isDerivedPaid(i.derived)) t.paid += usd;
+      switch (i.derived) {
+        case 'upcoming': t.upcoming += 1; break;
+        case 'missing': t.missing += 1; break;
+        case 'needs_review': t.needsReview += 1; break;
+        case 'matched': t.matched += 1; break;
+      }
     });
-    return { expected, paid, pending, overdue };
+    return t;
   }, [instances, fxRates]);
 
   const handleRefresh = async () => {
@@ -86,20 +94,13 @@ export default function RecurringTracking() {
       <div className="grid grid-cols-4 gap-2">
         <Card><CardContent className="pt-3 pb-3"><p className="text-[10px] text-muted-foreground">Expected</p><p className="text-base font-bold">{formatUSD(totals.expected)}</p></CardContent></Card>
         <Card><CardContent className="pt-3 pb-3"><p className="text-[10px] text-success">Paid</p><p className="text-base font-bold">{formatUSD(totals.paid)}</p></CardContent></Card>
-        <Card><CardContent className="pt-3 pb-3"><p className="text-[10px] text-amber-600">Pending</p><p className="text-base font-bold">{formatUSD(totals.pending)}</p></CardContent></Card>
-        <Card><CardContent className="pt-3 pb-3"><p className="text-[10px] text-destructive">Overdue</p><p className="text-base font-bold">{formatUSD(totals.overdue)}</p></CardContent></Card>
+        <Card><CardContent className="pt-3 pb-3"><p className="text-[10px] text-amber-600">Needs review</p><p className="text-base font-bold">{totals.needsReview}</p></CardContent></Card>
+        <Card><CardContent className="pt-3 pb-3"><p className="text-[10px] text-destructive">Missing</p><p className="text-base font-bold">{totals.missing}</p></CardContent></Card>
       </div>
 
       {/* Filter chips */}
       <div className="flex gap-1.5 overflow-x-auto pb-1">
-        {[
-          { v: 'all', label: 'All' },
-          { v: 'pending', label: 'Pending' },
-          { v: 'paid', label: 'Paid' },
-          { v: 'overdue', label: 'Overdue' },
-          { v: 'matched', label: 'Matched' },
-          { v: 'mismatch', label: 'Mismatch' },
-        ].map(f => (
+        {FILTERS.map(f => (
           <Button key={f.v} variant={filter === f.v ? 'default' : 'outline'} size="sm" className="h-7 text-xs shrink-0"
             onClick={() => setFilter(f.v)}>{f.label}</Button>
         ))}
@@ -117,14 +118,16 @@ export default function RecurringTracking() {
         {filtered.map(i => {
           const r = (i as any).recurring_expenses;
           const tx = (i as any).transactions;
-          const meta = STATUS_META[i.status];
-          const isPaid = i.status === 'matched' || i.status === 'paid_manual';
+          const meta = DERIVED_STATE_META[i.derived];
+          const cls = TONE_CLASS[meta.tone];
+          const isPaid = isDerivedPaid(i.derived);
+          const canLink = i.derived === 'upcoming' || i.derived === 'needs_review' || i.derived === 'missing';
           const diff = tx ? Math.abs(Number(tx.amount)) - Number(i.expected_amount) : 0;
           return (
             <Card key={i.id} className={
-              i.status === 'overdue' ? 'border-destructive/30' :
+              i.derived === 'missing' ? 'border-destructive/30' :
               isPaid ? 'border-success/30' :
-              i.status === 'due_soon' ? 'border-amber-500/30' : ''
+              i.derived === 'needs_review' ? 'border-amber-500/30' : ''
             }>
               <CardContent className="py-3">
                 <div className="flex items-center gap-3">
@@ -142,7 +145,7 @@ export default function RecurringTracking() {
                   </div>
                   <div className="text-right shrink-0">
                     <p className="text-sm font-bold tabular-nums">{formatCurrency(Number(i.expected_amount), i.expected_currency)}</p>
-                    <Badge variant="outline" className={`text-[9px] h-4 px-1.5 mt-0.5 ${meta.cls}`}>{meta.label}</Badge>
+                    <Badge variant="outline" className={`text-[9px] h-4 px-1.5 mt-0.5 ${cls}`}>{meta.label}</Badge>
                   </div>
                 </div>
                 {tx && (
@@ -157,6 +160,12 @@ export default function RecurringTracking() {
                   </div>
                 )}
                 <div className="flex gap-2 mt-2">
+                  {canLink && (
+                    <Button size="sm" variant="outline" className="h-7 text-xs flex-1"
+                      onClick={() => setLinkTarget(i)}>
+                      <Link2 className="h-3 w-3 mr-1" /> Link transaction
+                    </Button>
+                  )}
                   {!isPaid && (
                     <Button size="sm" variant="outline" className="h-7 text-xs flex-1"
                       onClick={() => markPaid.mutateAsync(i.id).then(() => toast.success('Marked paid'))}>
@@ -175,6 +184,12 @@ export default function RecurringTracking() {
           );
         })}
       </div>
+
+      <ManualMatchDialog
+        instance={linkTarget}
+        open={!!linkTarget}
+        onOpenChange={(o) => { if (!o) setLinkTarget(null); }}
+      />
     </div>
   );
 }
