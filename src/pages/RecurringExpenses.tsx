@@ -9,13 +9,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useRecurringExpenses, useCreateRecurringExpense, useUpdateRecurringExpense, useDeleteRecurringExpense } from '@/hooks/useRecurringExpenses';
 import { useTransactions } from '@/hooks/useTransactions';
+import { useRecurringInstances } from '@/hooks/useRecurringInstances';
 import { useCategories } from '@/hooks/useCategories';
 import { useAccounts } from '@/hooks/useAccounts';
 import { formatCurrency, formatUSD } from '@/lib/constants';
+import { toMonthlyAmount, isPaidStatus } from '@/lib/money';
 import { getBrandLogo, getInitialsColor } from '@/lib/brandLogos';
 import { Plus, Trash2, CheckCircle2, AlertCircle, Clock, CalendarDays, Repeat, Building, FileText, CreditCard, TrendingUp, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
-import { format, isBefore, subDays, addMonths, addYears, addWeeks } from 'date-fns';
+import { format, isBefore, addMonths, addYears, addWeeks } from 'date-fns';
 import { DemoDataBanner } from '@/components/DemoDataBanner';
 import { useDemoData } from '@/hooks/useDemoData';
 import RecurringTracking from '@/components/recurring/RecurringTracking';
@@ -42,14 +44,7 @@ function getNextDate(current: Date, frequency: string): Date {
   }
 }
 
-function toMonthly(amount: number, frequency: string): number {
-  switch (frequency) {
-    case 'weekly': return amount * 4.33;
-    case 'quarterly': return amount / 3;
-    case 'yearly': return amount / 12;
-    default: return amount;
-  }
-}
+// Monthly normalization lives in lib/money (toMonthlyAmount)
 
 export default function RecurringExpenses() {
   const { data: items, isLoading } = useRecurringExpenses();
