@@ -12,6 +12,7 @@ import Analytics from "./pages/Analytics";
 import RecurringExpenses from "./pages/RecurringExpenses";
 import CalendarPage from "./pages/Calendar";
 import BudgetPage from "./pages/Budget";
+import Planning from "./pages/Planning";
 import Rules from "./pages/Rules";
 import Settings from "./pages/Settings";
 import Auth from "./pages/Auth";
@@ -40,10 +41,16 @@ function ProtectedRoutes() {
         <Route path="/accounts" element={<Accounts />} />
         <Route path="/transactions" element={<Transactions />} />
         <Route path="/analytics" element={<Analytics />} />
+        <Route path="/planning" element={<Planning />} />
         <Route path="/recurring" element={<RecurringExpenses />} />
         <Route path="/calendar" element={<CalendarPage />} />
         <Route path="/budget" element={<BudgetPage />} />
         <Route path="/rules" element={<Rules />} />
+        <Route path="/import" element={<Settings initialTab="import" />} />
+        <Route path="/system/categories" element={<Settings initialTab="categories" />} />
+        <Route path="/system/merchants" element={<Settings initialTab="merchants" />} />
+        <Route path="/system/fx" element={<Settings initialTab="fx" />} />
+        <Route path="/system/integrations" element={<Settings initialTab="integrations" />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
