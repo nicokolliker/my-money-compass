@@ -363,8 +363,9 @@ export default function ImportTab() {
               <CheckCircle2 className="h-12 w-12 text-success" />
               <div className="text-center">
                 <p className="text-lg font-semibold text-foreground">Import Complete</p>
-                <div className="flex gap-3 justify-center mt-2">
+                <div className="flex gap-3 justify-center mt-2 flex-wrap">
                   <span className="text-sm text-foreground font-medium">{importResult.imported} imported</span>
+                  {importResult.merchantsMatched > 0 && <span className="text-sm text-primary">{importResult.merchantsMatched} merchants linked</span>}
                   {importResult.duplicates > 0 && <span className="text-sm text-amber-600">{importResult.duplicates} duplicates skipped</span>}
                   {importResult.skipped > 0 && <span className="text-sm text-muted-foreground">{importResult.skipped} invalid rows</span>}
                 </div>
