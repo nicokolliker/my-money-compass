@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
+import { computeBalance, computeBalanceUsd, type FxRateRow } from '@/lib/money';
 
 export type Account = Tables<'accounts'>;
 
