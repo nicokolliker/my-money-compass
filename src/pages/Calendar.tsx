@@ -3,7 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useRecurringInstances, useRefreshRecurringTracking, useMarkInstancePaid } from '@/hooks/useRecurringInstances';
+import { useFxRates } from '@/hooks/useFxRates';
 import { formatCurrency, formatUSD } from '@/lib/constants';
+import { toUSD, isPaidStatus, type FxRateRow } from '@/lib/money';
 import { getBrandLogo, getInitialsColor } from '@/lib/brandLogos';
 import {
   ChevronLeft, ChevronRight, CalendarDays, AlertCircle, CreditCard, RefreshCw, CheckCircle2,
