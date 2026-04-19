@@ -9,6 +9,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useAccounts } from '@/hooks/useAccounts';
 import { useCreateTransaction, useTransactions } from '@/hooks/useTransactions';
 import { useRules } from '@/hooks/useRules';
+import { useFxRates } from '@/hooks/useFxRates';
+import { useRefreshRecurringTracking } from '@/hooks/useRecurringInstances';
+import { toUSD, type FxRateRow } from '@/lib/money';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { supabase } from '@/integrations/supabase/client';
 import { Upload, FileSpreadsheet, AlertTriangle, CheckCircle2, XCircle } from 'lucide-react';
@@ -32,6 +35,8 @@ export default function ImportTab() {
   const { data: accounts } = useAccounts();
   const createTx = useCreateTransaction();
   const { data: rules } = useRules();
+  const { data: fxRates } = useFxRates();
+  const refreshRecurring = useRefreshRecurringTracking();
   const [file, setFile] = useState<File | null>(null);
   const [csvData, setCsvData] = useState<string[][]>([]);
   const [headers, setHeaders] = useState<string[]>([]);
@@ -112,7 +117,9 @@ export default function ImportTab() {
       const selectedRows = parsedRows.filter(r => r.selected && r.status !== 'skipped');
 
       for (const row of selectedRows) {
-        const fxRate = account?.currency === 'USD' ? 1 : 0.000833;
+        const currency = account?.currency || 'USD';
+        const amountUsd = toUSD(row.amount, currency, fxRates as FxRateRow[] | undefined);
+        const fxRate = row.amount !== 0 ? amountUsd / row.amount : 1;
 
         let categoryId: string | null = null;
         let isSub = false;
@@ -137,9 +144,9 @@ export default function ImportTab() {
           description: row.description,
           merchant: row.merchant || null,
           amount: row.amount,
-          currency: account?.currency || 'USD',
+          currency,
           fx_rate: fxRate,
-          amount_usd: account?.currency === 'USD' ? row.amount : row.amount * fxRate,
+          amount_usd: amountUsd,
           account_id: accountId,
           category_id: categoryId,
           type: row.amount < 0 ? 'expense' : 'income',
@@ -155,9 +162,16 @@ export default function ImportTab() {
 
       await supabase.from('import_logs').insert({ filename: file?.name || 'unknown', account_id: accountId, row_count: imported });
 
+      // Re-run recurring matching against newly imported transactions
+      let matchedCount = 0;
+      try {
+        const r = await refreshRecurring.mutateAsync();
+        matchedCount = r.matched || 0;
+      } catch {/* non-fatal */}
+
       setImportResult({ imported, skipped, duplicates });
       setStep('result');
-      toast.success(`Imported ${imported} transactions`);
+      toast.success(`Imported ${imported} · ${matchedCount} matched to recurring`);
     } catch (e: any) { toast.error(e.message); }
     setImporting(false);
   };

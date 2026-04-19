@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAccountBalances } from '@/hooks/useAccounts';
+import { useNetWorth } from '@/hooks/useNetWorth';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useRecurringExpenses } from '@/hooks/useRecurringExpenses';
-import { useRecurringInstances } from '@/hooks/useRecurringInstances';
-import { formatUSD, formatCurrency, ASSET_TYPES, LIABILITY_TYPES } from '@/lib/constants';
+import { useDerivedInstances } from '@/hooks/useRecurringInstances';
+import { formatUSD, formatCurrency } from '@/lib/constants';
 import { toMonthlyAmount } from '@/lib/money';
 import { getCategoryColor, getCategoryHex } from '@/lib/categoryColors';
 import { getCategoryIcon } from '@/lib/brandLogos';
@@ -23,7 +24,8 @@ export default function Dashboard() {
   const { data: transactions } = useTransactions();
   const { data: blueDollar } = useBlueDollarRate();
   const { data: recurringItems } = useRecurringExpenses();
-  const { data: instances } = useRecurringInstances();
+  const { data: instances } = useDerivedInstances();
+  const { totalAssetsUsd: totalAssets, totalLiabilitiesUsd: totalLiabilities, netWorthUsd: netWorth } = useNetWorth();
 
   const { hasDemoData, onCleared: onDemoCleared } = useDemoData();
 
@@ -35,13 +37,6 @@ export default function Dashboard() {
       return data;
     },
   });
-
-  const assets = accountBalances?.filter(a => ASSET_TYPES.includes(a.type)) || [];
-  const liabilities = accountBalances?.filter(a => LIABILITY_TYPES.includes(a.type)) || [];
-
-  const totalAssets = assets.reduce((s, a) => s + (a.currency === 'USD' ? a.computed_balance : a.computed_balance_usd), 0);
-  const totalLiabilities = Math.abs(liabilities.reduce((s, a) => s + (a.currency === 'USD' ? a.computed_balance : a.computed_balance_usd), 0));
-  const netWorth = totalAssets - totalLiabilities;
 
   const now = new Date();
   const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
@@ -90,8 +85,8 @@ export default function Dashboard() {
     active.forEach(i => {
       monthlyTotal += toMonthlyAmount(Math.abs(Number(i.amount)), i.frequency);
     });
-    // Overdue derived from canonical recurring_instances
-    const overdue = (instances || []).filter(i => i.status === 'overdue').length;
+    // "Overdue" UI label = derived `missing` state from canonical recurring_instances
+    const overdue = (instances || []).filter(i => i.derived === 'missing').length;
     const upcoming = active
       .filter(i => i.next_due_date)
       .sort((a, b) => new Date(a.next_due_date!).getTime() - new Date(b.next_due_date!).getTime())

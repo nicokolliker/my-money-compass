@@ -133,3 +133,57 @@ export const TONE_CLASS: Record<'success' | 'warning' | 'danger' | 'muted' | 'in
 export function isPaidStatus(s: string): boolean {
   return s === 'matched' || s === 'paid_manual';
 }
+
+// ---------- Derived instance state (single source of truth for UI) ----------
+
+/**
+ * Canonical product-level states. These drive ALL UI: Tracking, Calendar,
+ * Planning, Dashboard, Analytics. No page is allowed to inspect raw DB
+ * status — always go through `deriveInstanceState`.
+ *
+ *  upcoming     — expected payment in the future (or today)
+ *  needs_review — a candidate transaction exists but confidence is low
+ *  matched      — linked to a transaction by the matching engine
+ *  paid_manual  — user manually marked as paid
+ *  missing      — past expected date and no suitable matched transaction
+ */
+export type DerivedInstanceState =
+  | 'upcoming'
+  | 'needs_review'
+  | 'matched'
+  | 'paid_manual'
+  | 'missing';
+
+export type InstanceLike = {
+  status: string;
+  expected_date: string; // YYYY-MM-DD
+  matched_transaction_id?: string | null;
+};
+
+/** Today as YYYY-MM-DD in local time. */
+function todayISO(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+export function deriveInstanceState(i: InstanceLike): DerivedInstanceState {
+  if (i.status === 'matched' && i.matched_transaction_id) return 'matched';
+  if (i.status === 'paid_manual') return 'paid_manual';
+  if (i.status === 'needs_review') return 'needs_review';
+  // Anything else (expected / due_soon / overdue / mismatch) without a tx:
+  // past date with no match → missing; otherwise upcoming.
+  if (i.expected_date < todayISO() && !i.matched_transaction_id) return 'missing';
+  return 'upcoming';
+}
+
+export const DERIVED_STATE_META: Record<DerivedInstanceState, { label: string; tone: 'success' | 'warning' | 'danger' | 'muted' | 'info' }> = {
+  matched:      { label: 'Matched',      tone: 'success' },
+  paid_manual:  { label: 'Paid',         tone: 'success' },
+  upcoming:     { label: 'Upcoming',     tone: 'muted' },
+  needs_review: { label: 'Needs review', tone: 'info' },
+  missing:      { label: 'Missing',      tone: 'danger' },
+};
+
+export function isDerivedPaid(s: DerivedInstanceState): boolean {
+  return s === 'matched' || s === 'paid_manual';
+}

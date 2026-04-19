@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { deriveInstanceState, type DerivedInstanceState } from '@/lib/money';
 
 export type RecurringInstance = {
   id: string;
@@ -9,7 +10,7 @@ export type RecurringInstance = {
   expected_amount: number;
   expected_currency: string;
   expected_account_id: string | null;
-  status: 'expected' | 'due_soon' | 'matched' | 'paid_manual' | 'overdue' | 'mismatch' | 'skipped';
+  status: 'expected' | 'due_soon' | 'matched' | 'paid_manual' | 'overdue' | 'needs_review' | 'mismatch' | 'skipped';
   matched_transaction_id: string | null;
   match_confidence: number | null;
   matched_at: string | null;
@@ -32,6 +33,21 @@ export type RecurringInstance = {
     merchant: string | null;
   } | null;
 };
+
+/** Recurring instance with the canonical derived UI state attached. */
+export type DerivedRecurringInstance = RecurringInstance & { derived: DerivedInstanceState };
+
+/**
+ * Canonical hook — returns instances already enriched with `derived`.
+ * Every UI consumer MUST use this (never read `status` directly for grouping).
+ */
+export function useDerivedInstances(filters?: { from?: string; to?: string }) {
+  const q = useRecurringInstances(filters);
+  return {
+    ...q,
+    data: (q.data || []).map(i => ({ ...i, derived: deriveInstanceState(i) })) as DerivedRecurringInstance[],
+  };
+}
 
 async function getUserId() {
   const { data: { user } } = await supabase.auth.getUser();
