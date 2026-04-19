@@ -1,26 +1,48 @@
-import { ReactNode, useEffect } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Wallet, ArrowLeftRight, BarChart3, Settings, Repeat, BookOpen, Plus, CalendarDays, Target, LogOut } from 'lucide-react';
+import {
+  LayoutDashboard, Wallet, ArrowLeftRight, BarChart3, Settings, Repeat, BookOpen, Plus,
+  CalendarDays, Target, LogOut, Upload, ChevronDown, ChevronRight, Tag, Store, DollarSign, Plug, LayoutGrid,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
-import { useState } from 'react';
 import { TransactionForm } from '@/components/transactions/TransactionForm';
 import { useAuth } from '@/hooks/useAuth';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
+type NavLeaf = { path: string; label: string; icon: any };
+type NavGroup = { label: string; icon: any; children: NavLeaf[] };
+type NavEntry = NavLeaf | NavGroup;
 
-const NAV_ITEMS = [
+const NAV: NavEntry[] = [
   { path: '/', label: 'Home', icon: LayoutDashboard },
-  { path: '/accounts', label: 'Accounts', icon: Wallet },
+  {
+    label: 'Money', icon: Wallet, children: [
+      { path: '/accounts', label: 'Accounts', icon: Wallet },
+    ],
+  },
   { path: '/transactions', label: 'Activity', icon: ArrowLeftRight },
+  {
+    label: 'Planning', icon: Target, children: [
+      { path: '/planning', label: 'Overview', icon: LayoutGrid },
+      { path: '/recurring', label: 'Recurring', icon: Repeat },
+      { path: '/calendar', label: 'Calendar', icon: CalendarDays },
+      { path: '/budget', label: 'Budget', icon: Target },
+    ],
+  },
   { path: '/analytics', label: 'Analytics', icon: BarChart3 },
-  { path: '/recurring', label: 'Recurring', icon: Repeat },
-  { path: '/calendar', label: 'Calendar', icon: CalendarDays },
-  { path: '/budget', label: 'Budget', icon: Target },
-  { path: '/rules', label: 'Rules', icon: BookOpen },
-  { path: '/settings', label: 'Settings', icon: Settings },
+  { path: '/import', label: 'Import', icon: Upload },
+  {
+    label: 'System', icon: Settings, children: [
+      { path: '/system/categories', label: 'Categories', icon: Tag },
+      { path: '/system/merchants', label: 'Merchants', icon: Store },
+      { path: '/rules', label: 'Rules', icon: BookOpen },
+      { path: '/system/fx', label: 'FX Rates', icon: DollarSign },
+      { path: '/system/integrations', label: 'Integrations', icon: Plug },
+    ],
+  },
 ];
 
 const MOBILE_TOP = [
@@ -28,20 +50,31 @@ const MOBILE_TOP = [
   { path: '/accounts', label: 'Accounts', icon: Wallet },
   { path: '/transactions', label: 'Activity', icon: ArrowLeftRight },
 ];
-
 const MOBILE_BOTTOM = [
-  { path: '/recurring', label: 'Recurring', icon: Repeat },
+  { path: '/planning', label: 'Planning', icon: Target },
   { path: '/analytics', label: 'Analytics', icon: BarChart3 },
 ];
+
+function isLeaf(e: NavEntry): e is NavLeaf {
+  return (e as NavLeaf).path !== undefined;
+}
 
 export function AppLayout({ children }: { children: ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [showQuickAdd, setShowQuickAdd] = useState(false);
-  const { signOut, user } = useAuth();
+  const { signOut } = useAuth();
   const qc = useQueryClient();
 
-  // Invalidate all queries on auth state change (login/logout/user switch)
+  const initialOpen: Record<string, boolean> = {};
+  NAV.forEach(e => {
+    if (!isLeaf(e)) {
+      const childActive = e.children.some(c => location.pathname === c.path || location.pathname.startsWith(c.path + '/'));
+      initialOpen[e.label] = childActive || ['Money', 'Planning'].includes(e.label);
+    }
+  });
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(initialOpen);
+
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
@@ -51,6 +84,23 @@ export function AppLayout({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, [qc]);
 
+  const renderLeaf = (item: NavLeaf, indent = false) => (
+    <button
+      key={item.path}
+      onClick={() => navigate(item.path)}
+      className={cn(
+        'flex items-center gap-3 w-full rounded-xl text-sm font-medium transition-all duration-200',
+        indent ? 'pl-9 pr-3 py-2 text-[13px]' : 'px-3 py-2.5',
+        location.pathname === item.path
+          ? 'bg-primary text-primary-foreground shadow-soft'
+          : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+      )}
+    >
+      <item.icon className="h-4 w-4 shrink-0" />
+      {item.label}
+    </button>
+  );
+
   return (
     <div className="flex min-h-screen bg-background">
       {/* Desktop sidebar */}
@@ -58,22 +108,32 @@ export function AppLayout({ children }: { children: ReactNode }) {
         <div className="flex h-16 items-center px-5 border-b">
           <h1 className="text-lg font-bold text-foreground tracking-tight">💰 FinTrack</h1>
         </div>
-        <nav className="flex-1 px-3 py-4 space-y-1">
-          {NAV_ITEMS.map(item => (
-            <button
-              key={item.path}
-              onClick={() => navigate(item.path)}
-              className={cn(
-                'flex items-center gap-3 w-full rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200',
-                location.pathname === item.path
-                  ? 'bg-primary text-primary-foreground shadow-soft'
-                  : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-              )}
-            >
-              <item.icon className="h-4 w-4" />
-              {item.label}
-            </button>
-          ))}
+        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+          {NAV.map(entry => {
+            if (isLeaf(entry)) return renderLeaf(entry);
+            const open = openGroups[entry.label];
+            const hasActive = entry.children.some(c => location.pathname === c.path);
+            return (
+              <div key={entry.label}>
+                <button
+                  onClick={() => setOpenGroups(g => ({ ...g, [entry.label]: !open }))}
+                  className={cn(
+                    'flex items-center gap-3 w-full rounded-xl px-3 py-2.5 text-sm font-medium transition-all',
+                    hasActive ? 'text-foreground' : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                  )}
+                >
+                  <entry.icon className="h-4 w-4 shrink-0" />
+                  <span className="flex-1 text-left">{entry.label}</span>
+                  {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                </button>
+                {open && (
+                  <div className="mt-0.5 space-y-0.5">
+                    {entry.children.map(c => renderLeaf(c, true))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </nav>
         <div className="p-4 border-t space-y-2">
           <Button className="w-full rounded-xl h-11 shadow-soft" onClick={() => setShowQuickAdd(true)}>
@@ -104,14 +164,13 @@ export function AppLayout({ children }: { children: ReactNode }) {
                 location.pathname === item.path ? 'text-primary' : 'text-muted-foreground'
               )}
             >
-              <item.icon className={cn("h-5 w-5 transition-transform", location.pathname === item.path && "scale-110")} />
+              <item.icon className={cn('h-5 w-5 transition-transform', location.pathname === item.path && 'scale-110')} />
               {item.label}
             </button>
           ))}
-          {/* FAB */}
           <button
             onClick={() => setShowQuickAdd(true)}
-            className="flex items-center justify-center w-13 h-13 -mt-7 rounded-2xl bg-primary text-primary-foreground shadow-elevated active:scale-95 transition-transform"
+            className="flex items-center justify-center -mt-7 rounded-2xl bg-primary text-primary-foreground shadow-elevated active:scale-95 transition-transform"
             style={{ width: 52, height: 52 }}
           >
             <Plus className="h-6 w-6" />
@@ -125,7 +184,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
                 location.pathname === item.path ? 'text-primary' : 'text-muted-foreground'
               )}
             >
-              <item.icon className={cn("h-5 w-5 transition-transform", location.pathname === item.path && "scale-110")} />
+              <item.icon className={cn('h-5 w-5 transition-transform', location.pathname === item.path && 'scale-110')} />
               {item.label}
             </button>
           ))}
