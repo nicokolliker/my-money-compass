@@ -84,22 +84,25 @@ export function AppLayout({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, [qc]);
 
-  const renderLeaf = (item: NavLeaf, indent = false) => (
-    <button
-      key={item.path}
-      onClick={() => navigate(item.path)}
-      className={cn(
-        'flex items-center gap-3 w-full rounded-xl text-sm font-medium transition-all duration-200',
-        indent ? 'pl-9 pr-3 py-2 text-[13px]' : 'px-3 py-2.5',
-        location.pathname === item.path
-          ? 'bg-primary text-primary-foreground shadow-soft'
-          : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-      )}
-    >
-      <item.icon className="h-4 w-4 shrink-0" />
-      {item.label}
-    </button>
-  );
+  const renderLeaf = (item: NavLeaf, indent = false) => {
+    const active = location.pathname === item.path;
+    return (
+      <button
+        key={item.path}
+        onClick={() => navigate(item.path)}
+        className={cn(
+          'flex items-center gap-3 w-full rounded-xl text-sm font-medium transition-all duration-200',
+          indent ? 'pl-9 pr-3 py-2 text-[13px]' : 'px-3 py-2.5',
+          active
+            ? 'bg-gradient-to-r from-primary to-[hsl(var(--primary-glow))] text-primary-foreground shadow-[0_4px_14px_-4px_hsl(var(--primary)/0.5)]'
+            : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground'
+        )}
+      >
+        <item.icon className="h-4 w-4 shrink-0" />
+        {item.label}
+      </button>
+    );
+  };
 
   return (
     <div className="flex min-h-screen">
