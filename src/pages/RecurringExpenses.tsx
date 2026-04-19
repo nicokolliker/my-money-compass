@@ -12,15 +12,17 @@ import { useTransactions } from '@/hooks/useTransactions';
 import { useDerivedInstances } from '@/hooks/useRecurringInstances';
 import { useCategories } from '@/hooks/useCategories';
 import { useAccounts } from '@/hooks/useAccounts';
+import { useFxRates } from '@/hooks/useFxRates';
 import { formatCurrency, formatUSD } from '@/lib/constants';
-import { toMonthlyAmount, isDerivedPaid } from '@/lib/money';
+import { toMonthlyAmount, isDerivedPaid, toUSD, deriveInstanceState, type FxRateRow, type DerivedInstanceState } from '@/lib/money';
 import { getBrandLogo, getInitialsColor } from '@/lib/brandLogos';
-import { Plus, Trash2, CheckCircle2, AlertCircle, Clock, CalendarDays, Repeat, Building, FileText, CreditCard, TrendingUp, Pencil } from 'lucide-react';
+import { Plus, Trash2, CheckCircle2, AlertCircle, Clock, CalendarDays, Repeat, Building, FileText, CreditCard, Wallet, TrendingUp, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, isBefore, addMonths, addYears, addWeeks } from 'date-fns';
 import { DemoDataBanner } from '@/components/DemoDataBanner';
 import { useDemoData } from '@/hooks/useDemoData';
 import RecurringTracking from '@/components/recurring/RecurringTracking';
+import { RecurringStatusBadge } from '@/components/recurring/RecurringStatusBadge';
 
 const TYPE_LABELS: Record<string, { label: string; icon: typeof Repeat }> = {
   subscription: { label: 'Subscriptions', icon: Repeat },
