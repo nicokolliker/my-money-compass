@@ -118,11 +118,12 @@ export default function RecurringTracking() {
         {filtered.map(i => {
           const r = (i as any).recurring_expenses;
           const tx = (i as any).transactions;
-          const meta = DERIVED_STATE_META[i.derived];
-          const cls = TONE_CLASS[meta.tone];
           const isPaid = isDerivedPaid(i.derived);
           const canLink = i.derived === 'upcoming' || i.derived === 'needs_review' || i.derived === 'missing';
           const diff = tx ? Math.abs(Number(tx.amount)) - Number(i.expected_amount) : 0;
+          const usd = toUSD(Number(i.expected_amount), i.expected_currency, fxRates as FxRateRow[] | undefined);
+          const pm = r?.payment_methods;
+          const acc = r?.accounts;
           return (
             <Card key={i.id} className={
               i.derived === 'missing' ? 'border-destructive/30' :
@@ -139,13 +140,18 @@ export default function RecurringTracking() {
                   <span className="text-lg shrink-0">{r?.categories?.icon || '📌'}</span>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold truncate">{r?.name}</p>
-                    <p className="text-[11px] text-muted-foreground truncate">
-                      {r?.categories?.name || '—'}{r?.accounts ? ` · ${r.accounts.name}` : ''}
-                    </p>
+                    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground flex-wrap">
+                      <span>{r?.categories?.name || '—'}</span>
+                      {pm && (<><span>·</span><span className="flex items-center gap-0.5"><CreditCard className="h-3 w-3" />{pm.name}</span></>)}
+                      {acc && (<><span>·</span><span className="flex items-center gap-0.5"><Wallet className="h-3 w-3" />{acc.name}</span></>)}
+                    </div>
                   </div>
                   <div className="text-right shrink-0">
                     <p className="text-sm font-bold tabular-nums">{formatCurrency(Number(i.expected_amount), i.expected_currency)}</p>
-                    <Badge variant="outline" className={`text-[9px] h-4 px-1.5 mt-0.5 ${cls}`}>{meta.label}</Badge>
+                    {i.expected_currency !== 'USD' && (
+                      <p className="text-[10px] text-muted-foreground tabular-nums">~{formatUSD(usd)}</p>
+                    )}
+                    <RecurringStatusBadge state={i.derived} className="mt-0.5" />
                   </div>
                 </div>
                 {tx && (
