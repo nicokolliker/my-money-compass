@@ -17,7 +17,7 @@ import { Plus, Trash2, TrendingUp, TrendingDown, AlertTriangle, Target, DollarSi
 import { toast } from 'sonner';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 
-export default function BudgetPage() {
+export default function BudgetPage({ embedded = false }: { embedded?: boolean } = {}) {
   const currentMonth = format(new Date(), 'yyyy-MM-01');
   const { data: budgets, isLoading } = useBudgets(currentMonth);
   const { data: transactions } = useTransactions({
@@ -79,12 +79,14 @@ export default function BudgetPage() {
   if (isLoading) return <div className="flex items-center justify-center h-64 text-muted-foreground">Loading...</div>;
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Budget</h1>
-          <p className="text-sm text-muted-foreground">{format(new Date(), 'MMMM yyyy')}</p>
-        </div>
+    <div className={embedded ? 'space-y-4' : 'space-y-5'}>
+      <div className={embedded ? 'flex items-center justify-end' : 'flex items-center justify-between'}>
+        {!embedded && (
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Budget</h1>
+            <p className="text-sm text-muted-foreground">{format(new Date(), 'MMMM yyyy')}</p>
+          </div>
+        )}
         <Dialog open={showAdd} onOpenChange={setShowAdd}>
           <DialogTrigger asChild>
             <Button size="sm"><Plus className="h-4 w-4 mr-1" /> Set Budget</Button>

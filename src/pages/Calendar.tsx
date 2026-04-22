@@ -13,7 +13,7 @@ import {
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isToday, addMonths, subMonths, getDay } from 'date-fns';
 import { toast } from 'sonner';
 
-export default function CalendarPage() {
+export default function CalendarPage({ embedded = false }: { embedded?: boolean } = {}) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [view, setView] = useState<'calendar' | 'timeline'>('timeline');
   const monthStart = startOfMonth(currentMonth).toISOString().split('T')[0];
@@ -70,9 +70,9 @@ export default function CalendarPage() {
   if (isLoading) return <div className="flex items-center justify-center h-64 text-muted-foreground">Loading...</div>;
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-foreground">Payments Calendar</h1>
+    <div className={embedded ? 'space-y-4' : 'space-y-5'}>
+      <div className={embedded ? 'flex items-center justify-end' : 'flex items-center justify-between'}>
+        {!embedded && <h1 className="text-2xl font-bold text-foreground">Payments Calendar</h1>}
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refresh.isPending}>
             <RefreshCw className={`h-3.5 w-3.5 ${refresh.isPending ? 'animate-spin' : ''}`} />

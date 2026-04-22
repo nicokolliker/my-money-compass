@@ -6,47 +6,86 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useDerivedInstances, useRefreshRecurringTracking } from '@/hooks/useRecurringInstances';
 import { useTransactions } from '@/hooks/useTransactions';
+import { useBudgets } from '@/hooks/useBudgets';
 import { useNetWorth } from '@/hooks/useNetWorth';
 import { useFxRates } from '@/hooks/useFxRates';
 import { formatUSD, formatCurrency } from '@/lib/constants';
 import { toUSD, isDerivedPaid, DERIVED_STATE_META, TONE_CLASS, type FxRateRow } from '@/lib/money';
-import { Repeat, TrendingUp, Wallet, AlertCircle, CheckCircle2, Clock, RefreshCw, CalendarDays } from 'lucide-react';
+import { Repeat, TrendingUp, Wallet, AlertCircle, CheckCircle2, Clock, RefreshCw, CalendarDays, Target } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, addMonths } from 'date-fns';
 import { toast } from 'sonner';
 import RecurringExpenses from './RecurringExpenses';
 import CalendarPage from './Calendar';
 import BudgetPage from './Budget';
+import { PlanningShell } from '@/components/planning/PlanningShell';
 
 type PlanningTab = 'overview' | 'recurring' | 'calendar' | 'budget';
 
+const SECTION_META: Record<PlanningTab, { label: string; description: string }> = {
+  overview: { label: 'Overview', description: 'Snapshot of recurring, calendar and budget' },
+  recurring: { label: 'Recurring', description: 'Library of recurring items and tracking of expected vs actual' },
+  calendar: { label: 'Calendar', description: 'Expected payments by day across the month' },
+  budget: { label: 'Budget', description: 'Monthly limits per category and spending progress' },
+};
+
 export default function Planning({ initialTab }: { initialTab?: PlanningTab } = {}) {
   const location = useLocation();
+  const navigate = useNavigate();
   const tab: PlanningTab = initialTab || (location.state as any)?.tab || 'overview';
+  const meta = SECTION_META[tab];
+
+  const handleTabChange = (v: string) => {
+    const map: Record<string, string> = {
+      overview: '/planning',
+      recurring: '/planning/recurring',
+      calendar: '/planning/calendar',
+      budget: '/planning/budget',
+    };
+    if (map[v]) navigate(map[v], { replace: true });
+  };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 max-w-5xl">
+      {/* Module title (single, persistent) */}
       <div>
         <h1 className="text-2xl font-bold text-foreground">Planning</h1>
         <p className="text-sm text-muted-foreground">Recurring payments, calendar and budget in one place</p>
       </div>
-      <Tabs defaultValue={tab}>
+
+      <Tabs value={tab} onValueChange={handleTabChange}>
         <TabsList className="w-full flex-wrap">
           <TabsTrigger value="overview" className="flex-1">Overview</TabsTrigger>
           <TabsTrigger value="recurring" className="flex-1">Recurring</TabsTrigger>
           <TabsTrigger value="calendar" className="flex-1">Calendar</TabsTrigger>
           <TabsTrigger value="budget" className="flex-1">Budget</TabsTrigger>
         </TabsList>
-        <TabsContent value="overview" className="mt-4"><PlanningOverview /></TabsContent>
-        <TabsContent value="recurring" className="mt-4"><RecurringExpenses /></TabsContent>
-        <TabsContent value="calendar" className="mt-4"><CalendarPage /></TabsContent>
-        <TabsContent value="budget" className="mt-4"><BudgetPage /></TabsContent>
+
+        <TabsContent value="overview" className="mt-4">
+          <PlanningShell section={meta.label} description={meta.description}>
+            <PlanningOverview onNavigate={(t) => handleTabChange(t)} />
+          </PlanningShell>
+        </TabsContent>
+        <TabsContent value="recurring" className="mt-4">
+          <PlanningShell section={SECTION_META.recurring.label} description={SECTION_META.recurring.description}>
+            <RecurringExpenses embedded />
+          </PlanningShell>
+        </TabsContent>
+        <TabsContent value="calendar" className="mt-4">
+          <PlanningShell section={SECTION_META.calendar.label} description={SECTION_META.calendar.description}>
+            <CalendarPage embedded />
+          </PlanningShell>
+        </TabsContent>
+        <TabsContent value="budget" className="mt-4">
+          <PlanningShell section={SECTION_META.budget.label} description={SECTION_META.budget.description}>
+            <BudgetPage embedded />
+          </PlanningShell>
+        </TabsContent>
       </Tabs>
     </div>
   );
 }
 
-function PlanningOverview() {
-  const navigate = useNavigate();
+function PlanningOverview({ onNavigate }: { onNavigate: (tab: PlanningTab) => void }) {
   const refresh = useRefreshRecurringTracking();
   const monthStart = startOfMonth(new Date()).toISOString().split('T')[0];
   const monthEnd = endOfMonth(new Date()).toISOString().split('T')[0];
@@ -54,6 +93,7 @@ function PlanningOverview() {
 
   const { data: instances, isLoading } = useDerivedInstances({ from: monthStart, to: nextMonthEnd });
   const { data: transactions } = useTransactions();
+  const { data: budgets } = useBudgets(monthStart);
   const { liquidCashUsd } = useNetWorth();
   const { data: fxRates } = useFxRates();
 
@@ -86,6 +126,24 @@ function PlanningOverview() {
     [instances, monthStart]
   );
 
+  // Budget snapshot (totals across all category budgets for current month)
+  const budgetSnapshot = useMemo(() => {
+    if (!budgets || !transactions) return { total: 0, spent: 0, count: 0 };
+    const spentByCat: Record<string, number> = {};
+    transactions
+      .filter(t => t.type === 'expense' && t.date >= monthStart && t.date <= monthEnd)
+      .forEach(t => {
+        const k = t.category_id || 'uncat';
+        spentByCat[k] = (spentByCat[k] || 0) + Math.abs(Number(t.amount_usd));
+      });
+    let total = 0, spent = 0;
+    budgets.forEach(b => {
+      total += Number(b.amount);
+      spent += spentByCat[b.category_id || ''] || 0;
+    });
+    return { total, spent, count: budgets.length };
+  }, [budgets, transactions, monthStart, monthEnd]);
+
   const handleRefresh = async () => {
     try {
       const r = await refresh.mutateAsync();
@@ -94,6 +152,8 @@ function PlanningOverview() {
   };
 
   if (isLoading) return <div className="flex items-center justify-center h-64 text-muted-foreground">Loading...</div>;
+
+  const budgetPct = budgetSnapshot.total > 0 ? (budgetSnapshot.spent / budgetSnapshot.total) * 100 : 0;
 
   return (
     <div className="space-y-5">
@@ -128,18 +188,20 @@ function PlanningOverview() {
 
       <div className="grid grid-cols-4 gap-2">
         {[
-          { label: 'Missing', count: missing.length, cls: 'text-destructive', icon: AlertCircle },
-          { label: 'Review', count: needsReview.length, cls: 'text-amber-600', icon: Clock },
-          { label: 'Upcoming', count: upcomingMonth.length, cls: 'text-muted-foreground', icon: Clock },
-          { label: 'Paid', count: paid.length, cls: 'text-success', icon: CheckCircle2 },
+          { label: 'Missing', count: missing.length, cls: 'text-destructive', icon: AlertCircle, tab: 'recurring' as PlanningTab },
+          { label: 'Review', count: needsReview.length, cls: 'text-amber-600', icon: Clock, tab: 'recurring' as PlanningTab },
+          { label: 'Upcoming', count: upcomingMonth.length, cls: 'text-muted-foreground', icon: Clock, tab: 'calendar' as PlanningTab },
+          { label: 'Paid', count: paid.length, cls: 'text-success', icon: CheckCircle2, tab: 'recurring' as PlanningTab },
         ].map(s => (
-          <Card key={s.label}>
-            <CardContent className="pt-3 pb-3 text-center">
-              <s.icon className={`h-4 w-4 mx-auto ${s.cls}`} />
-              <p className="text-xl font-bold text-foreground mt-1">{s.count}</p>
-              <p className="text-[10px] text-muted-foreground">{s.label}</p>
-            </CardContent>
-          </Card>
+          <button key={s.label} onClick={() => onNavigate(s.tab)} className="text-left">
+            <Card className="hover:bg-accent/50 transition-colors h-full">
+              <CardContent className="pt-3 pb-3 text-center">
+                <s.icon className={`h-4 w-4 mx-auto ${s.cls}`} />
+                <p className="text-xl font-bold text-foreground mt-1">{s.count}</p>
+                <p className="text-[10px] text-muted-foreground">{s.label}</p>
+              </CardContent>
+            </Card>
+          </button>
         ))}
       </div>
 
@@ -149,7 +211,7 @@ function PlanningOverview() {
             <CardTitle className="text-sm font-semibold flex items-center gap-2">
               <AlertCircle className="h-4 w-4 text-amber-600" /> Needs attention
             </CardTitle>
-            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => navigate('/planning/recurring')}>View all</Button>
+            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => onNavigate('recurring')}>View all</Button>
           </CardHeader>
           <CardContent className="space-y-2">
             {[...missing, ...needsReview].slice(0, 5).map(i => {
@@ -182,7 +244,7 @@ function PlanningOverview() {
           <CardTitle className="text-sm font-semibold flex items-center gap-2">
             <CalendarDays className="h-4 w-4 text-muted-foreground" /> Upcoming
           </CardTitle>
-          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => navigate('/planning/calendar')}>Calendar</Button>
+          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => onNavigate('calendar')}>Calendar</Button>
         </CardHeader>
         <CardContent className="space-y-2">
           {upcoming.length === 0 && (
@@ -206,6 +268,37 @@ function PlanningOverview() {
               </div>
             );
           })}
+        </CardContent>
+      </Card>
+
+      {/* Budget snapshot */}
+      <Card>
+        <CardHeader className="pb-2 flex flex-row items-center justify-between">
+          <CardTitle className="text-sm font-semibold flex items-center gap-2">
+            <Target className="h-4 w-4 text-muted-foreground" /> Budget snapshot
+          </CardTitle>
+          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => onNavigate('budget')}>Open budget</Button>
+        </CardHeader>
+        <CardContent>
+          {budgetSnapshot.count === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-4">No budgets set this month</p>
+          ) : (
+            <div className="space-y-2">
+              <div className="flex items-baseline justify-between">
+                <p className="text-sm text-muted-foreground">{budgetSnapshot.count} categories</p>
+                <p className="text-sm font-semibold tabular-nums">
+                  {formatUSD(budgetSnapshot.spent)} <span className="text-muted-foreground font-normal">/ {formatUSD(budgetSnapshot.total)}</span>
+                </p>
+              </div>
+              <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${budgetPct > 100 ? 'bg-destructive' : budgetPct > 80 ? 'bg-amber-500' : 'bg-primary'}`}
+                  style={{ width: `${Math.min(budgetPct, 100)}%` }}
+                />
+              </div>
+              <p className="text-[10px] text-muted-foreground">{Math.round(budgetPct)}% of monthly budget used</p>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
