@@ -42,6 +42,12 @@ export default function RecurringTracking() {
   const markPaid = useMarkInstancePaid();
   const unmatch = useUnmatchInstance();
 
+  useEffect(() => {
+    if (!isLoading && instances !== undefined && instances.length === 0) {
+      refresh.mutateAsync().catch(() => {});
+    }
+  }, [monthStart, isLoading]);
+
   const filtered = useMemo(() => {
     if (!instances) return [];
     if (filter === 'all') return instances;
