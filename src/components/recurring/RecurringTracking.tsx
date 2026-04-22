@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -41,6 +41,12 @@ export default function RecurringTracking() {
   const refresh = useRefreshRecurringTracking();
   const markPaid = useMarkInstancePaid();
   const unmatch = useUnmatchInstance();
+
+  useEffect(() => {
+    if (!isLoading && instances !== undefined && instances.length === 0) {
+      refresh.mutateAsync().catch(() => {});
+    }
+  }, [monthStart, isLoading]);
 
   const filtered = useMemo(() => {
     if (!instances) return [];
