@@ -48,7 +48,7 @@ function getNextDate(current: Date, frequency: string): Date {
 
 // Monthly normalization lives in lib/money (toMonthlyAmount)
 
-export default function RecurringExpenses() {
+export default function RecurringExpenses({ embedded = false }: { embedded?: boolean } = {}) {
   const { data: items, isLoading } = useRecurringExpenses();
   const { data: transactions } = useTransactions();
   const { data: instances } = useDerivedInstances();
@@ -192,10 +192,10 @@ export default function RecurringExpenses() {
   if (isLoading) return <div className="flex items-center justify-center h-64 text-muted-foreground">Loading...</div>;
 
   return (
-    <div className="space-y-5">
-      {hasDemoData && <DemoDataBanner onCleared={onDemoCleared} />}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-foreground">Recurring</h1>
+    <div className={embedded ? 'space-y-4' : 'space-y-5'}>
+      {!embedded && hasDemoData && <DemoDataBanner onCleared={onDemoCleared} />}
+      <div className={embedded ? 'flex items-center justify-end' : 'flex items-center justify-between'}>
+        {!embedded && <h1 className="text-2xl font-bold text-foreground">Recurring</h1>}
         <Dialog open={showAdd} onOpenChange={o => { setShowAdd(o); if (!o) { setEditingId(null); setForm(emptyForm); } }}>
           <DialogTrigger asChild>
             <Button size="sm"><Plus className="h-4 w-4 mr-1" /> Add</Button>
