@@ -1,7 +1,7 @@
 import { ReactNode, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
-  LayoutDashboard, Wallet, ArrowLeftRight, BarChart3, Settings, Repeat, BookOpen, Plus,
+  LayoutDashboard, Wallet, ArrowLeftRight, BarChart3, Repeat, BookOpen, Plus,
   CalendarDays, Target, LogOut, Upload, ChevronDown, ChevronRight, Tag, Store, DollarSign, Plug, LayoutGrid,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -18,31 +18,27 @@ type NavEntry = NavLeaf | NavGroup;
 
 const NAV: NavEntry[] = [
   { path: '/', label: 'Home', icon: LayoutDashboard },
-  {
-    label: 'Money', icon: Wallet, children: [
-      { path: '/accounts', label: 'Accounts', icon: Wallet },
-    ],
-  },
+  { path: '/accounts', label: 'Accounts', icon: Wallet },
   { path: '/transactions', label: 'Activity', icon: ArrowLeftRight },
   {
     label: 'Planning', icon: Target, children: [
       { path: '/planning', label: 'Overview', icon: LayoutGrid },
-      { path: '/recurring', label: 'Recurring', icon: Repeat },
-      { path: '/calendar', label: 'Calendar', icon: CalendarDays },
-      { path: '/budget', label: 'Budget', icon: Target },
+      { path: '/planning/recurring', label: 'Recurring', icon: Repeat },
+      { path: '/planning/calendar', label: 'Calendar', icon: CalendarDays },
+      { path: '/planning/budget', label: 'Budget', icon: Target },
     ],
   },
   { path: '/analytics', label: 'Analytics', icon: BarChart3 },
-  { path: '/import', label: 'Import', icon: Upload },
   {
-    label: 'System', icon: Settings, children: [
-      { path: '/system/categories', label: 'Categories', icon: Tag },
-      { path: '/system/merchants', label: 'Merchants', icon: Store },
+    label: 'Rules & Data', icon: BookOpen, children: [
       { path: '/rules', label: 'Rules', icon: BookOpen },
-      { path: '/system/fx', label: 'FX Rates', icon: DollarSign },
-      { path: '/system/integrations', label: 'Integrations', icon: Plug },
+      { path: '/rules/categories', label: 'Categories', icon: Tag },
+      { path: '/rules/merchants', label: 'Merchants', icon: Store },
+      { path: '/rules/fx', label: 'FX Rates', icon: DollarSign },
     ],
   },
+  { path: '/import', label: 'Import', icon: Upload },
+  { path: '/integrations', label: 'Integrations', icon: Plug },
 ];
 
 const MOBILE_TOP = [
@@ -70,7 +66,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
   NAV.forEach(e => {
     if (!isLeaf(e)) {
       const childActive = e.children.some(c => location.pathname === c.path || location.pathname.startsWith(c.path + '/'));
-      initialOpen[e.label] = childActive || ['Money', 'Planning'].includes(e.label);
+      initialOpen[e.label] = childActive || ['Planning'].includes(e.label);
     }
   });
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(initialOpen);

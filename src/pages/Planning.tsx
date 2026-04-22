@@ -1,19 +1,51 @@
 import { useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useDerivedInstances, useRefreshRecurringTracking } from '@/hooks/useRecurringInstances';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useNetWorth } from '@/hooks/useNetWorth';
 import { useFxRates } from '@/hooks/useFxRates';
 import { formatUSD, formatCurrency } from '@/lib/constants';
-import { toUSD, isDerivedPaid, DERIVED_STATE_META, TONE_CLASS, type FxRateRow, type DerivedInstanceState } from '@/lib/money';
+import { toUSD, isDerivedPaid, DERIVED_STATE_META, TONE_CLASS, type FxRateRow } from '@/lib/money';
 import { Repeat, TrendingUp, Wallet, AlertCircle, CheckCircle2, Clock, RefreshCw, CalendarDays } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, addMonths } from 'date-fns';
 import { toast } from 'sonner';
+import RecurringExpenses from './RecurringExpenses';
+import CalendarPage from './Calendar';
+import BudgetPage from './Budget';
 
-export default function Planning() {
+type PlanningTab = 'overview' | 'recurring' | 'calendar' | 'budget';
+
+export default function Planning({ initialTab }: { initialTab?: PlanningTab } = {}) {
+  const location = useLocation();
+  const tab: PlanningTab = initialTab || (location.state as any)?.tab || 'overview';
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h1 className="text-2xl font-bold text-foreground">Planning</h1>
+        <p className="text-sm text-muted-foreground">Recurring payments, calendar and budget in one place</p>
+      </div>
+      <Tabs defaultValue={tab}>
+        <TabsList className="w-full flex-wrap">
+          <TabsTrigger value="overview" className="flex-1">Overview</TabsTrigger>
+          <TabsTrigger value="recurring" className="flex-1">Recurring</TabsTrigger>
+          <TabsTrigger value="calendar" className="flex-1">Calendar</TabsTrigger>
+          <TabsTrigger value="budget" className="flex-1">Budget</TabsTrigger>
+        </TabsList>
+        <TabsContent value="overview" className="mt-4"><PlanningOverview /></TabsContent>
+        <TabsContent value="recurring" className="mt-4"><RecurringExpenses /></TabsContent>
+        <TabsContent value="calendar" className="mt-4"><CalendarPage /></TabsContent>
+        <TabsContent value="budget" className="mt-4"><BudgetPage /></TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+function PlanningOverview() {
   const navigate = useNavigate();
   const refresh = useRefreshRecurringTracking();
   const monthStart = startOfMonth(new Date()).toISOString().split('T')[0];
@@ -42,8 +74,6 @@ export default function Planning() {
     [monthInstances, fxRates]
   );
 
-  const liquidCash = liquidCashUsd;
-
   const missing = monthInstances.filter(i => i.derived === 'missing');
   const needsReview = monthInstances.filter(i => i.derived === 'needs_review');
   const upcomingMonth = monthInstances.filter(i => i.derived === 'upcoming');
@@ -67,21 +97,16 @@ export default function Planning() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Planning</h1>
-          <p className="text-sm text-muted-foreground">{format(new Date(), 'MMMM yyyy')} projection</p>
-        </div>
+      <div className="flex items-center justify-end">
         <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refresh.isPending}>
           <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${refresh.isPending ? 'animate-spin' : ''}`} />
           Refresh
         </Button>
       </div>
 
-      {/* Monthly projection */}
       <Card className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground border-0 shadow-elevated">
         <CardContent className="pt-6 pb-6">
-          <p className="text-sm opacity-80 font-medium">This month</p>
+          <p className="text-sm opacity-80 font-medium">{format(new Date(), 'MMMM yyyy')}</p>
           <p className="text-4xl font-extrabold mt-1 tracking-tight">{formatUSD(monthIncome - expectedRecurring)}</p>
           <p className="text-xs opacity-70 mt-1">expected available after recurring</p>
           <div className="grid grid-cols-3 gap-3 mt-4 text-sm">
@@ -95,13 +120,12 @@ export default function Planning() {
             </div>
             <div>
               <div className="flex items-center gap-1 opacity-80"><Wallet className="h-3.5 w-3.5" /> Cash</div>
-              <p className="font-bold mt-0.5">{formatUSD(liquidCash)}</p>
+              <p className="font-bold mt-0.5">{formatUSD(liquidCashUsd)}</p>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Status grid */}
       <div className="grid grid-cols-4 gap-2">
         {[
           { label: 'Missing', count: missing.length, cls: 'text-destructive', icon: AlertCircle },
@@ -119,14 +143,13 @@ export default function Planning() {
         ))}
       </div>
 
-      {/* Needs attention */}
       {(missing.length > 0 || needsReview.length > 0) && (
         <Card className="border-amber-500/30">
           <CardHeader className="pb-2 flex flex-row items-center justify-between">
             <CardTitle className="text-sm font-semibold flex items-center gap-2">
               <AlertCircle className="h-4 w-4 text-amber-600" /> Needs attention
             </CardTitle>
-            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => navigate('/recurring')}>View all</Button>
+            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => navigate('/planning/recurring')}>View all</Button>
           </CardHeader>
           <CardContent className="space-y-2">
             {[...missing, ...needsReview].slice(0, 5).map(i => {
@@ -154,13 +177,12 @@ export default function Planning() {
         </Card>
       )}
 
-      {/* Upcoming list */}
       <Card>
         <CardHeader className="pb-2 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-semibold flex items-center gap-2">
             <CalendarDays className="h-4 w-4 text-muted-foreground" /> Upcoming
           </CardTitle>
-          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => navigate('/calendar')}>Calendar</Button>
+          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => navigate('/planning/calendar')}>Calendar</Button>
         </CardHeader>
         <CardContent className="space-y-2">
           {upcoming.length === 0 && (

@@ -9,11 +9,10 @@ import Dashboard from "./pages/Dashboard";
 import Accounts from "./pages/Accounts";
 import Transactions from "./pages/Transactions";
 import Analytics from "./pages/Analytics";
-import RecurringExpenses from "./pages/RecurringExpenses";
-import CalendarPage from "./pages/Calendar";
-import BudgetPage from "./pages/Budget";
 import Planning from "./pages/Planning";
 import Rules from "./pages/Rules";
+import ImportPage from "./pages/Import";
+import IntegrationsPage from "./pages/Integrations";
 import Settings from "./pages/Settings";
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
@@ -42,15 +41,23 @@ function ProtectedRoutes() {
         <Route path="/transactions" element={<Transactions />} />
         <Route path="/analytics" element={<Analytics />} />
         <Route path="/planning" element={<Planning />} />
-        <Route path="/recurring" element={<RecurringExpenses />} />
-        <Route path="/calendar" element={<CalendarPage />} />
-        <Route path="/budget" element={<BudgetPage />} />
+        <Route path="/planning/recurring" element={<Planning initialTab="recurring" />} />
+        <Route path="/planning/calendar" element={<Planning initialTab="calendar" />} />
+        <Route path="/planning/budget" element={<Planning initialTab="budget" />} />
         <Route path="/rules" element={<Rules />} />
-        <Route path="/import" element={<Settings initialTab="import" />} />
-        <Route path="/system/categories" element={<Settings initialTab="categories" />} />
-        <Route path="/system/merchants" element={<Settings initialTab="merchants" />} />
-        <Route path="/system/fx" element={<Settings initialTab="fx" />} />
-        <Route path="/system/integrations" element={<Settings initialTab="integrations" />} />
+        <Route path="/rules/categories" element={<Rules initialTab="categories" />} />
+        <Route path="/rules/merchants" element={<Rules initialTab="merchants" />} />
+        <Route path="/rules/fx" element={<Rules initialTab="fx" />} />
+        <Route path="/import" element={<ImportPage />} />
+        <Route path="/integrations" element={<IntegrationsPage />} />
+        {/* Legacy redirects */}
+        <Route path="/recurring" element={<Navigate to="/planning/recurring" replace />} />
+        <Route path="/calendar" element={<Navigate to="/planning/calendar" replace />} />
+        <Route path="/budget" element={<Navigate to="/planning/budget" replace />} />
+        <Route path="/system/categories" element={<Navigate to="/rules/categories" replace />} />
+        <Route path="/system/merchants" element={<Navigate to="/rules/merchants" replace />} />
+        <Route path="/system/fx" element={<Navigate to="/rules/fx" replace />} />
+        <Route path="/system/integrations" element={<Navigate to="/integrations" replace />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
