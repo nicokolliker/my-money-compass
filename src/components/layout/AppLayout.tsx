@@ -66,7 +66,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
   NAV.forEach(e => {
     if (!isLeaf(e)) {
       const childActive = e.children.some(c => location.pathname === c.path || location.pathname.startsWith(c.path + '/'));
-      initialOpen[e.label] = childActive || ['Money', 'Planning'].includes(e.label);
+      initialOpen[e.label] = childActive || ['Planning'].includes(e.label);
     }
   });
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(initialOpen);
