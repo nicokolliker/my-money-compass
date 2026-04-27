@@ -90,6 +90,8 @@ export default function Transactions() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [showDateFilter, setShowDateFilter] = useState(false);
+  const [uncategorizedOnly, setUncategorizedOnly] = useState(false);
+  const [editTx, setEditTx] = useState<any>(null);
 
   const { data: transactions, isLoading } = useTransactions({
     search: search || undefined,
