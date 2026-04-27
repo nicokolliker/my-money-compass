@@ -17,7 +17,7 @@ import { toast } from 'sonner';
 import RecurringExpenses from './RecurringExpenses';
 import CalendarPage from './Calendar';
 import BudgetPage from './Budget';
-import { PlanningShell } from '@/components/planning/PlanningShell';
+
 
 type PlanningTab = 'overview' | 'recurring' | 'calendar' | 'budget';
 
