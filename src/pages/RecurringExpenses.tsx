@@ -21,7 +21,7 @@ import { DemoDataBanner } from '@/components/DemoDataBanner';
 import { useDemoData } from '@/hooks/useDemoData';
 import RecurringTracking from '@/components/recurring/RecurringTracking';
 
-// New 6 recurring expense types
+// Recurring expense types
 const TYPE_LABELS: Record<string, { label: string; icon: string; color: string }> = {
   casa:           { label: 'Casa',                    icon: '🏠', color: '#FAECE7' },
   auto:           { label: 'Auto',                    icon: '🚗', color: '#E1F5EE' },
@@ -29,9 +29,18 @@ const TYPE_LABELS: Record<string, { label: string; icon: string; color: string }
   personal_care:  { label: 'Personal Care',           icon: '✨', color: '#EAF3DE' },
   obligaciones:   { label: 'Obligaciones',            icon: '📋', color: '#F1EFE8' },
   ocio:           { label: 'Ocio',                    icon: '🎉', color: '#FAEEDA' },
+  digital:        { label: 'Digital',                 icon: '💻', color: '#E6F1FB' },
 };
 
 const TYPE_KEYS = Object.keys(TYPE_LABELS);
+
+// Digital subcategories
+const DIGITAL_SUBTYPES: Record<string, { label: string; icon: string }> = {
+  ia:                  { label: 'IA',                          icon: '🤖' },
+  creatividad:         { label: 'Creatividad & Productividad', icon: '🎨' },
+  entretenimiento:     { label: 'Entretenimiento',             icon: '🎬' },
+  delivery_movilidad:  { label: 'Delivery & Movilidad',        icon: '🚚' },
+};
 
 // Status badge tones (Library list)
 const STATUS_STYLES: Record<DerivedInstanceState | 'none', { label: string; bg: string; color: string }> = {
@@ -74,10 +83,11 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
   const [showAdd, setShowAdd] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [topTab, setTopTab] = useState<'library' | 'tracking'>('library');
+  const [digitalExpanded, setDigitalExpanded] = useState(false);
   const { hasDemoData, onCleared: onDemoCleared } = useDemoData();
 
   const emptyForm = {
-    name: '', type: 'casa', category_id: '', account_id: '', amount: '',
+    name: '', type: 'casa', subtype: '', category_id: '', account_id: '', amount: '',
     currency: 'USD', frequency: 'monthly', due_day: '1', notes: '', end_date: '', renewal_notes: '',
   };
   const [form, setForm] = useState(emptyForm);
@@ -184,6 +194,7 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
     setForm({
       name: item.name,
       type: TYPE_KEYS.includes(item.type) ? item.type : 'casa',
+      subtype: item.subtype || '',
       category_id: item.category_id || '',
       account_id: item.account_id || '',
       amount: String(Math.abs(Number(item.amount))),
@@ -201,7 +212,9 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
     if (nextDue < new Date()) nextDue.setMonth(nextDue.getMonth() + 1);
 
     const payload: any = {
-      name: form.name, type: form.type, category_id: form.category_id || null,
+      name: form.name, type: form.type,
+      subtype: form.type === 'digital' ? (form.subtype || null) : null,
+      category_id: form.category_id || null,
       account_id: form.account_id || null, amount: parseFloat(form.amount),
       currency: form.currency, frequency: form.frequency,
       due_day: parseInt(form.due_day) || 1, notes: form.notes || null,
@@ -260,6 +273,19 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
                   </Select>
                 </div>
               </div>
+              {form.type === 'digital' && (
+                <div>
+                  <Label>Subcategoría</Label>
+                  <Select value={form.subtype} onValueChange={v => setForm(f => ({ ...f, subtype: v }))}>
+                    <SelectTrigger className="mt-1"><SelectValue placeholder="Seleccionar subcategoría" /></SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(DIGITAL_SUBTYPES).map(([key, sub]) => (
+                        <SelectItem key={key} value={key}>{sub.icon} {sub.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-2">
                 <div><Label>Amount</Label><Input type="number" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} className="mt-1" /></div>
                 <div><Label>Currency</Label>
@@ -330,6 +356,46 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
                 {TYPE_KEYS.map(k => {
                   const v = breakdown[k] || 0;
                   const pct = totalFijosUsd > 0 ? (v / totalFijosUsd) * 100 : 0;
+
+                  if (k === 'digital') {
+                    const digitalItems = (items || []).filter(i => i.is_active && i.type === 'digital');
+                    return (
+                      <div key={k}>
+                        <div
+                          className="flex items-center justify-between text-sm cursor-pointer select-none"
+                          onClick={() => setDigitalExpanded(x => !x)}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="inline-block w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: TYPE_LABELS[k].color }} />
+                            <span className="text-foreground truncate font-medium">{TYPE_LABELS[k].icon} {TYPE_LABELS[k].label}</span>
+                            <span className="text-[10px] text-muted-foreground">{digitalExpanded ? '▲' : '▼'}</span>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="text-xs text-muted-foreground tabular-nums">{pct.toFixed(0)}%</span>
+                            <span className="font-semibold tabular-nums text-foreground">{formatUSD(v)}</span>
+                          </div>
+                        </div>
+                        {digitalExpanded && Object.entries(DIGITAL_SUBTYPES).map(([subKey, sub]) => {
+                          const subItems = digitalItems.filter((i: any) => i.subtype === subKey);
+                          const subTotal = subItems.reduce((s, i: any) => {
+                            const m = toMonthlyAmount(Math.abs(Number(i.amount)), i.frequency);
+                            return s + toUSD(m, i.currency, fxList);
+                          }, 0);
+                          if (subTotal === 0 && subItems.length === 0) return null;
+                          return (
+                            <div key={subKey} className="flex items-center justify-between text-sm pl-6 mt-1">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="text-xs">{sub.icon}</span>
+                                <span className="text-xs text-muted-foreground truncate">{sub.label}</span>
+                              </div>
+                              <span className="text-xs font-medium tabular-nums text-foreground shrink-0">{formatUSD(subTotal)}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  }
+
                   return (
                     <div key={k} className="flex items-center justify-between text-sm">
                       <div className="flex items-center gap-2 min-w-0">
@@ -405,6 +471,11 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
                               <p className="text-sm font-semibold text-foreground truncate">{item.name}</p>
                               <p className="text-xs text-muted-foreground truncate">
                                 {acc?.name || '—'} · <span className="capitalize">{item.frequency}</span>
+                                {item.type === 'digital' && item.subtype && DIGITAL_SUBTYPES[item.subtype] && (
+                                  <span className="ml-1.5 inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-foreground/70 align-middle">
+                                    {DIGITAL_SUBTYPES[item.subtype].icon} {DIGITAL_SUBTYPES[item.subtype].label}
+                                  </span>
+                                )}
                               </p>
                             </div>
                             <div className="text-right shrink-0">
