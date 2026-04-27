@@ -6,7 +6,8 @@ import { useBudgets, useUpsertBudget } from '@/hooks/useBudgets';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useCategories } from '@/hooks/useCategories';
 import { useRecurringExpenses } from '@/hooks/useRecurringExpenses';
-import { toMonthlyAmount } from '@/lib/money';
+import { useFxRates } from '@/hooks/useFxRates';
+import { toMonthlyAmount, toUSD, type FxRateRow } from '@/lib/money';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -30,6 +31,7 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
   const { data: budgets } = useBudgets();
   const { data: categories } = useCategories();
   const { data: recurringItems } = useRecurringExpenses();
+  const { data: fxRates } = useFxRates();
   const upsertBudget = useUpsertBudget();
 
   const incomeCategoryId = useMemo(
@@ -94,8 +96,15 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
   const recurringMonthlyTotal = useMemo(() => {
     return (recurringItems || [])
       .filter(r => r.is_active)
-      .reduce((s, r) => s + toMonthlyAmount(Math.abs(Number(r.amount)), r.frequency), 0);
-  }, [recurringItems]);
+      .reduce((s, r) => {
+        const amountUsd = toUSD(
+          Math.abs(Number(r.amount)),
+          r.currency || 'USD',
+          fxRates as FxRateRow[] | undefined
+        );
+        return s + toMonthlyAmount(amountUsd, r.frequency);
+      }, 0);
+  }, [recurringItems, fxRates]);
 
   // ----- Save handlers -----
   const saveBudget = async (categoryId: string, monthIndex: number, value: number) => {
@@ -171,51 +180,54 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-semibold capitalize">
-            {new Date(currentYear, currentMonth).toLocaleString('es', { month: 'long', year: 'numeric' })} — Presupuestado vs Real
+            {new Date(currentYear, currentMonth).toLocaleString('es', { month: 'long', year: 'numeric' })} — Seguimiento del mes
           </CardTitle>
         </CardHeader>
         <CardContent>
           {chartData.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-6 text-center">
-              Definí presupuestos para ver el comparativo.
-            </p>
+            <div className="py-6 text-center space-y-1">
+              <p className="text-sm text-muted-foreground">No hay presupuestos definidos para este mes.</p>
+              <p className="text-xs text-muted-foreground">Usá la tabla de abajo para definir tu presupuesto mensual.</p>
+            </div>
           ) : (
             <div className="space-y-4">
               {chartData.map(item => {
-                const isOver = item.deviation > 0;
-                const max = Math.max(item.budgeted, item.spent, 1);
+                const pctUsed = item.budgeted > 0 ? Math.min((item.spent / item.budgeted) * 100, 100) : 0;
+                const isOver = item.spent > item.budgeted && item.budgeted > 0;
+                const remaining = item.budgeted - item.spent;
+                const barColor = isOver ? 'bg-destructive' : pctUsed > 80 ? 'bg-amber-500' : 'bg-emerald-500';
+
                 return (
                   <div key={item.id}>
                     <div className="flex items-center justify-between mb-1.5">
-                      <div className="flex items-center gap-2 text-sm font-medium">
+                      <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                         <span>{item.icon}</span>
                         <span>{item.name}</span>
                       </div>
-                      <span className={`text-xs font-semibold tabular-nums ${isOver ? 'text-destructive' : 'text-emerald-600'}`}>
-                        {isOver ? '+' : ''}{item.pct}% ({isOver ? '+' : ''}{fmt(item.deviation)})
-                      </span>
+                      <div className="text-xs tabular-nums">
+                        <span className={cn('font-semibold', isOver ? 'text-destructive' : 'text-foreground')}>
+                          {fmt(item.spent)}
+                        </span>
+                        <span className="text-muted-foreground"> / {fmt(item.budgeted)}</span>
+                      </div>
                     </div>
 
-                    {/* Budget bar */}
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-[10px] text-muted-foreground w-16 text-right shrink-0">Budget</span>
-                      <div className="flex-1 h-3 bg-muted rounded-full overflow-hidden">
-                        <div className="h-full bg-primary/40 rounded-full" style={{ width: '100%' }} />
-                      </div>
-                      <span className="text-[10px] tabular-nums text-muted-foreground w-14 text-right shrink-0">{fmt(item.budgeted)}</span>
+                    <div className="relative h-2 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className={cn('h-full rounded-full transition-all', barColor)}
+                        style={{ width: `${pctUsed}%` }}
+                      />
+                      {isOver && (
+                        <div className="absolute inset-0 rounded-full ring-1 ring-destructive/40 pointer-events-none" />
+                      )}
                     </div>
 
-                    {/* Actual bar */}
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] text-muted-foreground w-16 text-right shrink-0">Gastado</span>
-                      <div className="flex-1 h-3 bg-muted rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full ${isOver ? 'bg-destructive' : 'bg-emerald-500'}`}
-                          style={{ width: `${Math.min((item.spent / max) * 100, 100)}%` }}
-                        />
-                      </div>
-                      <span className={`text-[10px] tabular-nums font-semibold w-14 text-right shrink-0 ${isOver ? 'text-destructive' : 'text-emerald-600'}`}>
-                        {fmt(item.spent)}
+                    <div className="flex items-center justify-between mt-1 text-[10px] text-muted-foreground">
+                      <span>{Math.round(pctUsed)}% usado</span>
+                      <span className={cn(isOver && 'text-destructive font-semibold')}>
+                        {isOver
+                          ? `+${fmt(Math.abs(remaining))} sobre presupuesto`
+                          : `${fmt(remaining)} restante`}
                       </span>
                     </div>
                   </div>
@@ -236,14 +248,20 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
             <table style={{ minWidth: '900px' }} className="w-full text-xs border-collapse">
               <thead>
                 <tr className="border-b border-border bg-muted/40">
-                  <th className="text-left px-3 py-2 sticky left-0 bg-muted/40 z-10 min-w-[180px] font-semibold text-foreground">
+                  <th
+                    className="text-left px-3 py-2 sticky left-0 z-10 min-w-[180px] font-semibold text-foreground"
+                    style={{
+                      background: 'var(--color-background-secondary, hsl(var(--muted)))',
+                      boxShadow: '2px 0 4px -2px rgba(0,0,0,0.08)',
+                    }}
+                  >
                     Categoría
                   </th>
                   {MONTHS.map((m, i) => (
                     <th
                       key={m}
                       className={cn(
-                        'px-2 py-2 text-center font-semibold text-foreground min-w-[80px]',
+                        'px-2 py-2 text-center font-semibold text-foreground min-w-[68px]',
                         isCurrent(i) && 'bg-primary/10 text-primary'
                       )}
                     >
@@ -257,7 +275,13 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
               <tbody>
                 {/* Income row */}
                 <tr className="border-b border-border bg-emerald-500/5">
-                  <td className="px-3 py-2 sticky left-0 bg-emerald-500/5 z-10 font-semibold text-foreground">
+                  <td
+                    className="px-3 py-2 sticky left-0 z-10 font-semibold text-foreground"
+                    style={{
+                      background: 'color-mix(in srgb, var(--color-background-primary, hsl(var(--card))) 95%, #22c55e 5%)',
+                      boxShadow: '2px 0 4px -2px rgba(0,0,0,0.08)',
+                    }}
+                  >
                     💰 Ingresos
                   </td>
                   {MONTHS.map((_, i) => {
@@ -289,7 +313,13 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
 
                 {/* Fixed costs (recurring) row */}
                 <tr className="border-b border-border bg-primary/5">
-                  <td className="px-3 py-2 sticky left-0 bg-primary/5 z-10 font-semibold text-foreground">
+                  <td
+                    className="px-3 py-2 sticky left-0 z-10 font-semibold text-foreground"
+                    style={{
+                      background: 'color-mix(in srgb, var(--color-background-primary, hsl(var(--card))) 95%, hsl(var(--primary)) 5%)',
+                      boxShadow: '2px 0 4px -2px rgba(0,0,0,0.08)',
+                    }}
+                  >
                     🔒 Gastos fijos
                   </td>
                   {MONTHS.map((_, i) => (
@@ -313,7 +343,13 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                   }, 0);
                   return (
                     <tr key={cat.id} className="border-b border-border hover:bg-muted/20">
-                      <td className="px-3 py-2 sticky left-0 bg-card z-10">
+                      <td
+                        className="px-3 py-2 sticky left-0 z-10"
+                        style={{
+                          background: 'var(--color-background-primary, hsl(var(--card)))',
+                          boxShadow: '2px 0 4px -2px rgba(0,0,0,0.08)',
+                        }}
+                      >
                         <div className="flex items-center gap-1.5">
                           <span>{cat.icon}</span>
                           <span className="text-foreground truncate">{cat.name}</span>
@@ -373,7 +409,13 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
 
                 {/* Total egresos row */}
                 <tr className="border-y-2 border-border bg-muted/40">
-                  <td className="px-3 py-2 sticky left-0 bg-muted/40 z-10 font-semibold text-foreground">
+                  <td
+                    className="px-3 py-2 sticky left-0 z-10 font-semibold text-foreground"
+                    style={{
+                      background: 'var(--color-background-secondary, hsl(var(--muted)))',
+                      boxShadow: '2px 0 4px -2px rgba(0,0,0,0.08)',
+                    }}
+                  >
                     Total egresos
                   </td>
                   {MONTHS.map((_, i) => {
@@ -403,7 +445,13 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
 
                 {/* Result row */}
                 <tr className="bg-muted/60">
-                  <td className="px-3 py-2 sticky left-0 bg-muted/60 z-10 font-bold text-foreground">
+                  <td
+                    className="px-3 py-2 sticky left-0 z-10 font-bold text-foreground"
+                    style={{
+                      background: 'var(--color-background-secondary, hsl(var(--muted)))',
+                      boxShadow: '2px 0 4px -2px rgba(0,0,0,0.08)',
+                    }}
+                  >
                     = Resultado
                   </td>
                   {MONTHS.map((_, i) => {
