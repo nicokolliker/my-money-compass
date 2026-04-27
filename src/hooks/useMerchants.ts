@@ -72,8 +72,10 @@ export function useMergeMerchants() {
 }
 
 export function useMerchantTransactions(merchantId: string | null) {
+  const userId = useUserId();
   return useQuery({
-    queryKey: ['merchant-transactions', merchantId],
+    queryKey: ['merchant-transactions', userId, merchantId],
+    enabled: !!userId && !!merchantId,
     queryFn: async () => {
       if (!merchantId) return [];
       const { data, error } = await supabase
@@ -85,6 +87,5 @@ export function useMerchantTransactions(merchantId: string | null) {
       if (error) throw error;
       return data;
     },
-    enabled: !!merchantId,
   });
 }
