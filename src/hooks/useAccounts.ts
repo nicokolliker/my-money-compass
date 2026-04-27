@@ -2,12 +2,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 import { computeBalance, computeBalanceUsd, type FxRateRow } from '@/lib/money';
+import { useUserId } from '@/hooks/useAuthUser';
 
 export type Account = Tables<'accounts'>;
 
 export function useAccounts() {
+  const userId = useUserId();
   return useQuery({
-    queryKey: ['accounts'],
+    queryKey: ['accounts', userId],
+    enabled: !!userId,
     queryFn: async () => {
       const { data, error } = await supabase.from('accounts').select('*').order('sort_order').order('name');
       if (error) throw error;
@@ -17,8 +20,10 @@ export function useAccounts() {
 }
 
 export function useAccountBalances() {
+  const userId = useUserId();
   return useQuery({
-    queryKey: ['account-balances'],
+    queryKey: ['account-balances', userId],
+    enabled: !!userId,
     queryFn: async () => {
       const [accountsRes, txRes, fxRes] = await Promise.all([
         supabase.from('accounts').select('*, account_groups(name, icon, sort_order)').eq('is_active', true).order('sort_order').order('name'),
