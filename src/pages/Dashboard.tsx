@@ -9,6 +9,7 @@ import { formatUSD, formatCurrency } from '@/lib/constants';
 import { toMonthlyAmount } from '@/lib/money';
 import { getCategoryColor, getCategoryHex } from '@/lib/categoryColors';
 import { getCategoryIcon } from '@/lib/brandLogos';
+import { MerchantLogo } from '@/components/MerchantLogo';
 import { TrendingUp, TrendingDown, ArrowUpDown, DollarSign, ArrowUp, ArrowDown, CalendarDays, Repeat, Building, AlertTriangle } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { useQuery } from '@tanstack/react-query';
@@ -217,7 +218,8 @@ export default function Dashboard() {
               const dueDate = new Date(inst.expected_date + 'T12:00:00');
               return (
                 <div key={inst.id} className="flex items-center gap-3 py-1.5">
-                  <span className="text-lg">{cat?.icon || '📌'}</span>
+                  <MerchantLogo name={r?.name || ''} size={32} />
+                  {void cat /* keep cat in scope */}
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-foreground truncate">{r?.name || 'Recurring'}</p>
                     <p className="text-[10px] text-muted-foreground truncate">

@@ -7,7 +7,8 @@ import { useCategories } from '@/hooks/useCategories';
 import { useTransactionRecurringMap } from '@/hooks/useTransactionRecurringMap';
 import { formatCurrency, formatUSD, TRANSACTION_TYPE_LABELS } from '@/lib/constants';
 import { getCategoryColor } from '@/lib/categoryColors';
-import { getBrandLogo, getInitialsColor, getCategoryIcon } from '@/lib/brandLogos';
+import { getCategoryIcon } from '@/lib/brandLogos';
+import { MerchantLogo } from '@/components/MerchantLogo';
 import { Search, Trash2, ArrowLeftRight, Repeat, Calendar, Link2 } from 'lucide-react';
 import { DemoDataBanner } from '@/components/DemoDataBanner';
 import { useDemoData } from '@/hooks/useDemoData';
@@ -32,54 +33,24 @@ function formatDateGroupLabel(dateStr: string): string {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: d.getFullYear() !== today.getFullYear() ? 'numeric' : undefined });
 }
 
-function MerchantAvatar({ tx, cat }: { tx: any; cat: any }) {
+function MerchantAvatar({ tx }: { tx: any; cat?: any }) {
   const isTransfer = tx.type === 'transfer';
   const merchantData = (tx as any).merchants;
   const name = merchantData?.display_name || merchantData?.name || tx.merchant || tx.description || '';
 
   if (isTransfer) {
     return (
-      <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+      <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0">
         <ArrowLeftRight className="h-4 w-4 text-muted-foreground" />
       </div>
     );
   }
 
-  // Custom logo from merchant record
   if (merchantData?.logo_url) {
-    return <img src={merchantData.logo_url} alt={name} className="w-10 h-10 rounded-full object-cover" />;
+    return <img src={merchantData.logo_url} alt={name} className="w-10 h-10 rounded-full object-cover shrink-0" />;
   }
 
-  // Brand logo
-  const brand = getBrandLogo(name);
-  if (brand) {
-    return (
-      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg ${brand.bg}`}>
-        {brand.icon}
-      </div>
-    );
-  }
-
-  // Category icon fallback
-  if (cat?.icon) {
-    return (
-      <div
-        className="w-10 h-10 rounded-full flex items-center justify-center text-lg"
-        style={{ backgroundColor: cat.color ? `hsl(${cat.color} / 0.15)` : undefined }}
-      >
-        {cat.icon}
-      </div>
-    );
-  }
-
-  // Initials fallback
-  const initial = name[0]?.toUpperCase() || '?';
-  const colors = getInitialsColor(name);
-  return (
-    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${colors.bg} ${colors.text}`}>
-      {initial}
-    </div>
-  );
+  return <MerchantLogo name={name} size={40} />;
 }
 
 export default function Transactions() {
