@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -162,10 +162,10 @@ export default function MerchantsTab() {
         </div>
       )}
 
-      {/* Edit Merchant Sheet */}
-      <Sheet open={editSheet} onOpenChange={setEditSheet}>
-        <SheetContent side="bottom" className="h-[85vh] rounded-t-2xl">
-          <SheetHeader><SheetTitle>Edit Merchant</SheetTitle></SheetHeader>
+      {/* Edit Merchant Dialog */}
+      <Dialog open={editSheet} onOpenChange={setEditSheet}>
+        <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Edit Merchant</DialogTitle></DialogHeader>
           {selected && (
             <div className="space-y-5 mt-4 overflow-y-auto">
               {/* Logo + Name */}
@@ -256,8 +256,8 @@ export default function MerchantsTab() {
               )}
             </div>
           )}
-        </SheetContent>
-      </Sheet>
+        </DialogContent>
+      </Dialog>
 
       {/* Merge Dialog */}
       <AlertDialog open={mergeDialog} onOpenChange={setMergeDialog}>
