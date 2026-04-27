@@ -495,8 +495,8 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
               </tbody>
             </table>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }
