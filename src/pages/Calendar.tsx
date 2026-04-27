@@ -5,7 +5,7 @@ import { useDerivedInstances, useRefreshRecurringTracking, useMarkInstancePaid }
 import { useFxRates } from '@/hooks/useFxRates';
 import { formatCurrency, formatUSD } from '@/lib/constants';
 import { toUSD, isDerivedPaid, type FxRateRow } from '@/lib/money';
-import { getBrandLogo, getInitialsColor } from '@/lib/brandLogos';
+import { MerchantLogo } from '@/components/MerchantLogo';
 import { RecurringStatusBadge } from '@/components/recurring/RecurringStatusBadge';
 import {
   ChevronLeft, ChevronRight, CalendarDays, AlertCircle, CreditCard, Wallet, RefreshCw, CheckCircle2,
@@ -131,8 +131,6 @@ export default function CalendarPage({ embedded = false }: { embedded?: boolean 
           {items.map(item => {
             const r = (item as any).recurring_expenses;
             const name = r?.name || 'Recurring';
-            const brand = getBrandLogo(name);
-            const initials = getInitialsColor(name);
             const cat = r?.categories;
             const acc = r?.accounts;
             const pm = r?.payment_methods;
