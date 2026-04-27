@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { TransactionForm } from '@/components/transactions/TransactionForm';
+import { DebugPanel } from '@/components/DebugPanel';
 import { useAuth } from '@/hooks/useAuth';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -196,10 +197,11 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
       {/* Quick Add Sheet */}
       <Sheet open={showQuickAdd} onOpenChange={setShowQuickAdd}>
-        <SheetContent side="bottom" className="h-[85vh] rounded-t-2xl">
+        <SheetContent side="bottom" className="h-[85vh] rounded-t-2xl overflow-y-auto">
           <TransactionForm onSuccess={() => setShowQuickAdd(false)} />
         </SheetContent>
       </Sheet>
+      <DebugPanel />
     </div>
   );
 }

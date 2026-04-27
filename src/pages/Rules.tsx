@@ -25,24 +25,23 @@ export default function Rules({ initialTab }: { initialTab?: RulesTab } = {}) {
   const location = useLocation();
   const tab: RulesTab = initialTab || (location.state as any)?.tab || 'rules';
 
+  const titles: Record<RulesTab, { title: string; subtitle: string }> = {
+    rules: { title: 'Rules', subtitle: 'Auto-categorization rules for imported transactions' },
+    categories: { title: 'Categories', subtitle: 'Manage your spending categories' },
+    merchants: { title: 'Merchants', subtitle: 'Manage merchant names and default categories' },
+    fx: { title: 'FX Rates', subtitle: 'Exchange rates for currency conversion' },
+  };
+
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Rules &amp; Data</h1>
-        <p className="text-sm text-muted-foreground">Manage normalization rules, categories, merchants and FX rates</p>
+        <h1 className="text-2xl font-bold text-foreground">{titles[tab].title}</h1>
+        <p className="text-sm text-muted-foreground">{titles[tab].subtitle}</p>
       </div>
-      <Tabs defaultValue={tab}>
-        <TabsList className="w-full flex-wrap">
-          <TabsTrigger value="rules" className="flex-1">Rules</TabsTrigger>
-          <TabsTrigger value="categories" className="flex-1">Categories</TabsTrigger>
-          <TabsTrigger value="merchants" className="flex-1">Merchants</TabsTrigger>
-          <TabsTrigger value="fx" className="flex-1">FX Rates</TabsTrigger>
-        </TabsList>
-        <TabsContent value="rules" className="mt-4"><RulesPanel /></TabsContent>
-        <TabsContent value="categories" className="mt-4"><CategoriesTab /></TabsContent>
-        <TabsContent value="merchants" className="mt-4"><MerchantsTab /></TabsContent>
-        <TabsContent value="fx" className="mt-4"><FxRatesPanel /></TabsContent>
-      </Tabs>
+      {tab === 'rules' && <RulesPanel />}
+      {tab === 'categories' && <CategoriesTab />}
+      {tab === 'merchants' && <MerchantsTab />}
+      {tab === 'fx' && <FxRatesPanel />}
     </div>
   );
 }

@@ -51,7 +51,8 @@ function getNextDate(current: Date, frequency: string): Date {
 export default function RecurringExpenses({ embedded = false }: { embedded?: boolean } = {}) {
   const { data: items, isLoading } = useRecurringExpenses();
   const { data: transactions } = useTransactions();
-  const { data: instances } = useDerivedInstances();
+  const { data: instances, error: instancesError } = useDerivedInstances();
+  if (instancesError) console.error('Recurring instances error:', instancesError);
   const { data: categories } = useCategories();
   const { data: accounts } = useAccounts();
   const { data: fxRates } = useFxRates();
@@ -189,7 +190,7 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
 
   const [topTab, setTopTab] = useState<'library' | 'tracking'>('library');
 
-  if (isLoading) return <div className="flex items-center justify-center h-64 text-muted-foreground">Loading...</div>;
+  if (isLoading) return <div className="flex items-center justify-center h-64 text-muted-foreground">Loading recurring expenses...</div>;
 
   return (
     <div className={embedded ? 'space-y-4' : 'space-y-5'}>

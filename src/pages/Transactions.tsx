@@ -324,7 +324,7 @@ export default function Transactions() {
       )}
 
       <Sheet open={!!editTx} onOpenChange={(open) => { if (!open) setEditTx(null); }}>
-        <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
+        <SheetContent side="bottom" className="h-[85vh] rounded-t-2xl overflow-y-auto">
           {editTx && (
             <TransactionForm
               editData={editTx}
