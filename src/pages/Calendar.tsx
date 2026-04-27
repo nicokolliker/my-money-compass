@@ -149,13 +149,7 @@ export default function CalendarPage({ embedded = false }: { embedded?: boolean 
                     <p className="text-xl font-bold text-foreground">{format(item.dueDate, 'd')}</p>
                   </div>
                   <div className="w-px h-10 bg-border" />
-                  {brand ? (
-                    <div className={`w-9 h-9 rounded-full flex items-center justify-center text-base ${brand.bg}`}>{brand.icon}</div>
-                  ) : (
-                    <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold ${initials.bg} ${initials.text}`}>
-                      {name[0]?.toUpperCase()}
-                    </div>
-                  )}
+                  <MerchantLogo name={name} size={36} />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-foreground truncate">{name}</p>
                     <div className="flex items-center gap-1.5 text-xs text-muted-foreground flex-wrap">
