@@ -76,7 +76,7 @@ export function useRecurringInstances(filters?: { from?: string; to?: string }) 
       if (!instances || instances.length === 0) return [];
 
       // Step 2: fetch related recurring_expenses for the ids we got
-      const recurringIds = [...new Set(instances.map((i: any) => i.recurring_id))];
+      const recurringIds = [...new Set(instances.map((i: any) => i.recurring_id as string))] as string[];
       const { data: recurringExpenses } = await supabase
         .from('recurring_expenses')
         .select('id, name, type, frequency, category_id, categories(name, icon, color), accounts(name, currency, type)')
