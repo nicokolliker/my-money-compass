@@ -19,8 +19,10 @@ import { isBefore, format } from 'date-fns';
 import { RecurringStatusBadge } from '@/components/recurring/RecurringStatusBadge';
 import { DemoDataBanner } from '@/components/DemoDataBanner';
 import { useDemoData } from '@/hooks/useDemoData';
+import { useUserId } from '@/hooks/useAuthUser';
 
 export default function Dashboard() {
+  const userId = useUserId();
   const { data: accountBalances, isLoading } = useAccountBalances();
   const { data: transactions } = useTransactions();
   const { data: blueDollar } = useBlueDollarRate();
@@ -31,7 +33,8 @@ export default function Dashboard() {
   const { hasDemoData, onCleared: onDemoCleared } = useDemoData();
 
   const { data: snapshots } = useQuery({
-    queryKey: ['net-worth-snapshots'],
+    queryKey: ['net-worth-snapshots', userId],
+    enabled: !!userId,
     queryFn: async () => {
       const { data, error } = await supabase.from('net_worth_snapshots').select('*').order('date');
       if (error) throw error;

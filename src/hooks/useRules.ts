@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { Tables, TablesInsert } from '@/integrations/supabase/types';
+import { useUserId } from '@/hooks/useAuthUser';
 
 export type Rule = Tables<'rules'>;
 
@@ -11,8 +12,10 @@ async function getUserId() {
 }
 
 export function useRules() {
+  const userId = useUserId();
   return useQuery({
-    queryKey: ['rules'],
+    queryKey: ['rules', userId],
+    enabled: !!userId,
     queryFn: async () => {
       const { data, error } = await supabase.from('rules').select('*, categories(name)').order('keyword');
       if (error) throw error;

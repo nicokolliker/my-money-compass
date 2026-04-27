@@ -1,12 +1,15 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { Tables, TablesUpdate } from '@/integrations/supabase/types';
+import { useUserId } from '@/hooks/useAuthUser';
 
 export type Merchant = Tables<'merchants'>;
 
 export function useMerchants() {
+  const userId = useUserId();
   return useQuery({
-    queryKey: ['merchants'],
+    queryKey: ['merchants', userId],
+    enabled: !!userId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('merchants')
@@ -69,8 +72,10 @@ export function useMergeMerchants() {
 }
 
 export function useMerchantTransactions(merchantId: string | null) {
+  const userId = useUserId();
   return useQuery({
-    queryKey: ['merchant-transactions', merchantId],
+    queryKey: ['merchant-transactions', userId, merchantId],
+    enabled: !!userId && !!merchantId,
     queryFn: async () => {
       if (!merchantId) return [];
       const { data, error } = await supabase
@@ -82,6 +87,5 @@ export function useMerchantTransactions(merchantId: string | null) {
       if (error) throw error;
       return data;
     },
-    enabled: !!merchantId,
   });
 }

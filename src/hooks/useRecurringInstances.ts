@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { deriveInstanceState, type DerivedInstanceState } from '@/lib/money';
+import { useUserId } from '@/hooks/useAuthUser';
 
 export type RecurringInstance = {
   id: string;
@@ -56,8 +57,10 @@ async function getUserId() {
 }
 
 export function useRecurringInstances(filters?: { from?: string; to?: string }) {
+  const userId = useUserId();
   return useQuery({
-    queryKey: ['recurring-instances', filters],
+    queryKey: ['recurring-instances', userId, filters],
+    enabled: !!userId,
     queryFn: async () => {
       let q = (supabase as any)
         .from('recurring_instances')

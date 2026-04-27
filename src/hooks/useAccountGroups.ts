@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { Tables, TablesInsert } from '@/integrations/supabase/types';
+import { useUserId } from '@/hooks/useAuthUser';
 
 export type AccountGroup = Tables<'account_groups'>;
 
@@ -11,8 +12,10 @@ async function getUserId() {
 }
 
 export function useAccountGroups() {
+  const userId = useUserId();
   return useQuery({
-    queryKey: ['account-groups'],
+    queryKey: ['account-groups', userId],
+    enabled: !!userId,
     queryFn: async () => {
       const { data, error } = await supabase.from('account_groups').select('*').order('sort_order');
       if (error) throw error;

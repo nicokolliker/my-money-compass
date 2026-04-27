@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { Tables, TablesInsert } from '@/integrations/supabase/types';
+import { useUserId } from '@/hooks/useAuthUser';
 
 export type Category = Tables<'categories'>;
 export type Subcategory = Tables<'subcategories'>;
@@ -12,8 +13,10 @@ async function getUserId() {
 }
 
 export function useCategories() {
+  const userId = useUserId();
   return useQuery({
-    queryKey: ['categories'],
+    queryKey: ['categories', userId],
+    enabled: !!userId,
     queryFn: async () => {
       const { data, error } = await supabase.from('categories').select('*').order('sort_order');
       if (error) throw error;
@@ -23,8 +26,10 @@ export function useCategories() {
 }
 
 export function useSubcategories(categoryId?: string) {
+  const userId = useUserId();
   return useQuery({
-    queryKey: ['subcategories', categoryId],
+    queryKey: ['subcategories', userId, categoryId],
+    enabled: !!userId,
     queryFn: async () => {
       let q = supabase.from('subcategories').select('*').order('name');
       if (categoryId) q = q.eq('category_id', categoryId);
