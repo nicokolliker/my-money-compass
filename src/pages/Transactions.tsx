@@ -194,6 +194,19 @@ export default function Transactions() {
             {(dateFrom || dateTo) && <Button variant="ghost" size="sm" className="text-xs h-9" onClick={() => { setDateFrom(''); setDateTo(''); }}>Clear</Button>}
           </div>
         )}
+        <div className="flex gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={() => setUncategorizedOnly(!uncategorizedOnly)}
+            className={`text-xs font-medium px-3 py-1.5 rounded-full border transition-colors ${
+              uncategorizedOnly
+                ? 'bg-primary text-primary-foreground border-primary'
+                : 'bg-background text-muted-foreground border-border hover:border-primary/50'
+            }`}
+          >
+            📌 Without category
+          </button>
+        </div>
       </div>
 
       {/* List */}
