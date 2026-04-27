@@ -19,6 +19,8 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { TransactionForm } from '@/components/transactions/TransactionForm';
 
 function formatDateGroupLabel(dateStr: string): string {
   const d = new Date(dateStr + 'T12:00:00');
