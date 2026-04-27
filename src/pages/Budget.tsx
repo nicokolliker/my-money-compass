@@ -37,9 +37,15 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
     [categories]
   );
 
-  // Variable budget categories (exclude the income projection one)
+  // Variable budget categories — exclude system / aggregated categories
+  const EXCLUDED_CATEGORIES = [
+    'Ingresos Proyectados', 'Income', 'Ingresos',
+    'Transfers', 'Transferencias', 'Transfer',
+    'Debt / Loans', 'Debt', 'Loans',
+    'Digital', // parent category — subcategories appear individually
+  ];
   const variableCategories = useMemo(
-    () => (categories || []).filter(c => c.name !== INCOME_CATEGORY_NAME),
+    () => (categories || []).filter(c => !EXCLUDED_CATEGORIES.includes(c.name)),
     [categories]
   );
 
@@ -170,38 +176,47 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
         </CardHeader>
         <CardContent>
           {chartData.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-6 text-center">No hay presupuestos definidos para este mes.</p>
+            <p className="text-sm text-muted-foreground py-6 text-center">
+              Definí presupuestos para ver el comparativo.
+            </p>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-4">
               {chartData.map(item => {
                 const isOver = item.deviation > 0;
                 const max = Math.max(item.budgeted, item.spent, 1);
-                const budgetPct = (item.budgeted / max) * 100;
-                const spentPct = (item.spent / max) * 100;
                 return (
-                  <div key={item.id} className="space-y-1">
-                    <div className="flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-1.5 min-w-0">
+                  <div key={item.id}>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2 text-sm font-medium">
                         <span>{item.icon}</span>
-                        <span className="text-foreground font-medium truncate">{item.name}</span>
+                        <span>{item.name}</span>
                       </div>
-                      <div className={cn('font-semibold tabular-nums shrink-0', isOver ? 'text-destructive' : 'text-emerald-600')}>
-                        {isOver ? '+' : ''}{Math.round(item.deviation).toLocaleString('en-US')} USD ({isOver ? '+' : ''}{item.pct}%)
+                      <span className={`text-xs font-semibold tabular-nums ${isOver ? 'text-destructive' : 'text-emerald-600'}`}>
+                        {isOver ? '+' : ''}{item.pct}% ({isOver ? '+' : ''}{fmt(item.deviation)})
+                      </span>
+                    </div>
+
+                    {/* Budget bar */}
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[10px] text-muted-foreground w-16 text-right shrink-0">Budget</span>
+                      <div className="flex-1 h-3 bg-muted rounded-full overflow-hidden">
+                        <div className="h-full bg-primary/40 rounded-full" style={{ width: '100%' }} />
                       </div>
+                      <span className="text-[10px] tabular-nums text-muted-foreground w-14 text-right shrink-0">{fmt(item.budgeted)}</span>
                     </div>
-                    <div className="relative h-5 rounded bg-muted overflow-hidden">
-                      <div
-                        className="absolute top-0 left-0 h-full bg-primary/40"
-                        style={{ width: `${budgetPct}%` }}
-                      />
-                      <div
-                        className={cn('absolute top-0 left-0 h-2 mt-1.5', isOver ? 'bg-destructive' : 'bg-emerald-500')}
-                        style={{ width: `${spentPct}%` }}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-                      <span>Gastado: {fmt(item.spent)}</span>
-                      <span>Budget: {fmt(item.budgeted)}</span>
+
+                    {/* Actual bar */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-muted-foreground w-16 text-right shrink-0">Gastado</span>
+                      <div className="flex-1 h-3 bg-muted rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${isOver ? 'bg-destructive' : 'bg-emerald-500'}`}
+                          style={{ width: `${Math.min((item.spent / max) * 100, 100)}%` }}
+                        />
+                      </div>
+                      <span className={`text-[10px] tabular-nums font-semibold w-14 text-right shrink-0 ${isOver ? 'text-destructive' : 'text-emerald-600'}`}>
+                        {fmt(item.spent)}
+                      </span>
                     </div>
                   </div>
                 );
@@ -217,8 +232,8 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
           <CardTitle className="text-sm font-semibold">Planificación anual {selectedYear}</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs border-collapse">
+          <div className="overflow-x-auto -mx-6 px-6">
+            <table style={{ minWidth: '900px' }} className="w-full text-xs border-collapse">
               <thead>
                 <tr className="border-b border-border bg-muted/40">
                   <th className="text-left px-3 py-2 sticky left-0 bg-muted/40 z-10 min-w-[180px] font-semibold text-foreground">
@@ -298,7 +313,7 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                   }, 0);
                   return (
                     <tr key={cat.id} className="border-b border-border hover:bg-muted/20">
-                      <td className="px-3 py-2 sticky left-0 bg-background z-10">
+                      <td className="px-3 py-2 sticky left-0 bg-card z-10">
                         <div className="flex items-center gap-1.5">
                           <span>{cat.icon}</span>
                           <span className="text-foreground truncate">{cat.name}</span>
