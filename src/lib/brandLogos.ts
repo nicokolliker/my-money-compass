@@ -1,95 +1,148 @@
-// Brand logo mapping for accounts, merchants, and subscriptions
-// Uses emoji/initials as lightweight logos — no external images needed
+// Brand logo mapping using Clearbit Logo API.
+// Maps brand name variations → domain, then we build a logo URL from the domain.
 
-export const BRAND_LOGOS: Record<string, { icon: string; bg: string; text: string }> = {
-  // Accounts / Financial institutions
-  'wise': { icon: '🌐', bg: 'bg-emerald-50', text: 'text-emerald-600' },
-  'mercado pago': { icon: '🟦', bg: 'bg-sky-50', text: 'text-sky-600' },
-  'galicia': { icon: '🏦', bg: 'bg-orange-50', text: 'text-orange-600' },
-  'dolarapp': { icon: '💲', bg: 'bg-green-50', text: 'text-green-600' },
-  'deel': { icon: '💼', bg: 'bg-blue-50', text: 'text-blue-600' },
-  'jpm': { icon: '🏛️', bg: 'bg-slate-50', text: 'text-slate-700' },
-  'jp morgan': { icon: '🏛️', bg: 'bg-slate-50', text: 'text-slate-700' },
-  'chase': { icon: '🏛️', bg: 'bg-blue-50', text: 'text-blue-700' },
-  'binance': { icon: '⬡', bg: 'bg-yellow-50', text: 'text-yellow-600' },
-  'splitwise': { icon: '🔀', bg: 'bg-teal-50', text: 'text-teal-600' },
-  'paypal': { icon: '🅿️', bg: 'bg-blue-50', text: 'text-blue-600' },
-  'revolut': { icon: '🔵', bg: 'bg-indigo-50', text: 'text-indigo-600' },
-  'n26': { icon: '🏦', bg: 'bg-teal-50', text: 'text-teal-600' },
-  'brubank': { icon: '🟣', bg: 'bg-purple-50', text: 'text-purple-600' },
-  'uala': { icon: '🔴', bg: 'bg-red-50', text: 'text-red-500' },
-  'ualá': { icon: '🔴', bg: 'bg-red-50', text: 'text-red-500' },
-  'bbva': { icon: '🏦', bg: 'bg-blue-50', text: 'text-blue-700' },
-  'santander': { icon: '🏦', bg: 'bg-red-50', text: 'text-red-600' },
-  'hsbc': { icon: '🏦', bg: 'bg-red-50', text: 'text-red-600' },
+export const BRAND_DOMAINS: Record<string, string> = {
+  // Financial
+  'wise':               'wise.com',
+  'mercado pago':       'mercadopago.com',
+  'mercadopago':        'mercadopago.com',
+  'galicia':            'bancogalicia.com.ar',
+  'dolarapp':           'dolarapp.com',
+  'deel':               'deel.com',
+  'jpm':                'jpmorgan.com',
+  'jp morgan':          'jpmorgan.com',
+  'jpmorgan':           'jpmorgan.com',
+  'chase':              'chase.com',
+  'binance':            'binance.com',
+  'paypal':             'paypal.com',
+  'revolut':            'revolut.com',
+  'bbva':               'bbva.com',
+  'santander':          'santander.com',
+  'hsbc':               'hsbc.com',
 
-  // Merchants / Subscriptions
-  'spotify': { icon: '🎵', bg: 'bg-green-50', text: 'text-green-600' },
-  'netflix': { icon: '🎬', bg: 'bg-red-50', text: 'text-red-600' },
-  'youtube': { icon: '▶️', bg: 'bg-red-50', text: 'text-red-500' },
-  'youtube premium': { icon: '▶️', bg: 'bg-red-50', text: 'text-red-500' },
-  'amazon': { icon: '📦', bg: 'bg-amber-50', text: 'text-amber-600' },
-  'amazon prime': { icon: '📦', bg: 'bg-amber-50', text: 'text-amber-600' },
-  'uber': { icon: '🚗', bg: 'bg-slate-50', text: 'text-slate-700' },
-  'uber eats': { icon: '🍔', bg: 'bg-green-50', text: 'text-green-600' },
-  'rappi': { icon: '🛵', bg: 'bg-orange-50', text: 'text-orange-500' },
-  'pedidosya': { icon: '🛵', bg: 'bg-red-50', text: 'text-red-500' },
-  'apple': { icon: '🍎', bg: 'bg-gray-50', text: 'text-gray-700' },
-  'google': { icon: '🔍', bg: 'bg-blue-50', text: 'text-blue-500' },
-  'microsoft': { icon: '🪟', bg: 'bg-blue-50', text: 'text-blue-600' },
-  'github': { icon: '🐙', bg: 'bg-gray-50', text: 'text-gray-700' },
-  'openai': { icon: '🤖', bg: 'bg-emerald-50', text: 'text-emerald-600' },
-  'chatgpt': { icon: '🤖', bg: 'bg-emerald-50', text: 'text-emerald-600' },
-  'claude': { icon: '🧠', bg: 'bg-orange-50', text: 'text-orange-600' },
-  'notion': { icon: '📓', bg: 'bg-gray-50', text: 'text-gray-700' },
-  'slack': { icon: '💬', bg: 'bg-purple-50', text: 'text-purple-600' },
-  'discord': { icon: '🎮', bg: 'bg-indigo-50', text: 'text-indigo-600' },
-  'figma': { icon: '🎨', bg: 'bg-violet-50', text: 'text-violet-600' },
-  'vercel': { icon: '▲', bg: 'bg-gray-50', text: 'text-gray-700' },
-  'hbo': { icon: '🎭', bg: 'bg-purple-50', text: 'text-purple-600' },
-  'hbo max': { icon: '🎭', bg: 'bg-purple-50', text: 'text-purple-600' },
-  'disney': { icon: '🏰', bg: 'bg-blue-50', text: 'text-blue-600' },
-  'disney+': { icon: '🏰', bg: 'bg-blue-50', text: 'text-blue-600' },
-  'paramount': { icon: '⭐', bg: 'bg-blue-50', text: 'text-blue-700' },
-  'twitch': { icon: '🟣', bg: 'bg-purple-50', text: 'text-purple-600' },
-  'steam': { icon: '🎮', bg: 'bg-slate-50', text: 'text-slate-700' },
-  'starbucks': { icon: '☕', bg: 'bg-green-50', text: 'text-green-700' },
-  'mcdonald': { icon: '🍟', bg: 'bg-yellow-50', text: 'text-yellow-600' },
-  'mcdonalds': { icon: '🍟', bg: 'bg-yellow-50', text: 'text-yellow-600' },
-  "mcdonald's": { icon: '🍟', bg: 'bg-yellow-50', text: 'text-yellow-600' },
-  'icloud': { icon: '☁️', bg: 'bg-blue-50', text: 'text-blue-500' },
-  'dropbox': { icon: '📁', bg: 'bg-blue-50', text: 'text-blue-600' },
-  'linear': { icon: '🔷', bg: 'bg-violet-50', text: 'text-violet-600' },
-  'gym': { icon: '💪', bg: 'bg-emerald-50', text: 'text-emerald-600' },
-  'megatlon': { icon: '💪', bg: 'bg-emerald-50', text: 'text-emerald-600' },
-  'mercadolibre': { icon: '🛒', bg: 'bg-yellow-50', text: 'text-yellow-600' },
-  'mercado libre': { icon: '🛒', bg: 'bg-yellow-50', text: 'text-yellow-600' },
-  'whole foods': { icon: '🥑', bg: 'bg-green-50', text: 'text-green-700' },
-  'wework': { icon: '🏢', bg: 'bg-yellow-50', text: 'text-yellow-700' },
-  'farmacity': { icon: '💊', bg: 'bg-green-50', text: 'text-green-600' },
-  'cabify': { icon: '🚕', bg: 'bg-purple-50', text: 'text-purple-600' },
-  'coto': { icon: '🛒', bg: 'bg-red-50', text: 'text-red-600' },
-  'booking.com': { icon: '🏨', bg: 'bg-blue-50', text: 'text-blue-600' },
-  'renfe': { icon: '🚄', bg: 'bg-purple-50', text: 'text-purple-600' },
-  'amc': { icon: '🎬', bg: 'bg-red-50', text: 'text-red-600' },
-  'cinemark': { icon: '🎬', bg: 'bg-blue-50', text: 'text-blue-600' },
-  'afip': { icon: '🏛️', bg: 'bg-gray-50', text: 'text-gray-700' },
-  'airbnb': { icon: '🏠', bg: 'bg-rose-50', text: 'text-rose-500' },
-  'booking': { icon: '🏨', bg: 'bg-blue-50', text: 'text-blue-600' },
-  'zara': { icon: '👗', bg: 'bg-gray-50', text: 'text-gray-700' },
-  'nike': { icon: '👟', bg: 'bg-gray-50', text: 'text-gray-700' },
-  'adidas': { icon: '👟', bg: 'bg-gray-50', text: 'text-gray-700' },
-  'aws': { icon: '☁️', bg: 'bg-orange-50', text: 'text-orange-600' },
-  'digital ocean': { icon: '🌊', bg: 'bg-blue-50', text: 'text-blue-600' },
-  'digitalocean': { icon: '🌊', bg: 'bg-blue-50', text: 'text-blue-600' },
-  'supabase': { icon: '⚡', bg: 'bg-green-50', text: 'text-green-600' },
-  'grammarly': { icon: '📝', bg: 'bg-green-50', text: 'text-green-600' },
-  'canva': { icon: '🎨', bg: 'bg-cyan-50', text: 'text-cyan-600' },
-  'zoom': { icon: '📹', bg: 'bg-blue-50', text: 'text-blue-600' },
-  'whatsapp': { icon: '💬', bg: 'bg-green-50', text: 'text-green-600' },
-  'telegram': { icon: '✈️', bg: 'bg-blue-50', text: 'text-blue-500' },
-  'cash': { icon: '💵', bg: 'bg-emerald-50', text: 'text-emerald-600' },
+  // Streaming & Entertainment
+  'netflix':            'netflix.com',
+  'spotify':            'spotify.com',
+  'youtube':            'youtube.com',
+  'youtube premium':    'youtube.com',
+  'amazon prime':       'amazon.com',
+  'amazon':             'amazon.com',
+  'hbo':                'hbomax.com',
+  'hbo max':            'hbomax.com',
+  'max':                'max.com',
+  'disney':             'disneyplus.com',
+  'disney+':            'disneyplus.com',
+  'paramount':          'paramountplus.com',
+  'paramount+':         'paramountplus.com',
+  'apple tv':           'tv.apple.com',
+  'apple tv+':          'tv.apple.com',
+  'apple music':        'music.apple.com',
+  'apple one':          'apple.com',
+  'twitch':             'twitch.tv',
+  'crunchyroll':        'crunchyroll.com',
+  'espn':               'espn.com',
+  'river':              'cariverplate.com.ar',
+  'river plate':        'cariverplate.com.ar',
+
+  // AI & Productivity
+  'openai':             'openai.com',
+  'chatgpt':            'openai.com',
+  'claude':             'anthropic.com',
+  'anthropic':          'anthropic.com',
+  'google':             'google.com',
+  'google ai':          'google.com',
+  'gemini':             'google.com',
+  'perplexity':         'perplexity.ai',
+  'gamma':              'gamma.app',
+  'runway':             'runwayml.com',
+  'midjourney':         'midjourney.com',
+  'elevenlabs':         'elevenlabs.io',
+  'notion':             'notion.so',
+  'notebooklm':         'notebooklm.google.com',
+  'microsoft':          'microsoft.com',
+  'github':             'github.com',
+  'figma':              'figma.com',
+  'canva':              'canva.com',
+  'adobe':              'adobe.com',
+  'adobe creative':     'adobe.com',
+  'loom':               'loom.com',
+  'grammarly':          'grammarly.com',
+  'blinkist':           'blinkist.com',
+  'blinkst':            'blinkist.com',
+  'slack':              'slack.com',
+  'discord':            'discord.com',
+  'icloud':             'icloud.com',
+  'dropbox':            'dropbox.com',
+  'vercel':             'vercel.com',
+  'linear':             'linear.app',
+  'duolingo':           'duolingo.com',
+  'headspace':          'headspace.com',
+  'calm':               'calm.com',
+  'fitia':              'fitia.app',
+
+  // Transport & Delivery
+  'uber':               'uber.com',
+  'uber eats':          'ubereats.com',
+  'uberone':            'uber.com',
+  'uber one':           'uber.com',
+  'didi':               'didiglobal.com',
+  'cabify':             'cabify.com',
+  'rappi':              'rappi.com',
+  'pedidosya':          'pedidosya.com',
+  'pedidos ya':         'pedidosya.com',
+  'glovo':              'glovoapp.com',
+
+  // Argentine services
+  'personal':           'personal.com.ar',
+  'movistar':           'movistar.com.ar',
+  'claro':              'claro.com.ar',
+  'flow':               'flow.com.ar',
+  'edesur':             'edesur.com.ar',
+  'edenor':             'edenor.com',
+  'metrogas':           'metrogas.com.ar',
+  'osde':               'osde.com.ar',
+  'swiss medical':      'swissmedical.com.ar',
+  'galeno':             'galeno.com.ar',
+  'sancor salud':       'sancorsalud.com.ar',
+  'farmacity':          'farmacity.com',
+  'mercadolibre':       'mercadolibre.com.ar',
+  'mercado libre':      'mercadolibre.com.ar',
+  'wework':             'wework.com',
+  'starbucks':          'starbucks.com',
+  'whole foods':        'wholefoodsmarket.com',
+  'airbnb':             'airbnb.com',
+  'booking':            'booking.com',
+  'booking.com':        'booking.com',
+  'steam':              'steampowered.com',
+  'apple':              'apple.com',
+  'coto':               'coto.com.ar',
 };
+
+export function getBrandDomain(name: string): string | null {
+  if (!name) return null;
+  const lower = name.toLowerCase().trim();
+
+  // Exact match
+  if (BRAND_DOMAINS[lower]) return BRAND_DOMAINS[lower];
+
+  // Partial match — check if any key is contained in the name
+  for (const [key, domain] of Object.entries(BRAND_DOMAINS)) {
+    if (lower.includes(key) || (key.length >= 4 && key.includes(lower))) return domain;
+  }
+
+  return null;
+}
+
+export function getBrandLogoUrl(name: string): string | null {
+  const domain = getBrandDomain(name);
+  if (!domain) return null;
+  return `https://logo.clearbit.com/${domain}`;
+}
+
+// Backwards compatibility — returns null so callers fall through to other rendering paths.
+export function getBrandLogo(_name: string): null {
+  return null;
+}
 
 // Fallback category icons - only used when DB category has no icon set
 const CATEGORY_ICON_FALLBACKS: Record<string, string> = {
@@ -117,36 +170,11 @@ const CATEGORY_ICON_FALLBACKS: Record<string, string> = {
   'Transfer': '🔄',
 };
 
-/**
- * Find brand logo by matching against name (case-insensitive, partial match)
- */
-export function getBrandLogo(name: string): { icon: string; bg: string; text: string } | null {
-  const lower = name.toLowerCase().trim();
-  
-  // Exact match first
-  if (BRAND_LOGOS[lower]) return BRAND_LOGOS[lower];
-  
-  // Partial match (brand name contained in the string)
-  for (const [key, val] of Object.entries(BRAND_LOGOS)) {
-    if (lower.includes(key) || key.includes(lower)) return val;
-  }
-  
-  return null;
-}
-
-/**
- * Get category icon. Prefers DB-stored icon, falls back to hardcoded map.
- * @param name Category name
- * @param dbIcon Optional icon from DB category record
- */
 export function getCategoryIcon(name: string, dbIcon?: string | null): string {
   if (dbIcon) return dbIcon;
   return CATEGORY_ICON_FALLBACKS[name] || '📌';
 }
 
-/**
- * Generate a consistent color for initials fallback based on string hash
- */
 const AVATAR_COLORS = [
   { bg: 'bg-blue-100', text: 'text-blue-700' },
   { bg: 'bg-emerald-100', text: 'text-emerald-700' },
