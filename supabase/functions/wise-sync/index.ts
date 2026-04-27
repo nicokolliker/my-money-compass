@@ -437,12 +437,19 @@ async function wiseGet(path: string, token: string) {
   return res.json();
 }
 
-async function getRules(supabase: ReturnType<typeof createClient>) {
+interface Rule {
+  keyword: string;
+  category_id: string | null;
+  mark_as_subscription: boolean;
+  match_field?: string | null;
+}
+
+async function getRules(supabase: any): Promise<Rule[]> {
   const { data } = await supabase
     .from("rules")
     .select("*")
     .eq("is_active", true);
-  return data || [];
+  return (data as Rule[]) || [];
 }
 
 function json(data: unknown, status = 200) {
