@@ -213,7 +213,9 @@ export default function Transactions() {
       {isLoading ? (
         <div className="text-center py-8 text-muted-foreground">Loading...</div>
       ) : grouped.length === 0 ? (
-        <p className="text-center py-12 text-muted-foreground">No transactions found</p>
+        <p className="text-center py-12 text-muted-foreground">
+          {uncategorizedOnly ? '✅ All transactions are categorized' : 'No transactions found'}
+        </p>
       ) : (
         <div className="space-y-6">
           {grouped.map(group => (
