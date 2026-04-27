@@ -239,7 +239,16 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
       </Card>
 
       {/* Section 2: Annual planning table */}
-      <div className="-mx-4 lg:-mx-8">
+      <div
+        className="relative"
+        style={{
+          width: '100vw',
+          marginLeft: '50%',
+          transform: 'translateX(-50%)',
+          paddingLeft: '1rem',
+          paddingRight: '1rem',
+        }}
+      >
         <div className="rounded-xl border border-border bg-card overflow-hidden">
           <div className="px-4 py-3 border-b border-border">
             <h3 className="text-sm font-semibold">Planificación anual {selectedYear}</h3>
