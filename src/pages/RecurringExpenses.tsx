@@ -21,7 +21,7 @@ import { DemoDataBanner } from '@/components/DemoDataBanner';
 import { useDemoData } from '@/hooks/useDemoData';
 import RecurringTracking from '@/components/recurring/RecurringTracking';
 
-// New 6 recurring expense types
+// Recurring expense types
 const TYPE_LABELS: Record<string, { label: string; icon: string; color: string }> = {
   casa:           { label: 'Casa',                    icon: '🏠', color: '#FAECE7' },
   auto:           { label: 'Auto',                    icon: '🚗', color: '#E1F5EE' },
@@ -29,9 +29,18 @@ const TYPE_LABELS: Record<string, { label: string; icon: string; color: string }
   personal_care:  { label: 'Personal Care',           icon: '✨', color: '#EAF3DE' },
   obligaciones:   { label: 'Obligaciones',            icon: '📋', color: '#F1EFE8' },
   ocio:           { label: 'Ocio',                    icon: '🎉', color: '#FAEEDA' },
+  digital:        { label: 'Digital',                 icon: '💻', color: '#E6F1FB' },
 };
 
 const TYPE_KEYS = Object.keys(TYPE_LABELS);
+
+// Digital subcategories
+const DIGITAL_SUBTYPES: Record<string, { label: string; icon: string }> = {
+  ia:                  { label: 'IA',                          icon: '🤖' },
+  creatividad:         { label: 'Creatividad & Productividad', icon: '🎨' },
+  entretenimiento:     { label: 'Entretenimiento',             icon: '🎬' },
+  delivery_movilidad:  { label: 'Delivery & Movilidad',        icon: '🚚' },
+};
 
 // Status badge tones (Library list)
 const STATUS_STYLES: Record<DerivedInstanceState | 'none', { label: string; bg: string; color: string }> = {
