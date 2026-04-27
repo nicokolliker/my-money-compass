@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { Tables, TablesInsert } from '@/integrations/supabase/types';
+import { useUserId } from '@/hooks/useAuthUser';
 
 export type Budget = Tables<'budgets'>;
 
@@ -11,8 +12,10 @@ async function getUserId() {
 }
 
 export function useBudgets(month?: string) {
+  const userId = useUserId();
   return useQuery({
-    queryKey: ['budgets', month],
+    queryKey: ['budgets', userId, month],
+    enabled: !!userId,
     queryFn: async () => {
       let q = supabase.from('budgets').select('*, categories(name, icon, color)').order('created_at');
       if (month) q = q.eq('month', month);
