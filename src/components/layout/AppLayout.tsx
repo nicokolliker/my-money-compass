@@ -197,10 +197,11 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
       {/* Quick Add Sheet */}
       <Sheet open={showQuickAdd} onOpenChange={setShowQuickAdd}>
-        <SheetContent side="bottom" className="h-[85vh] rounded-t-2xl">
+        <SheetContent side="bottom" className="h-[85vh] rounded-t-2xl overflow-y-auto">
           <TransactionForm onSuccess={() => setShowQuickAdd(false)} />
         </SheetContent>
       </Sheet>
+      <DebugPanel />
     </div>
   );
 }
