@@ -364,36 +364,44 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
                     return (
                       <div key={k}>
                         <div
-                          className="flex items-center justify-between text-sm cursor-pointer select-none"
-                          onClick={() => setDigitalExpanded(x => !x)}
+                          className="flex items-center justify-between text-sm cursor-pointer"
+                          style={{ userSelect: 'none' }}
+                          onClick={(e) => { e.stopPropagation(); setDigitalExpanded(v => !v); }}
                         >
-                          <div className="flex items-center gap-2 min-w-0">
+                          <div className="flex items-center gap-2 min-w-0 pointer-events-none">
                             <span className="inline-block w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: TYPE_LABELS[k].color }} />
                             <span className="text-foreground truncate font-medium">{TYPE_LABELS[k].icon} {TYPE_LABELS[k].label}</span>
-                            <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${digitalExpanded ? 'rotate-180' : ''}`} />
+                            <ChevronDown
+                              className="h-3.5 w-3.5 text-muted-foreground"
+                              style={{ transform: digitalExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}
+                            />
                           </div>
-                          <div className="flex items-center gap-2 shrink-0">
+                          <div className="flex items-center gap-2 shrink-0 pointer-events-none">
                             <span className="text-xs text-muted-foreground tabular-nums">{pct.toFixed(0)}%</span>
                             <span className="font-semibold tabular-nums text-foreground">{formatUSD(v)}</span>
                           </div>
                         </div>
-                        {digitalExpanded && Object.entries(DIGITAL_SUBTYPES).map(([subKey, sub]) => {
-                          const subItems = digitalItems.filter((i: any) => i.subtype === subKey);
-                          const subTotal = subItems.reduce((s, i: any) => {
-                            const m = toMonthlyAmount(Math.abs(Number(i.amount)), i.frequency);
-                            return s + toUSD(m, i.currency, fxList);
-                          }, 0);
-                          if (subTotal === 0 && subItems.length === 0) return null;
-                          return (
-                            <div key={subKey} className="flex items-center justify-between text-sm pl-6 mt-1">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <span className="text-xs">{sub.icon}</span>
-                                <span className="text-xs text-muted-foreground truncate">{sub.label}</span>
-                              </div>
-                              <span className="text-xs font-medium tabular-nums text-foreground shrink-0">{formatUSD(subTotal)}</span>
-                            </div>
-                          );
-                        })}
+                        {digitalExpanded && (
+                          <div className="mt-1 space-y-1">
+                            {Object.entries(DIGITAL_SUBTYPES).map(([subKey, sub]) => {
+                              const subItems = digitalItems.filter((i: any) => i.subtype === subKey);
+                              const subTotal = subItems.reduce((s, i: any) => {
+                                const m = toMonthlyAmount(Math.abs(Number(i.amount)), i.frequency);
+                                return s + toUSD(m, i.currency, fxList);
+                              }, 0);
+                              return (
+                                <div key={subKey} className="flex items-center justify-between text-sm pl-6">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <span className="text-xs">{sub.icon}</span>
+                                    <span className="text-xs text-muted-foreground truncate">{sub.label}</span>
+                                    {subItems.length > 0 && <span className="text-[10px] text-muted-foreground">· {subItems.length}</span>}
+                                  </div>
+                                  <span className="text-xs font-medium tabular-nums text-foreground shrink-0">{formatUSD(subTotal)}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                     );
                   }
