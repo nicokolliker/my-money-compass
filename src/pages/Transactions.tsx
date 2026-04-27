@@ -110,9 +110,12 @@ export default function Transactions() {
 
   const grouped = useMemo(() => {
     if (!transactions) return [];
+    const filtered = uncategorizedOnly
+      ? transactions.filter(tx => !tx.category_id)
+      : transactions;
     const groups: { date: string; label: string; txs: typeof transactions }[] = [];
     let currentDate = '';
-    transactions.forEach(tx => {
+    filtered.forEach(tx => {
       if (tx.date !== currentDate) {
         currentDate = tx.date;
         groups.push({ date: tx.date, label: formatDateGroupLabel(tx.date), txs: [] });
@@ -120,7 +123,7 @@ export default function Transactions() {
       groups[groups.length - 1].txs.push(tx);
     });
     return groups;
-  }, [transactions]);
+  }, [transactions, uncategorizedOnly]);
 
   const handleDelete = async (id: string) => {
     try { await deleteTx.mutateAsync(id); toast.success('Transaction deleted'); }
