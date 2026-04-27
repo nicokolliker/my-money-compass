@@ -415,6 +415,7 @@ export type Database = {
           payment_method_id: string | null
           renewal_notes: string | null
           status: string
+          subtype: string | null
           type: string
           updated_at: string
           user_id: string | null
@@ -438,6 +439,7 @@ export type Database = {
           payment_method_id?: string | null
           renewal_notes?: string | null
           status?: string
+          subtype?: string | null
           type?: string
           updated_at?: string
           user_id?: string | null
@@ -461,6 +463,7 @@ export type Database = {
           payment_method_id?: string | null
           renewal_notes?: string | null
           status?: string
+          subtype?: string | null
           type?: string
           updated_at?: string
           user_id?: string | null
