@@ -370,7 +370,7 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
                           <div className="flex items-center gap-2 min-w-0">
                             <span className="inline-block w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: TYPE_LABELS[k].color }} />
                             <span className="text-foreground truncate font-medium">{TYPE_LABELS[k].icon} {TYPE_LABELS[k].label}</span>
-                            <span className="text-[10px] text-muted-foreground">{digitalExpanded ? '▲' : '▼'}</span>
+                            <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${digitalExpanded ? 'rotate-180' : ''}`} />
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
                             <span className="text-xs text-muted-foreground tabular-nums">{pct.toFixed(0)}%</span>
