@@ -259,6 +259,7 @@ export type Database = {
           created_at: string
           default_category_id: string | null
           display_name: string | null
+          domain: string | null
           id: string
           is_active: boolean
           logo_url: string | null
@@ -271,6 +272,7 @@ export type Database = {
           created_at?: string
           default_category_id?: string | null
           display_name?: string | null
+          domain?: string | null
           id?: string
           is_active?: boolean
           logo_url?: string | null
@@ -283,6 +285,7 @@ export type Database = {
           created_at?: string
           default_category_id?: string | null
           display_name?: string | null
+          domain?: string | null
           id?: string
           is_active?: boolean
           logo_url?: string | null

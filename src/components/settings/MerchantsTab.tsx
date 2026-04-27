@@ -13,12 +13,13 @@ import {
 import { useMerchants, useUpdateMerchant, useDeleteMerchant, useMergeMerchants, useMerchantTransactions } from '@/hooks/useMerchants';
 import { useCategories } from '@/hooks/useCategories';
 import { getBrandLogo, getInitialsColor } from '@/lib/brandLogos';
+import { MerchantLogo } from '@/components/MerchantLogo';
 import { formatCurrency, formatUSD } from '@/lib/constants';
 import { Search, Pencil, Trash2, GitMerge, ChevronRight, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
-function MerchantLogo({ merchant, size = 'md' }: { merchant: any; size?: 'sm' | 'md' }) {
+function MerchantLogoLegacy({ merchant, size = 'md' }: { merchant: any; size?: 'sm' | 'md' }) {
   const dim = size === 'sm' ? 'w-8 h-8 text-sm' : 'w-10 h-10 text-lg';
 
   if (merchant.logo_url) {
@@ -51,7 +52,7 @@ export default function MerchantsTab() {
   const [mergeDialog, setMergeDialog] = useState(false);
   const [mergeTargetId, setMergeTargetId] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState({ display_name: '', default_category_id: '' });
+  const [editForm, setEditForm] = useState({ display_name: '', default_category_id: '', domain: '' });
 
   const selected = merchants?.find(m => m.id === selectedId);
   const { data: merchantTxs } = useMerchantTransactions(selectedId);
@@ -66,6 +67,7 @@ export default function MerchantsTab() {
     setEditForm({
       display_name: m.display_name || m.name,
       default_category_id: m.default_category_id || '',
+      domain: m.domain || '',
     });
     setEditSheet(true);
   };
@@ -77,7 +79,8 @@ export default function MerchantsTab() {
         id: selectedId,
         display_name: editForm.display_name || null,
         default_category_id: editForm.default_category_id || null,
-      });
+        domain: editForm.domain.trim() || null,
+      } as any);
       toast.success('Merchant updated');
       setEditSheet(false);
     } catch (e: any) { toast.error(e.message); }
@@ -137,7 +140,10 @@ export default function MerchantsTab() {
                 onClick={() => openEdit(m)}
                 className="w-full flex items-center gap-3 py-3 px-3 rounded-xl hover:bg-accent/60 transition-colors text-left"
               >
-                <MerchantLogo merchant={m} />
+                <MerchantLogo name={m.display_name || m.name} domain={(m as any).domain} size={36} />
+                {m.logo_url ? (
+                  <img src={m.logo_url} alt="" className="hidden" />
+                ) : null}
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-foreground truncate">{m.display_name || m.name}</p>
                   {cat && (
@@ -165,7 +171,7 @@ export default function MerchantsTab() {
               {/* Logo + Name */}
               <div className="flex items-center gap-4">
                 <div className="relative group">
-                  <MerchantLogo merchant={selected} />
+                  <MerchantLogo name={selected.display_name || selected.name} domain={(selected as any).domain || editForm.domain} size={40} />
                   <label className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer transition-opacity">
                     <Upload className="h-4 w-4 text-white" />
                     <input type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
@@ -175,6 +181,32 @@ export default function MerchantsTab() {
                   <Label className="text-xs">Display Name</Label>
                   <Input value={editForm.display_name} onChange={e => setEditForm(f => ({ ...f, display_name: e.target.value }))} className="mt-1 rounded-xl" />
                 </div>
+              </div>
+
+              {/* Domain (for automatic logo) */}
+              <div>
+                <Label className="text-xs">Dominio (para logo automático)</Label>
+                <div className="flex items-center gap-2 mt-1">
+                  <Input
+                    placeholder="netflix.com"
+                    value={editForm.domain}
+                    onChange={e => setEditForm(f => ({ ...f, domain: e.target.value }))}
+                    className="flex-1 rounded-xl"
+                  />
+                  {editForm.domain.trim() && (
+                    <div className="w-9 h-9 rounded-full overflow-hidden bg-muted flex items-center justify-center shrink-0">
+                      <img
+                        src={`https://logo.clearbit.com/${editForm.domain.trim()}`}
+                        alt="logo preview"
+                        className="w-full h-full object-contain"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                      />
+                    </div>
+                  )}
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Ingresá el dominio para mostrar el logo real. Preview en tiempo real.
+                </p>
               </div>
 
               {/* Default Category */}
