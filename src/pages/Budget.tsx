@@ -239,13 +239,13 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
       </Card>
 
       {/* Section 2: Annual planning table */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-semibold">Planificación anual {selectedYear}</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto -mx-6 px-6">
-            <table style={{ minWidth: '900px' }} className="w-full text-xs border-collapse">
+      <div className="-mx-4 lg:-mx-8">
+        <div className="rounded-xl border border-border bg-card overflow-hidden">
+          <div className="px-4 py-3 border-b border-border">
+            <h3 className="text-sm font-semibold">Planificación anual {selectedYear}</h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="text-xs border-collapse" style={{ minWidth: '960px', width: '100%' }}>
               <thead>
                 <tr className="border-b border-border bg-muted/40">
                   <th
