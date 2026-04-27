@@ -49,7 +49,7 @@ function getNextDate(current: Date, frequency: string): Date {
 // Monthly normalization lives in lib/money (toMonthlyAmount)
 
 export default function RecurringExpenses({ embedded = false }: { embedded?: boolean } = {}) {
-  const { data: items, isLoading } = useRecurringExpenses();
+  const { data: items, isLoading, error: itemsError } = useRecurringExpenses();
   const { data: transactions } = useTransactions();
   const { data: instances, error: instancesError } = useDerivedInstances();
   if (instancesError) console.error('Recurring instances error:', instancesError);
@@ -348,6 +348,7 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
 
       {/* Items list */}
       <div className="space-y-2">
+        {itemsError && <p className="text-destructive text-sm text-center py-4">Error loading: {(itemsError as any).message}</p>}
         {filtered.length === 0 && (
           <div className="text-center py-12">
             <Repeat className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
