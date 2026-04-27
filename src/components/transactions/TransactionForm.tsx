@@ -3,18 +3,79 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Check, ChevronsUpDown } from 'lucide-react';
 import { useAccounts } from '@/hooks/useAccounts';
 import { useCategories } from '@/hooks/useCategories';
 import { useMerchants } from '@/hooks/useMerchants';
-import { useCreateTransaction, useCreateTransfer } from '@/hooks/useTransactions';
+import { useCreateTransaction, useCreateTransfer, useUpdateTransaction } from '@/hooks/useTransactions';
 import { useFxRates } from '@/hooks/useFxRates';
-import { CURRENCIES, TRANSACTION_TYPE_LABELS } from '@/lib/constants';
+import { CURRENCIES, TRANSACTION_TYPE_LABELS, formatUSD } from '@/lib/constants';
 import { SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { toast } from 'sonner';
 
 interface Props {
   onSuccess?: () => void;
   editData?: any;
+}
+
+function MerchantCombobox({ merchants, value, onChange }: { merchants: any[]; value: string; onChange: (v: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const selected = merchants.find(m => m.id === value);
+  const filtered = merchants.filter(m =>
+    (m.display_name || m.name || '').toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm mt-1"
+        >
+          <span className={selected ? 'text-foreground' : 'text-muted-foreground'}>
+            {selected ? (selected.display_name || selected.name) : 'Select merchant (optional)'}
+          </span>
+          <ChevronsUpDown className="h-4 w-4 opacity-50" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+        <div className="p-2 border-b">
+          <Input
+            placeholder="Search merchants..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="h-8 text-sm"
+            autoFocus
+          />
+        </div>
+        <div className="max-h-[240px] overflow-y-auto p-1">
+          <button
+            type="button"
+            className="w-full text-left px-2 py-1.5 text-sm rounded hover:bg-accent"
+            onClick={() => { onChange('none'); setOpen(false); setSearch(''); }}
+          >
+            No merchant
+          </button>
+          {filtered.map((m: any) => (
+            <button
+              type="button"
+              key={m.id}
+              className="w-full flex items-center justify-between px-2 py-1.5 text-sm rounded hover:bg-accent"
+              onClick={() => { onChange(m.id); setOpen(false); setSearch(''); }}
+            >
+              <span>{m.display_name || m.name}</span>
+              {value === m.id && <Check className="h-4 w-4" />}
+            </button>
+          ))}
+          {filtered.length === 0 && (
+            <p className="px-2 py-3 text-xs text-center text-muted-foreground">No merchants found</p>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 export function TransactionForm({ onSuccess, editData }: Props) {
@@ -24,33 +85,36 @@ export function TransactionForm({ onSuccess, editData }: Props) {
   const { data: fxRates } = useFxRates();
   const createTx = useCreateTransaction();
   const createTransfer = useCreateTransfer();
+  const updateTx = useUpdateTransaction();
 
-  const [type, setType] = useState<string>('expense');
-  const [amount, setAmount] = useState('');
-  const [description, setDescription] = useState('');
-  const [merchantId, setMerchantId] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [accountId, setAccountId] = useState('');
+  const [type, setType] = useState<string>(editData?.type || 'expense');
+  const [amount, setAmount] = useState(editData ? String(Math.abs(Number(editData.amount))) : '');
+  const [description, setDescription] = useState(editData?.description || '');
+  const [merchantId, setMerchantId] = useState(editData?.merchant_id || '');
+  const [date, setDate] = useState(editData?.date || new Date().toISOString().split('T')[0]);
+  const [accountId, setAccountId] = useState(editData?.account_id || '');
   const [toAccountId, setToAccountId] = useState('');
-  const [categoryId, setCategoryId] = useState('');
-  const [fxRate, setFxRate] = useState('1');
+  const [categoryId, setCategoryId] = useState(editData?.category_id || '');
+  const [fxRate, setFxRate] = useState(editData?.fx_rate ? String(editData.fx_rate) : '1');
   const [toAmount, setToAmount] = useState('');
-  const [isSubscription, setIsSubscription] = useState(false);
+  const [isSubscription, setIsSubscription] = useState(editData?.is_subscription || false);
 
   const activeAccounts = accounts?.filter(a => a.is_active) || [];
   const selectedAccount = activeAccounts.find(a => a.id === accountId);
   const toAccount = activeAccounts.find(a => a.id === toAccountId);
   const isCrossCurrency = type === 'transfer' && selectedAccount && toAccount && selectedAccount.currency !== toAccount.currency;
+  const isEdit = !!editData?.id;
 
-  // Auto-set FX rate when currencies change
+  // Auto-set FX rate when currencies change (skip in edit mode to preserve historical rate)
   useEffect(() => {
+    if (isEdit) return;
     if (selectedAccount && selectedAccount.currency !== 'USD' && fxRates) {
       const rate = fxRates.find(r => r.from_currency === selectedAccount.currency && r.to_currency === 'USD');
       if (rate) setFxRate(String(rate.rate));
     } else if (selectedAccount?.currency === 'USD') {
       setFxRate('1');
     }
-  }, [accountId, fxRates, selectedAccount]);
+  }, [accountId, fxRates, selectedAccount, isEdit]);
 
   // Set default account
   useEffect(() => {
@@ -64,7 +128,27 @@ export function TransactionForm({ onSuccess, editData }: Props) {
     if (!numAmount || !accountId) return;
 
     try {
-      if (type === 'transfer') {
+      const resolvedMerchantId = merchantId && merchantId !== 'none' ? merchantId : null;
+      const selectedMerchant = resolvedMerchantId ? merchants?.find(m => m.id === resolvedMerchantId) : null;
+
+      if (isEdit) {
+        const signedAmount = type === 'expense' ? -Math.abs(numAmount) : Math.abs(numAmount);
+        const rate = parseFloat(fxRate);
+        await updateTx.mutateAsync({
+          id: editData.id,
+          date,
+          description,
+          merchant: selectedMerchant?.display_name || selectedMerchant?.name || editData.merchant || null,
+          merchant_id: resolvedMerchantId,
+          amount: signedAmount,
+          fx_rate: rate,
+          amount_usd: selectedAccount!.currency === 'USD' ? signedAmount : signedAmount * rate,
+          account_id: accountId,
+          category_id: categoryId || null,
+          type: type as any,
+          is_subscription: isSubscription,
+        });
+      } else if (type === 'transfer') {
         if (!toAccountId) return;
         const numToAmount = isCrossCurrency ? parseFloat(toAmount) : numAmount;
         await createTransfer.mutateAsync({
@@ -81,8 +165,6 @@ export function TransactionForm({ onSuccess, editData }: Props) {
       } else {
         const signedAmount = type === 'expense' ? -Math.abs(numAmount) : Math.abs(numAmount);
         const rate = parseFloat(fxRate);
-        const resolvedMerchantId = merchantId && merchantId !== 'none' ? merchantId : null;
-        const selectedMerchant = resolvedMerchantId ? merchants?.find(m => m.id === resolvedMerchantId) : null;
         await createTx.mutateAsync({
           date,
           description,
@@ -98,17 +180,19 @@ export function TransactionForm({ onSuccess, editData }: Props) {
           is_subscription: isSubscription,
         });
       }
-      toast.success('Transaction saved');
+      toast.success(isEdit ? 'Transaction updated' : 'Transaction saved');
       onSuccess?.();
     } catch (e: any) {
       toast.error(e.message);
     }
   };
 
+  const isPending = updateTx.isPending || createTx.isPending || createTransfer.isPending;
+
   return (
     <div className="flex flex-col gap-4 overflow-y-auto">
       <SheetHeader>
-        <SheetTitle>Add Transaction</SheetTitle>
+        <SheetTitle>{isEdit ? 'Edit Transaction' : 'Add Transaction'}</SheetTitle>
       </SheetHeader>
 
       {/* Type toggle */}
@@ -145,6 +229,11 @@ export function TransactionForm({ onSuccess, editData }: Props) {
             </span>
           )}
         </div>
+        {selectedAccount && selectedAccount.currency !== 'USD' && amount && parseFloat(amount) > 0 && (
+          <p className="mt-1 text-xs text-muted-foreground tabular-nums">
+            ≈ {formatUSD(Math.abs(parseFloat(amount)) * parseFloat(fxRate || '1'))} USD
+          </p>
+        )}
       </div>
 
       {/* Account */}
@@ -201,19 +290,29 @@ export function TransactionForm({ onSuccess, editData }: Props) {
       {type !== 'transfer' && (
         <div>
           <Label>Merchant</Label>
-          <Select value={merchantId} onValueChange={(v) => {
-            setMerchantId(v);
-            // Auto-set category from merchant default
-            if (v && !categoryId) {
-              const m = merchants?.find(m => m.id === v);
-              if (m?.default_category_id) setCategoryId(m.default_category_id);
-            }
-          }}>
-            <SelectTrigger className="mt-1"><SelectValue placeholder="Select merchant (optional)" /></SelectTrigger>
+          <MerchantCombobox
+            merchants={merchants || []}
+            value={merchantId}
+            onChange={(v) => {
+              setMerchantId(v);
+              if (v && v !== 'none' && !categoryId) {
+                const m = merchants?.find(m => m.id === v);
+                if ((m as any)?.default_category_id) setCategoryId((m as any).default_category_id);
+              }
+            }}
+          />
+        </div>
+      )}
+
+      {/* Category (not for transfers) — moved up */}
+      {type !== 'transfer' && (
+        <div>
+          <Label>Category</Label>
+          <Select value={categoryId} onValueChange={setCategoryId}>
+            <SelectTrigger className="mt-1"><SelectValue placeholder="Select category" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="none">No merchant</SelectItem>
-              {merchants?.map((m: any) => (
-                <SelectItem key={m.id} value={m.id}>{m.display_name || m.name}</SelectItem>
+              {categories?.map(c => (
+                <SelectItem key={c.id} value={c.id}>{c.icon} {c.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -232,21 +331,6 @@ export function TransactionForm({ onSuccess, editData }: Props) {
         <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="mt-1" />
       </div>
 
-      {/* Category (not for transfers) */}
-      {type !== 'transfer' && (
-        <div>
-          <Label>Category</Label>
-          <Select value={categoryId} onValueChange={setCategoryId}>
-            <SelectTrigger className="mt-1"><SelectValue placeholder="Select category" /></SelectTrigger>
-            <SelectContent>
-              {categories?.map(c => (
-                <SelectItem key={c.id} value={c.id}>{c.icon} {c.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
-
       {/* Subscription toggle */}
       {type === 'expense' && (
         <label className="flex items-center gap-2 text-sm">
@@ -255,8 +339,8 @@ export function TransactionForm({ onSuccess, editData }: Props) {
         </label>
       )}
 
-      <Button onClick={handleSubmit} className="h-12 text-base mt-2" disabled={createTx.isPending || createTransfer.isPending}>
-        {createTx.isPending || createTransfer.isPending ? 'Saving...' : 'Save Transaction'}
+      <Button onClick={handleSubmit} className="h-12 text-base mt-2" disabled={isPending}>
+        {isPending ? 'Saving...' : isEdit ? 'Save Changes' : 'Save Transaction'}
       </Button>
     </div>
   );

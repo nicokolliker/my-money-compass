@@ -19,6 +19,8 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { TransactionForm } from '@/components/transactions/TransactionForm';
 
 function formatDateGroupLabel(dateStr: string): string {
   const d = new Date(dateStr + 'T12:00:00');
@@ -88,6 +90,8 @@ export default function Transactions() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [showDateFilter, setShowDateFilter] = useState(false);
+  const [uncategorizedOnly, setUncategorizedOnly] = useState(false);
+  const [editTx, setEditTx] = useState<any>(null);
 
   const { data: transactions, isLoading } = useTransactions({
     search: search || undefined,
@@ -106,9 +110,12 @@ export default function Transactions() {
 
   const grouped = useMemo(() => {
     if (!transactions) return [];
+    const filtered = uncategorizedOnly
+      ? transactions.filter(tx => !tx.category_id)
+      : transactions;
     const groups: { date: string; label: string; txs: typeof transactions }[] = [];
     let currentDate = '';
-    transactions.forEach(tx => {
+    filtered.forEach(tx => {
       if (tx.date !== currentDate) {
         currentDate = tx.date;
         groups.push({ date: tx.date, label: formatDateGroupLabel(tx.date), txs: [] });
@@ -116,7 +123,7 @@ export default function Transactions() {
       groups[groups.length - 1].txs.push(tx);
     });
     return groups;
-  }, [transactions]);
+  }, [transactions, uncategorizedOnly]);
 
   const handleDelete = async (id: string) => {
     try { await deleteTx.mutateAsync(id); toast.success('Transaction deleted'); }
@@ -187,13 +194,28 @@ export default function Transactions() {
             {(dateFrom || dateTo) && <Button variant="ghost" size="sm" className="text-xs h-9" onClick={() => { setDateFrom(''); setDateTo(''); }}>Clear</Button>}
           </div>
         )}
+        <div className="flex gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={() => setUncategorizedOnly(!uncategorizedOnly)}
+            className={`text-xs font-medium px-3 py-1.5 rounded-full border transition-colors ${
+              uncategorizedOnly
+                ? 'bg-primary text-primary-foreground border-primary'
+                : 'bg-background text-muted-foreground border-border hover:border-primary/50'
+            }`}
+          >
+            📌 Without category
+          </button>
+        </div>
       </div>
 
       {/* List */}
       {isLoading ? (
         <div className="text-center py-8 text-muted-foreground">Loading...</div>
       ) : grouped.length === 0 ? (
-        <p className="text-center py-12 text-muted-foreground">No transactions found</p>
+        <p className="text-center py-12 text-muted-foreground">
+          {uncategorizedOnly ? '✅ All transactions are categorized' : 'No transactions found'}
+        </p>
       ) : (
         <div className="space-y-6">
           {grouped.map(group => (
@@ -212,47 +234,54 @@ export default function Transactions() {
 
                   return (
                     <div key={tx.id} className={`flex items-center gap-3 py-3 px-3 rounded-xl hover:bg-accent/60 active:bg-accent transition-colors group ${tx.is_subscription ? 'border-l-2 border-l-primary/40' : ''}`}>
-                      <MerchantAvatar tx={tx} cat={cat} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-foreground truncate">{(tx as any).merchants?.display_name || tx.merchant || tx.description || 'Untitled'}</p>
-                        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                          <span className="text-xs text-muted-foreground">{acct?.name}</span>
+                      <div
+                        className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer"
+                        onClick={() => setEditTx(tx)}
+                      >
+                        <MerchantAvatar tx={tx} cat={cat} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-foreground truncate">{(tx as any).merchants?.display_name || tx.merchant || tx.description || 'Untitled'}</p>
+                          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                            <span className="text-xs text-muted-foreground">{acct?.name}</span>
 
-                          {/* Category pill */}
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <button
-                                style={cat?.color ? { backgroundColor: `hsl(${cat.color} / 0.15)`, color: `hsl(${cat.color})` } : undefined}
-                                className={`text-[11px] font-medium px-1.5 py-0.5 rounded-full hover:ring-1 hover:ring-primary/30 transition-all ${!cat?.color ? 'bg-muted text-muted-foreground' : ''}`}
-                              >
-                                {cat ? (
-                                  <span className="flex items-center gap-1">
-                                    <span>{cat.icon || '📌'}</span>
-                                    <span>{cat.name}</span>
-                                  </span>
-                                ) : '+ Category'}
-                              </button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-48 p-1" align="start">
-                              <div className="space-y-0.5 max-h-48 overflow-auto">
-                                <button className="w-full text-left px-2 py-1.5 text-xs rounded hover:bg-accent" onClick={() => handleCategoryChange(tx.id, null)}>
-                                  📌 Uncategorized
-                                </button>
-                                {categories?.map(c => (
-                                  <button key={c.id} className="w-full text-left px-2 py-1.5 text-xs rounded hover:bg-accent" onClick={() => handleCategoryChange(tx.id, c.id)}>
-                                    {c.icon || '📌'} {c.name}
+                            {/* Category pill */}
+                            <div onClick={(e) => e.stopPropagation()}>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <button
+                                    style={cat?.color ? { backgroundColor: `hsl(${cat.color} / 0.15)`, color: `hsl(${cat.color})` } : undefined}
+                                    className={`text-[11px] font-medium px-1.5 py-0.5 rounded-full hover:ring-1 hover:ring-primary/30 transition-all ${!cat?.color ? 'bg-muted text-muted-foreground' : ''}`}
+                                  >
+                                    {cat ? (
+                                      <span className="flex items-center gap-1">
+                                        <span>{cat.icon || '📌'}</span>
+                                        <span>{cat.name}</span>
+                                      </span>
+                                    ) : '+ Category'}
                                   </button>
-                                ))}
-                              </div>
-                            </PopoverContent>
-                          </Popover>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-48 p-1" align="start">
+                                  <div className="space-y-0.5 max-h-48 overflow-auto">
+                                    <button className="w-full text-left px-2 py-1.5 text-xs rounded hover:bg-accent" onClick={() => handleCategoryChange(tx.id, null)}>
+                                      📌 Uncategorized
+                                    </button>
+                                    {categories?.map(c => (
+                                      <button key={c.id} className="w-full text-left px-2 py-1.5 text-xs rounded hover:bg-accent" onClick={() => handleCategoryChange(tx.id, c.id)}>
+                                        {c.icon || '📌'} {c.name}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                            </div>
 
-                          {tx.is_subscription && <Badge variant="secondary" className="text-[10px] h-4 px-1.5 font-medium">🔄 Recurring</Badge>}
-                          {recurringMatchMap[tx.id] && (
-                            <Badge variant="outline" className="text-[10px] h-4 px-1.5 font-medium flex items-center gap-0.5">
-                              <Link2 className="h-2.5 w-2.5" /> {recurringMatchMap[tx.id].recurring_name}
-                            </Badge>
-                          )}
+                            {tx.is_subscription && <Badge variant="secondary" className="text-[10px] h-4 px-1.5 font-medium">🔄 Recurring</Badge>}
+                            {recurringMatchMap[tx.id] && (
+                              <Badge variant="outline" className="text-[10px] h-4 px-1.5 font-medium flex items-center gap-0.5">
+                                <Link2 className="h-2.5 w-2.5" /> {recurringMatchMap[tx.id].recurring_name}
+                              </Badge>
+                            )}
+                          </div>
                         </div>
                       </div>
 
@@ -265,8 +294,8 @@ export default function Transactions() {
                         )}
                       </div>
 
-                      <div className="flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                        <Button variant="ghost" size="icon" className="h-7 w-7" title={tx.is_subscription ? 'Unmark recurring' : 'Mark as recurring'} onClick={() => handleToggleSubscription(tx.id, tx.is_subscription)}>
+                      <div className="flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" onClick={(e) => e.stopPropagation()}>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" title={tx.is_subscription ? 'Unmark recurring' : 'Mark as recurring'} onClick={(e) => { e.stopPropagation(); handleToggleSubscription(tx.id, tx.is_subscription); }}>
                           <Repeat className={`h-3 w-3 ${tx.is_subscription ? 'text-primary' : 'text-muted-foreground'}`} />
                         </Button>
                         <AlertDialog>
@@ -293,6 +322,17 @@ export default function Transactions() {
           ))}
         </div>
       )}
+
+      <Sheet open={!!editTx} onOpenChange={(open) => { if (!open) setEditTx(null); }}>
+        <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
+          {editTx && (
+            <TransactionForm
+              editData={editTx}
+              onSuccess={() => setEditTx(null)}
+            />
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
