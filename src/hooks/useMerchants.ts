@@ -13,7 +13,7 @@ export function useMerchants() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('merchants')
-        .select('*, categories:default_category_id(id, name, icon, color)')
+        .select('*')
         .order('name');
       if (error) throw error;
       return data;
