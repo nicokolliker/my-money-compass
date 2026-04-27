@@ -194,6 +194,7 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
     setForm({
       name: item.name,
       type: TYPE_KEYS.includes(item.type) ? item.type : 'casa',
+      subtype: item.subtype || '',
       category_id: item.category_id || '',
       account_id: item.account_id || '',
       amount: String(Math.abs(Number(item.amount))),
@@ -211,7 +212,9 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
     if (nextDue < new Date()) nextDue.setMonth(nextDue.getMonth() + 1);
 
     const payload: any = {
-      name: form.name, type: form.type, category_id: form.category_id || null,
+      name: form.name, type: form.type,
+      subtype: form.type === 'digital' ? (form.subtype || null) : null,
+      category_id: form.category_id || null,
       account_id: form.account_id || null, amount: parseFloat(form.amount),
       currency: form.currency, frequency: form.frequency,
       due_day: parseInt(form.due_day) || 1, notes: form.notes || null,
