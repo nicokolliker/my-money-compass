@@ -442,6 +442,7 @@ interface Rule {
   category_id: string | null;
   mark_as_subscription: boolean;
   match_field?: string | null;
+  is_active?: boolean;
 }
 
 async function getRules(supabase: any): Promise<Rule[]> {
