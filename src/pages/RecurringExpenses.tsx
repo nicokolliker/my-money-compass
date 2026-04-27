@@ -510,6 +510,7 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
                       );
                     })}
                   </div>
+                  )}
                 </div>
               );
             })}
