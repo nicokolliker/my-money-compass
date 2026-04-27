@@ -190,7 +190,7 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
 
   const [topTab, setTopTab] = useState<'library' | 'tracking'>('library');
 
-  if (isLoading) return <div className="flex items-center justify-center h-64 text-muted-foreground">Loading...</div>;
+  if (isLoading) return <div className="flex items-center justify-center h-64 text-muted-foreground">Loading recurring expenses...</div>;
 
   return (
     <div className={embedded ? 'space-y-4' : 'space-y-5'}>
