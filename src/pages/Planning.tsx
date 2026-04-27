@@ -34,53 +34,27 @@ export default function Planning({ initialTab }: { initialTab?: PlanningTab } = 
   const tab: PlanningTab = initialTab || (location.state as any)?.tab || 'overview';
   const meta = SECTION_META[tab];
 
-  const handleTabChange = (v: string) => {
-    const map: Record<string, string> = {
+  const handleNavigate = (t: PlanningTab) => {
+    const map: Record<PlanningTab, string> = {
       overview: '/planning',
       recurring: '/planning/recurring',
       calendar: '/planning/calendar',
       budget: '/planning/budget',
     };
-    if (map[v]) navigate(map[v], { replace: true });
+    navigate(map[t], { replace: true });
   };
 
   return (
     <div className="space-y-4 max-w-5xl">
-      {/* Module title (single, persistent) */}
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Planning</h1>
-        <p className="text-sm text-muted-foreground">Recurring payments, calendar and budget in one place</p>
+        <h1 className="text-2xl font-bold text-foreground">{meta.label}</h1>
+        <p className="text-sm text-muted-foreground">{meta.description}</p>
       </div>
 
-      <Tabs value={tab} onValueChange={handleTabChange}>
-        <TabsList className="w-full flex-wrap">
-          <TabsTrigger value="overview" className="flex-1">Overview</TabsTrigger>
-          <TabsTrigger value="recurring" className="flex-1">Recurring</TabsTrigger>
-          <TabsTrigger value="calendar" className="flex-1">Calendar</TabsTrigger>
-          <TabsTrigger value="budget" className="flex-1">Budget</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="overview" className="mt-4">
-          <PlanningShell section={meta.label} description={meta.description}>
-            <PlanningOverview onNavigate={(t) => handleTabChange(t)} />
-          </PlanningShell>
-        </TabsContent>
-        <TabsContent value="recurring" className="mt-4">
-          <PlanningShell section={SECTION_META.recurring.label} description={SECTION_META.recurring.description}>
-            <RecurringExpenses embedded />
-          </PlanningShell>
-        </TabsContent>
-        <TabsContent value="calendar" className="mt-4">
-          <PlanningShell section={SECTION_META.calendar.label} description={SECTION_META.calendar.description}>
-            <CalendarPage embedded />
-          </PlanningShell>
-        </TabsContent>
-        <TabsContent value="budget" className="mt-4">
-          <PlanningShell section={SECTION_META.budget.label} description={SECTION_META.budget.description}>
-            <BudgetPage embedded />
-          </PlanningShell>
-        </TabsContent>
-      </Tabs>
+      {tab === 'overview' && <PlanningOverview onNavigate={handleNavigate} />}
+      {tab === 'recurring' && <RecurringExpenses embedded />}
+      {tab === 'calendar' && <CalendarPage embedded />}
+      {tab === 'budget' && <BudgetPage embedded />}
     </div>
   );
 }
