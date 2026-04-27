@@ -77,8 +77,11 @@ export function useRecurringInstances(filters?: { from?: string; to?: string }) 
       if (filters?.from) q = q.gte('expected_date', filters.from);
       if (filters?.to) q = q.lte('expected_date', filters.to);
       const { data, error } = await q;
-      if (error) throw error;
-      return data as RecurringInstance[];
+      if (error) {
+        console.error('recurring_instances query error:', error);
+        throw error;
+      }
+      return (data || []) as RecurringInstance[];
     },
   });
 }
