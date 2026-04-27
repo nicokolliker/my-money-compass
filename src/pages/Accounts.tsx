@@ -12,7 +12,7 @@ import { useAccountBalances, useCreateAccount, useUpdateAccount } from '@/hooks/
 import { useAccountGroups, useCreateAccountGroup, useUpdateAccountGroup, useDeleteAccountGroup } from '@/hooks/useAccountGroups';
 import { useNetWorth } from '@/hooks/useNetWorth';
 import { ACCOUNT_TYPE_LABELS, CURRENCIES, formatCurrency, formatUSD } from '@/lib/constants';
-import { getBrandLogo } from '@/lib/brandLogos';
+import { MerchantLogo } from '@/components/MerchantLogo';
 import { getAccountStyle } from '@/lib/accountIcons';
 import { Plus, ChevronDown, FolderPlus, Pencil, Trash2, FileUp, PenLine, Wifi, Clock } from 'lucide-react';
 import { toast } from 'sonner';
@@ -20,21 +20,10 @@ import { DemoDataBanner } from '@/components/DemoDataBanner';
 import { useDemoData } from '@/hooks/useDemoData';
 import { Badge } from '@/components/ui/badge';
 
-function AccountLogo({ name, type }: { name: string; type: string }) {
-  const brand = getBrandLogo(name);
-  if (brand) {
-    return (
-      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg ${brand.bg}`}>
-        {brand.icon}
-      </div>
-    );
-  }
-  const style = getAccountStyle(type);
-  return (
-    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg ${style.bg}`}>
-      {style.emoji}
-    </div>
-  );
+function AccountLogo({ name, institution }: { name: string; institution?: string | null }) {
+  // Try institution name first (e.g. "Wise", "Banco Galicia"), then fall back to account name
+  const logoName = institution || name;
+  return <MerchantLogo name={logoName} size={40} />;
 }
 
 export default function Accounts() {
@@ -191,7 +180,7 @@ export default function Accounts() {
                     const pct = totalNetWorth !== 0 ? (balUsd / totalNetWorth * 100) : 0;
                     return (
                       <button key={a.id} onClick={() => openEdit(a)} className="flex items-center gap-3 w-full py-3 text-left hover:bg-accent/50 active:bg-accent rounded-lg px-2 -mx-2 transition-colors">
-                        <AccountLogo name={a.name} type={a.type} />
+                        <AccountLogo name={a.name} institution={(a as any).institution} />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5">
                             <p className="text-sm font-semibold text-foreground truncate">{a.name}</p>
