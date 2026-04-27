@@ -273,6 +273,19 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
                   </Select>
                 </div>
               </div>
+              {form.type === 'digital' && (
+                <div>
+                  <Label>Subcategoría</Label>
+                  <Select value={form.subtype} onValueChange={v => setForm(f => ({ ...f, subtype: v }))}>
+                    <SelectTrigger className="mt-1"><SelectValue placeholder="Seleccionar subcategoría" /></SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(DIGITAL_SUBTYPES).map(([key, sub]) => (
+                        <SelectItem key={key} value={key}>{sub.icon} {sub.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-2">
                 <div><Label>Amount</Label><Input type="number" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} className="mt-1" /></div>
                 <div><Label>Currency</Label>
