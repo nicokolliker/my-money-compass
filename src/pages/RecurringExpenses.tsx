@@ -14,7 +14,7 @@ import { useAccounts } from '@/hooks/useAccounts';
 import { useFxRates } from '@/hooks/useFxRates';
 import { formatUSD } from '@/lib/constants';
 import { toMonthlyAmount, isDerivedPaid, toUSD, type FxRateRow, type DerivedInstanceState } from '@/lib/money';
-import { Plus, Trash2, Pencil, Repeat } from 'lucide-react';
+import { Plus, Trash2, Pencil, Repeat, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, addMonths, addYears, addWeeks } from 'date-fns';
 import { DemoDataBanner } from '@/components/DemoDataBanner';
