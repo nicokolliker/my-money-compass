@@ -3,13 +3,18 @@ import { getBrandLogoUrl, getInitialsColor } from '@/lib/brandLogos';
 
 interface Props {
   name: string;
+  domain?: string | null;
   size?: number;
   className?: string;
 }
 
-export function MerchantLogo({ name, size = 40, className = '' }: Props) {
+export function MerchantLogo({ name, domain, size = 40, className = '' }: Props) {
   const [imgError, setImgError] = useState(false);
-  const logoUrl = getBrandLogoUrl(name);
+
+  // Priority: explicit domain > auto-detected from name
+  const logoUrl = domain
+    ? `https://logo.clearbit.com/${domain}`
+    : getBrandLogoUrl(name);
 
   const dim = { width: size, height: size };
 
