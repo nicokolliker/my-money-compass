@@ -18,6 +18,7 @@ import { Plus, Trash2, Pencil, Repeat, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, addMonths, addYears, addWeeks } from 'date-fns';
 import { DemoDataBanner } from '@/components/DemoDataBanner';
+import { MerchantLogo } from '@/components/MerchantLogo';
 import { useDemoData } from '@/hooks/useDemoData';
 import RecurringTracking from '@/components/recurring/RecurringTracking';
 
