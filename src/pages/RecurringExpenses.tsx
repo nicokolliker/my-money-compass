@@ -84,6 +84,8 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
   const [editingId, setEditingId] = useState<string | null>(null);
   const [topTab, setTopTab] = useState<'library' | 'tracking'>('library');
   const [digitalExpanded, setDigitalExpanded] = useState(false);
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+  const toggleGroup = (type: string) => setCollapsedGroups(prev => ({ ...prev, [type]: !prev[type] }));
   const { hasDemoData, onCleared: onDemoCleared } = useDemoData();
 
   const emptyForm = {
