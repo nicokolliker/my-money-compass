@@ -62,26 +62,41 @@ export function useRecurringInstances(filters?: { from?: string; to?: string }) 
     queryKey: ['recurring-instances', userId, filters],
     enabled: !!userId,
     queryFn: async () => {
-      let q = (supabase as any)
+      // Step 1: fetch instances
+      const { data: instances, error } = await (supabase as any)
         .from('recurring_instances')
-        .select(`
-          *,
-          recurring_expenses(id, name, type, frequency, category_id, payment_method_id,
-            categories(name, icon, color),
-            accounts(name, currency, type),
-            payment_methods(name, type, icon)
-          ),
-          transactions(id, date, amount, currency, description, merchant)
-        `)
+        .select('*')
         .order('expected_date', { ascending: true });
-      if (filters?.from) q = q.gte('expected_date', filters.from);
-      if (filters?.to) q = q.lte('expected_date', filters.to);
-      const { data, error } = await q;
+
       if (error) {
-        console.error('recurring_instances query error:', error);
+        console.error('recurring_instances error:', error);
         throw error;
       }
-      return (data || []) as RecurringInstance[];
+
+      if (!instances || instances.length === 0) return [];
+
+      // Step 2: fetch related recurring_expenses for the ids we got
+      const recurringIds = [...new Set(instances.map((i: any) => i.recurring_id))];
+      const { data: recurringExpenses } = await supabase
+        .from('recurring_expenses')
+        .select('id, name, type, frequency, category_id, categories(name, icon, color), accounts(name, currency, type)')
+        .in('id', recurringIds);
+
+      const expenseMap = Object.fromEntries((recurringExpenses || []).map((r: any) => [r.id, r]));
+
+      // Step 3: filter by date range and attach related data
+      const filtered = filters?.from || filters?.to
+        ? instances.filter((i: any) => {
+            if (filters?.from && i.expected_date < filters.from) return false;
+            if (filters?.to && i.expected_date > filters.to) return false;
+            return true;
+          })
+        : instances;
+
+      return filtered.map((i: any) => ({
+        ...i,
+        recurring_expenses: expenseMap[i.recurring_id] || null,
+      })) as RecurringInstance[];
     },
   });
 }
