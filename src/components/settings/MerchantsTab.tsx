@@ -13,12 +13,13 @@ import {
 import { useMerchants, useUpdateMerchant, useDeleteMerchant, useMergeMerchants, useMerchantTransactions } from '@/hooks/useMerchants';
 import { useCategories } from '@/hooks/useCategories';
 import { getBrandLogo, getInitialsColor } from '@/lib/brandLogos';
+import { MerchantLogo } from '@/components/MerchantLogo';
 import { formatCurrency, formatUSD } from '@/lib/constants';
 import { Search, Pencil, Trash2, GitMerge, ChevronRight, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
-function MerchantLogo({ merchant, size = 'md' }: { merchant: any; size?: 'sm' | 'md' }) {
+function MerchantLogoLegacy({ merchant, size = 'md' }: { merchant: any; size?: 'sm' | 'md' }) {
   const dim = size === 'sm' ? 'w-8 h-8 text-sm' : 'w-10 h-10 text-lg';
 
   if (merchant.logo_url) {
