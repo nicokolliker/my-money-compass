@@ -136,7 +136,7 @@ export function getBrandDomain(name: string): string | null {
 export function getBrandLogoUrl(name: string): string | null {
   const domain = getBrandDomain(name);
   if (!domain) return null;
-  return `https://logo.clearbit.com/${domain}`;
+  return `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
 }
 
 // Backwards compatibility — returns null so callers fall through to other rendering paths.
