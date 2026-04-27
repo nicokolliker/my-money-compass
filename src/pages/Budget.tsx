@@ -248,14 +248,20 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
             <table style={{ minWidth: '900px' }} className="w-full text-xs border-collapse">
               <thead>
                 <tr className="border-b border-border bg-muted/40">
-                  <th className="text-left px-3 py-2 sticky left-0 bg-muted/40 z-10 min-w-[180px] font-semibold text-foreground">
+                  <th
+                    className="text-left px-3 py-2 sticky left-0 z-10 min-w-[180px] font-semibold text-foreground"
+                    style={{
+                      background: 'var(--color-background-secondary, hsl(var(--muted)))',
+                      boxShadow: '2px 0 4px -2px rgba(0,0,0,0.08)',
+                    }}
+                  >
                     Categoría
                   </th>
                   {MONTHS.map((m, i) => (
                     <th
                       key={m}
                       className={cn(
-                        'px-2 py-2 text-center font-semibold text-foreground min-w-[80px]',
+                        'px-2 py-2 text-center font-semibold text-foreground min-w-[68px]',
                         isCurrent(i) && 'bg-primary/10 text-primary'
                       )}
                     >
@@ -269,7 +275,13 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
               <tbody>
                 {/* Income row */}
                 <tr className="border-b border-border bg-emerald-500/5">
-                  <td className="px-3 py-2 sticky left-0 bg-emerald-500/5 z-10 font-semibold text-foreground">
+                  <td
+                    className="px-3 py-2 sticky left-0 z-10 font-semibold text-foreground"
+                    style={{
+                      background: 'color-mix(in srgb, var(--color-background-primary, hsl(var(--card))) 95%, #22c55e 5%)',
+                      boxShadow: '2px 0 4px -2px rgba(0,0,0,0.08)',
+                    }}
+                  >
                     💰 Ingresos
                   </td>
                   {MONTHS.map((_, i) => {
@@ -301,7 +313,13 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
 
                 {/* Fixed costs (recurring) row */}
                 <tr className="border-b border-border bg-primary/5">
-                  <td className="px-3 py-2 sticky left-0 bg-primary/5 z-10 font-semibold text-foreground">
+                  <td
+                    className="px-3 py-2 sticky left-0 z-10 font-semibold text-foreground"
+                    style={{
+                      background: 'color-mix(in srgb, var(--color-background-primary, hsl(var(--card))) 95%, hsl(var(--primary)) 5%)',
+                      boxShadow: '2px 0 4px -2px rgba(0,0,0,0.08)',
+                    }}
+                  >
                     🔒 Gastos fijos
                   </td>
                   {MONTHS.map((_, i) => (
@@ -325,7 +343,13 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                   }, 0);
                   return (
                     <tr key={cat.id} className="border-b border-border hover:bg-muted/20">
-                      <td className="px-3 py-2 sticky left-0 bg-card z-10">
+                      <td
+                        className="px-3 py-2 sticky left-0 z-10"
+                        style={{
+                          background: 'var(--color-background-primary, hsl(var(--card)))',
+                          boxShadow: '2px 0 4px -2px rgba(0,0,0,0.08)',
+                        }}
+                      >
                         <div className="flex items-center gap-1.5">
                           <span>{cat.icon}</span>
                           <span className="text-foreground truncate">{cat.name}</span>
@@ -385,7 +409,13 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
 
                 {/* Total egresos row */}
                 <tr className="border-y-2 border-border bg-muted/40">
-                  <td className="px-3 py-2 sticky left-0 bg-muted/40 z-10 font-semibold text-foreground">
+                  <td
+                    className="px-3 py-2 sticky left-0 z-10 font-semibold text-foreground"
+                    style={{
+                      background: 'var(--color-background-secondary, hsl(var(--muted)))',
+                      boxShadow: '2px 0 4px -2px rgba(0,0,0,0.08)',
+                    }}
+                  >
                     Total egresos
                   </td>
                   {MONTHS.map((_, i) => {
@@ -415,7 +445,13 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
 
                 {/* Result row */}
                 <tr className="bg-muted/60">
-                  <td className="px-3 py-2 sticky left-0 bg-muted/60 z-10 font-bold text-foreground">
+                  <td
+                    className="px-3 py-2 sticky left-0 z-10 font-bold text-foreground"
+                    style={{
+                      background: 'var(--color-background-secondary, hsl(var(--muted)))',
+                      boxShadow: '2px 0 4px -2px rgba(0,0,0,0.08)',
+                    }}
+                  >
                     = Resultado
                   </td>
                   {MONTHS.map((_, i) => {
