@@ -19,7 +19,7 @@ export function useRecurringExpenses() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('recurring_expenses')
-        .select('*, categories(name, icon, color), accounts(name, currency, type), payment_methods(name, type, icon)')
+        .select('*, categories(name, icon, color), accounts(name, currency, type)')
         .order('next_due_date', { ascending: true });
       if (error) throw error;
       return data;
