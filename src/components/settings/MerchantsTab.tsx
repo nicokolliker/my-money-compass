@@ -183,6 +183,32 @@ export default function MerchantsTab() {
                 </div>
               </div>
 
+              {/* Domain (for automatic logo) */}
+              <div>
+                <Label className="text-xs">Dominio (para logo automático)</Label>
+                <div className="flex items-center gap-2 mt-1">
+                  <Input
+                    placeholder="netflix.com"
+                    value={editForm.domain}
+                    onChange={e => setEditForm(f => ({ ...f, domain: e.target.value }))}
+                    className="flex-1 rounded-xl"
+                  />
+                  {editForm.domain.trim() && (
+                    <div className="w-9 h-9 rounded-full overflow-hidden bg-muted flex items-center justify-center shrink-0">
+                      <img
+                        src={`https://logo.clearbit.com/${editForm.domain.trim()}`}
+                        alt="logo preview"
+                        className="w-full h-full object-contain"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                      />
+                    </div>
+                  )}
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Ingresá el dominio para mostrar el logo real. Preview en tiempo real.
+                </p>
+              </div>
+
               {/* Default Category */}
               <div>
                 <Label className="text-xs">Default Category</Label>
