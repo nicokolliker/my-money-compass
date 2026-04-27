@@ -322,6 +322,17 @@ export default function Transactions() {
           ))}
         </div>
       )}
+
+      <Sheet open={!!editTx} onOpenChange={(open) => { if (!open) setEditTx(null); }}>
+        <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
+          {editTx && (
+            <TransactionForm
+              editData={editTx}
+              onSuccess={() => setEditTx(null)}
+            />
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
