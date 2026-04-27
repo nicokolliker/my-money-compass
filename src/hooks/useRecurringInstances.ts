@@ -57,8 +57,10 @@ async function getUserId() {
 }
 
 export function useRecurringInstances(filters?: { from?: string; to?: string }) {
+  const userId = useUserId();
   return useQuery({
-    queryKey: ['recurring-instances', filters],
+    queryKey: ['recurring-instances', userId, filters],
+    enabled: !!userId,
     queryFn: async () => {
       let q = (supabase as any)
         .from('recurring_instances')
