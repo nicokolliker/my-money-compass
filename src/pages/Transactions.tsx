@@ -37,6 +37,7 @@ function MerchantAvatar({ tx }: { tx: any; cat?: any }) {
   const isTransfer = tx.type === 'transfer';
   const merchantData = (tx as any).merchants;
   const name = merchantData?.display_name || merchantData?.name || tx.merchant || tx.description || '';
+  const domain = merchantData?.domain || null;
 
   if (isTransfer) {
     return (
@@ -50,7 +51,7 @@ function MerchantAvatar({ tx }: { tx: any; cat?: any }) {
     return <img src={merchantData.logo_url} alt={name} className="w-10 h-10 rounded-full object-cover shrink-0" />;
   }
 
-  return <MerchantLogo name={name} size={40} />;
+  return <MerchantLogo name={name} domain={domain} size={40} />;
 }
 
 export default function Transactions() {
