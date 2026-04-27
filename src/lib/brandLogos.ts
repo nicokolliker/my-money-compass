@@ -140,7 +140,8 @@ export function getBrandLogoUrl(name: string): string | null {
 }
 
 // Backwards compatibility — returns null so callers fall through to other rendering paths.
-export function getBrandLogo(_name: string): null {
+// Typed loosely to allow legacy `.bg` / `.icon` / `.text` access on the (always-null) result.
+export function getBrandLogo(_name: string): { icon: string; bg: string; text: string } | null {
   return null;
 }
 
