@@ -234,47 +234,54 @@ export default function Transactions() {
 
                   return (
                     <div key={tx.id} className={`flex items-center gap-3 py-3 px-3 rounded-xl hover:bg-accent/60 active:bg-accent transition-colors group ${tx.is_subscription ? 'border-l-2 border-l-primary/40' : ''}`}>
-                      <MerchantAvatar tx={tx} cat={cat} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-foreground truncate">{(tx as any).merchants?.display_name || tx.merchant || tx.description || 'Untitled'}</p>
-                        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                          <span className="text-xs text-muted-foreground">{acct?.name}</span>
+                      <div
+                        className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer"
+                        onClick={() => setEditTx(tx)}
+                      >
+                        <MerchantAvatar tx={tx} cat={cat} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-foreground truncate">{(tx as any).merchants?.display_name || tx.merchant || tx.description || 'Untitled'}</p>
+                          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                            <span className="text-xs text-muted-foreground">{acct?.name}</span>
 
-                          {/* Category pill */}
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <button
-                                style={cat?.color ? { backgroundColor: `hsl(${cat.color} / 0.15)`, color: `hsl(${cat.color})` } : undefined}
-                                className={`text-[11px] font-medium px-1.5 py-0.5 rounded-full hover:ring-1 hover:ring-primary/30 transition-all ${!cat?.color ? 'bg-muted text-muted-foreground' : ''}`}
-                              >
-                                {cat ? (
-                                  <span className="flex items-center gap-1">
-                                    <span>{cat.icon || '📌'}</span>
-                                    <span>{cat.name}</span>
-                                  </span>
-                                ) : '+ Category'}
-                              </button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-48 p-1" align="start">
-                              <div className="space-y-0.5 max-h-48 overflow-auto">
-                                <button className="w-full text-left px-2 py-1.5 text-xs rounded hover:bg-accent" onClick={() => handleCategoryChange(tx.id, null)}>
-                                  📌 Uncategorized
-                                </button>
-                                {categories?.map(c => (
-                                  <button key={c.id} className="w-full text-left px-2 py-1.5 text-xs rounded hover:bg-accent" onClick={() => handleCategoryChange(tx.id, c.id)}>
-                                    {c.icon || '📌'} {c.name}
+                            {/* Category pill */}
+                            <div onClick={(e) => e.stopPropagation()}>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <button
+                                    style={cat?.color ? { backgroundColor: `hsl(${cat.color} / 0.15)`, color: `hsl(${cat.color})` } : undefined}
+                                    className={`text-[11px] font-medium px-1.5 py-0.5 rounded-full hover:ring-1 hover:ring-primary/30 transition-all ${!cat?.color ? 'bg-muted text-muted-foreground' : ''}`}
+                                  >
+                                    {cat ? (
+                                      <span className="flex items-center gap-1">
+                                        <span>{cat.icon || '📌'}</span>
+                                        <span>{cat.name}</span>
+                                      </span>
+                                    ) : '+ Category'}
                                   </button>
-                                ))}
-                              </div>
-                            </PopoverContent>
-                          </Popover>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-48 p-1" align="start">
+                                  <div className="space-y-0.5 max-h-48 overflow-auto">
+                                    <button className="w-full text-left px-2 py-1.5 text-xs rounded hover:bg-accent" onClick={() => handleCategoryChange(tx.id, null)}>
+                                      📌 Uncategorized
+                                    </button>
+                                    {categories?.map(c => (
+                                      <button key={c.id} className="w-full text-left px-2 py-1.5 text-xs rounded hover:bg-accent" onClick={() => handleCategoryChange(tx.id, c.id)}>
+                                        {c.icon || '📌'} {c.name}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                            </div>
 
-                          {tx.is_subscription && <Badge variant="secondary" className="text-[10px] h-4 px-1.5 font-medium">🔄 Recurring</Badge>}
-                          {recurringMatchMap[tx.id] && (
-                            <Badge variant="outline" className="text-[10px] h-4 px-1.5 font-medium flex items-center gap-0.5">
-                              <Link2 className="h-2.5 w-2.5" /> {recurringMatchMap[tx.id].recurring_name}
-                            </Badge>
-                          )}
+                            {tx.is_subscription && <Badge variant="secondary" className="text-[10px] h-4 px-1.5 font-medium">🔄 Recurring</Badge>}
+                            {recurringMatchMap[tx.id] && (
+                              <Badge variant="outline" className="text-[10px] h-4 px-1.5 font-medium flex items-center gap-0.5">
+                                <Link2 className="h-2.5 w-2.5" /> {recurringMatchMap[tx.id].recurring_name}
+                              </Badge>
+                            )}
+                          </div>
                         </div>
                       </div>
 
