@@ -49,7 +49,7 @@ function getNextDate(current: Date, frequency: string): Date {
 // Monthly normalization lives in lib/money (toMonthlyAmount)
 
 export default function RecurringExpenses({ embedded = false }: { embedded?: boolean } = {}) {
-  const { data: items, isLoading } = useRecurringExpenses();
+  const { data: items, isLoading, error: itemsError } = useRecurringExpenses();
   const { data: transactions } = useTransactions();
   const { data: instances, error: instancesError } = useDerivedInstances();
   if (instancesError) console.error('Recurring instances error:', instancesError);
