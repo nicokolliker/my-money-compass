@@ -1,236 +1,439 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Progress } from '@/components/ui/progress';
-import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Label } from '@/components/ui/label';
-import { useBudgets, useUpsertBudget, useDeleteBudget } from '@/hooks/useBudgets';
+import { useBudgets, useUpsertBudget } from '@/hooks/useBudgets';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useCategories } from '@/hooks/useCategories';
-import { formatUSD } from '@/lib/constants';
-import { getCategoryColor } from '@/lib/categoryColors';
-import { getCategoryIcon } from '@/lib/brandLogos';
-import { Plus, Trash2, TrendingUp, TrendingDown, AlertTriangle, Target, DollarSign } from 'lucide-react';
+import { useRecurringExpenses } from '@/hooks/useRecurringExpenses';
+import { toMonthlyAmount } from '@/lib/money';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
-import { format, startOfMonth, endOfMonth } from 'date-fns';
+import { cn } from '@/lib/utils';
+
+const MONTHS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+const INCOME_CATEGORY_NAME = 'Ingresos Proyectados';
+
+const fmt = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
+const monthStrFor = (year: number, monthIdx: number) =>
+  `${year}-${String(monthIdx + 1).padStart(2, '0')}-01`;
+const monthPrefix = (year: number, monthIdx: number) =>
+  `${year}-${String(monthIdx + 1).padStart(2, '0')}`;
 
 export default function BudgetPage({ embedded = false }: { embedded?: boolean } = {}) {
-  const currentMonth = format(new Date(), 'yyyy-MM-01');
-  const { data: budgets, isLoading } = useBudgets(currentMonth);
-  const { data: transactions } = useTransactions({
-    dateFrom: currentMonth,
-    dateTo: format(endOfMonth(new Date()), 'yyyy-MM-dd'),
-  });
+  const today = new Date();
+  const [selectedYear, setSelectedYear] = useState(today.getFullYear());
+  const currentMonth = today.getMonth();
+  const currentYear = today.getFullYear();
+
+  const { data: transactions } = useTransactions();
+  const { data: budgets } = useBudgets();
   const { data: categories } = useCategories();
+  const { data: recurringItems } = useRecurringExpenses();
   const upsertBudget = useUpsertBudget();
-  const deleteBudget = useDeleteBudget();
-  const [showAdd, setShowAdd] = useState(false);
-  const [form, setForm] = useState({ category_id: '', amount: '' });
 
-  const spendingByCategory = useMemo(() => {
-    if (!transactions) return {};
-    const map: Record<string, number> = {};
-    transactions.forEach(t => {
-      if (t.type !== 'expense') return;
-      const catId = t.category_id || 'uncategorized';
-      map[catId] = (map[catId] || 0) + Math.abs(Number(t.amount_usd));
-    });
-    return map;
-  }, [transactions]);
+  const incomeCategoryId = useMemo(
+    () => categories?.find(c => c.name === INCOME_CATEGORY_NAME)?.id || null,
+    [categories]
+  );
 
-  const budgetItems = useMemo(() => {
-    if (!budgets) return [];
-    return budgets.map(b => {
-      const cat = (b as any).categories;
-      const spent = spendingByCategory[b.category_id || ''] || 0;
-      const pct = b.amount > 0 ? (spent / Number(b.amount)) * 100 : 0;
-      return { ...b, cat, spent, pct, remaining: Number(b.amount) - spent };
-    });
-  }, [budgets, spendingByCategory]);
+  // Variable budget categories (exclude the income projection one)
+  const variableCategories = useMemo(
+    () => (categories || []).filter(c => c.name !== INCOME_CATEGORY_NAME),
+    [categories]
+  );
 
-  const totalBudget = budgetItems.reduce((s, b) => s + Number(b.amount), 0);
-  const totalSpent = budgetItems.reduce((s, b) => s + b.spent, 0);
-  const totalPct = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
-  const overBudgetCount = budgetItems.filter(b => b.pct > 100).length;
+  const isPast = (monthIndex: number) =>
+    selectedYear < currentYear ||
+    (selectedYear === currentYear && monthIndex < currentMonth);
+  const isCurrent = (monthIndex: number) =>
+    selectedYear === currentYear && monthIndex === currentMonth;
 
-  const handleAdd = async () => {
-    if (!form.category_id || !form.amount) return;
+  // ----- Helpers -----
+  const getActualSpending = useCallback(
+    (categoryId: string, monthIndex: number) => {
+      const prefix = monthPrefix(selectedYear, monthIndex);
+      return Math.abs(
+        (transactions || [])
+          .filter(t => t.category_id === categoryId && t.type === 'expense' && t.date.startsWith(prefix))
+          .reduce((s, t) => s + Number(t.amount_usd || 0), 0)
+      );
+    },
+    [transactions, selectedYear]
+  );
+
+  const getActualIncome = useCallback(
+    (monthIndex: number) => {
+      const prefix = monthPrefix(selectedYear, monthIndex);
+      return Math.abs(
+        (transactions || [])
+          .filter(t => t.type === 'income' && t.date.startsWith(prefix))
+          .reduce((s, t) => s + Number(t.amount_usd || 0), 0)
+      );
+    },
+    [transactions, selectedYear]
+  );
+
+  const getBudgetAmount = useCallback(
+    (categoryId: string | null, monthIndex: number) => {
+      if (!categoryId) return 0;
+      const monthStr = monthStrFor(selectedYear, monthIndex);
+      const b = (budgets || []).find(b => b.category_id === categoryId && String(b.month).startsWith(monthPrefix(selectedYear, monthIndex)));
+      return Number(b?.amount || 0);
+      void monthStr;
+    },
+    [budgets, selectedYear]
+  );
+
+  const recurringMonthlyTotal = useMemo(() => {
+    return (recurringItems || [])
+      .filter(r => r.is_active)
+      .reduce((s, r) => s + toMonthlyAmount(Math.abs(Number(r.amount)), r.frequency), 0);
+  }, [recurringItems]);
+
+  // ----- Save handlers -----
+  const saveBudget = async (categoryId: string, monthIndex: number, value: number) => {
+    if (!categoryId) return;
     try {
       await upsertBudget.mutateAsync({
-        category_id: form.category_id,
-        month: currentMonth,
-        amount: parseFloat(form.amount),
+        category_id: categoryId,
+        month: monthStrFor(selectedYear, monthIndex),
+        amount: value,
+        currency: 'USD',
       });
-      toast.success('Budget set');
-      setShowAdd(false);
-      setForm({ category_id: '', amount: '' });
-    } catch (e: any) { toast.error(e.message); }
+    } catch (e: any) {
+      toast.error(e.message || 'Error saving');
+    }
   };
 
-  const unbugdetedCategories = useMemo(() => {
-    if (!categories || !budgets) return categories || [];
-    const budgetCatIds = new Set(budgets.map(b => b.category_id));
-    return categories.filter(c => !budgetCatIds.has(c.id));
-  }, [categories, budgets]);
+  // ----- Chart data: budgeted vs actual for current month -----
+  const chartData = useMemo(() => {
+    const prefix = monthPrefix(currentYear, currentMonth);
+    return variableCategories
+      .map(cat => {
+        const b = (budgets || []).find(
+          b => b.category_id === cat.id && String(b.month).startsWith(prefix)
+        );
+        if (!b) return null;
+        const budgeted = Number(b.amount || 0);
+        const spent = Math.abs(
+          (transactions || [])
+            .filter(t => t.category_id === cat.id && t.type === 'expense' && t.date.startsWith(prefix))
+            .reduce((s, t) => s + Number(t.amount_usd || 0), 0)
+        );
+        const deviation = spent - budgeted;
+        const pct = budgeted > 0 ? Math.round((deviation / budgeted) * 100) : 0;
+        return { id: cat.id, name: cat.name, icon: cat.icon, budgeted, spent, deviation, pct };
+      })
+      .filter(Boolean) as Array<{
+        id: string; name: string; icon: string | null; budgeted: number; spent: number; deviation: number; pct: number;
+      }>;
+  }, [variableCategories, budgets, transactions, currentYear, currentMonth]);
 
-  if (isLoading) return <div className="flex items-center justify-center h-64 text-muted-foreground">Loading...</div>;
+  // ----- Annual totals per row -----
+  const incomeYearTotal = useMemo(() => {
+    return MONTHS.reduce((s, _, i) => {
+      const v = isPast(i) ? getActualIncome(i) : getBudgetAmount(incomeCategoryId, i);
+      return s + v;
+    }, 0);
+  }, [incomeCategoryId, selectedYear, getActualIncome, getBudgetAmount]);
+
+  const recurringYearTotal = recurringMonthlyTotal * 12;
 
   return (
     <div className={embedded ? 'space-y-4' : 'space-y-5'}>
-      <div className={embedded ? 'flex items-center justify-end' : 'flex items-center justify-between'}>
+      {/* Header */}
+      <div className={embedded ? 'flex items-center justify-end gap-2' : 'flex items-center justify-between'}>
         {!embedded && (
           <div>
             <h1 className="text-2xl font-bold text-foreground">Budget</h1>
-            <p className="text-sm text-muted-foreground">{format(new Date(), 'MMMM yyyy')}</p>
+            <p className="text-sm text-muted-foreground">Annual planning and monthly tracking</p>
           </div>
         )}
-        <Dialog open={showAdd} onOpenChange={setShowAdd}>
-          <DialogTrigger asChild>
-            <Button size="sm"><Plus className="h-4 w-4 mr-1" /> Set Budget</Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader><DialogTitle>Set Category Budget</DialogTitle></DialogHeader>
-            <div className="space-y-3 pt-2">
-              <div>
-                <Label>Category</Label>
-                <Select value={form.category_id} onValueChange={v => setForm(f => ({ ...f, category_id: v }))}>
-                  <SelectTrigger className="mt-1"><SelectValue placeholder="Select category" /></SelectTrigger>
-                  <SelectContent>
-                    {unbugdetedCategories?.map(c => (
-                      <SelectItem key={c.id} value={c.id}>{c.icon} {c.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Monthly Budget (USD)</Label>
-                <Input type="number" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} className="mt-1" placeholder="500" />
-              </div>
-              <Button className="w-full" onClick={handleAdd} disabled={upsertBudget.isPending}>Set Budget</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setSelectedYear(y => y - 1)}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <span className="text-base font-semibold text-foreground tabular-nums w-14 text-center">{selectedYear}</span>
+          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setSelectedYear(y => y + 1)}>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
-      {/* Overall progress */}
-      <Card className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground border-0">
-        <CardContent className="pt-5 pb-5">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-sm opacity-80">Total Budget</p>
-            <p className="text-sm opacity-80 tabular-nums">{Math.round(totalPct)}%</p>
-          </div>
-          <Progress value={Math.min(totalPct, 100)} className="h-3 bg-primary-foreground/20" />
-          <div className="flex items-center justify-between mt-3">
-            <div>
-              <p className="text-2xl font-extrabold">{formatUSD(totalSpent)}</p>
-              <p className="text-xs opacity-70">spent</p>
+      {/* Section 1: Chart for current month */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-semibold capitalize">
+            {new Date(currentYear, currentMonth).toLocaleString('es', { month: 'long', year: 'numeric' })} — Presupuestado vs Real
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {chartData.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-6 text-center">No hay presupuestos definidos para este mes.</p>
+          ) : (
+            <div className="space-y-3">
+              {chartData.map(item => {
+                const isOver = item.deviation > 0;
+                const max = Math.max(item.budgeted, item.spent, 1);
+                const budgetPct = (item.budgeted / max) * 100;
+                const spentPct = (item.spent / max) * 100;
+                return (
+                  <div key={item.id} className="space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span>{item.icon}</span>
+                        <span className="text-foreground font-medium truncate">{item.name}</span>
+                      </div>
+                      <div className={cn('font-semibold tabular-nums shrink-0', isOver ? 'text-destructive' : 'text-emerald-600')}>
+                        {isOver ? '+' : ''}{Math.round(item.deviation).toLocaleString('en-US')} USD ({isOver ? '+' : ''}{item.pct}%)
+                      </div>
+                    </div>
+                    <div className="relative h-5 rounded bg-muted overflow-hidden">
+                      <div
+                        className="absolute top-0 left-0 h-full bg-primary/40"
+                        style={{ width: `${budgetPct}%` }}
+                      />
+                      <div
+                        className={cn('absolute top-0 left-0 h-2 mt-1.5', isOver ? 'bg-destructive' : 'bg-emerald-500')}
+                        style={{ width: `${spentPct}%` }}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                      <span>Gastado: {fmt(item.spent)}</span>
+                      <span>Budget: {fmt(item.budgeted)}</span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-            <div className="text-right">
-              <p className="text-2xl font-extrabold">{formatUSD(totalBudget)}</p>
-              <p className="text-xs opacity-70">budget</p>
-            </div>
-          </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* Insights */}
-      <div className="grid grid-cols-3 gap-2">
-        <Card>
-          <CardContent className="pt-3 pb-3 text-center">
-            <Target className="h-4 w-4 mx-auto text-primary mb-1" />
-            <p className="text-lg font-bold text-foreground">{formatUSD(totalBudget - totalSpent)}</p>
-            <p className="text-[10px] text-muted-foreground">Remaining</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-3 pb-3 text-center">
-            <DollarSign className="h-4 w-4 mx-auto text-primary mb-1" />
-            <p className="text-lg font-bold text-foreground">{budgetItems.length}</p>
-            <p className="text-[10px] text-muted-foreground">Categories</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-3 pb-3 text-center">
-            <AlertTriangle className={`h-4 w-4 mx-auto mb-1 ${overBudgetCount > 0 ? 'text-destructive' : 'text-muted-foreground'}`} />
-            <p className="text-lg font-bold text-foreground">{overBudgetCount}</p>
-            <p className="text-[10px] text-muted-foreground">Over Budget</p>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Section 2: Annual planning table */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-semibold">Planificación anual {selectedYear}</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs border-collapse">
+              <thead>
+                <tr className="border-b border-border bg-muted/40">
+                  <th className="text-left px-3 py-2 sticky left-0 bg-muted/40 z-10 min-w-[180px] font-semibold text-foreground">
+                    Categoría
+                  </th>
+                  {MONTHS.map((m, i) => (
+                    <th
+                      key={m}
+                      className={cn(
+                        'px-2 py-2 text-center font-semibold text-foreground min-w-[80px]',
+                        isCurrent(i) && 'bg-primary/10 text-primary'
+                      )}
+                    >
+                      {m}
+                      {isCurrent(i) && <div className="text-[9px] font-normal opacity-80">← actual</div>}
+                    </th>
+                  ))}
+                  <th className="px-3 py-2 text-right font-semibold text-foreground min-w-[90px]">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {/* Income row */}
+                <tr className="border-b border-border bg-emerald-500/5">
+                  <td className="px-3 py-2 sticky left-0 bg-emerald-500/5 z-10 font-semibold text-foreground">
+                    💰 Ingresos
+                  </td>
+                  {MONTHS.map((_, i) => {
+                    const actual = getActualIncome(i);
+                    const budgeted = getBudgetAmount(incomeCategoryId, i);
+                    return (
+                      <td key={i} className={cn('px-1 py-1 text-center tabular-nums', isCurrent(i) && 'bg-primary/5')}>
+                        {isPast(i) ? (
+                          <span className="text-emerald-600 font-medium">{actual > 0 ? fmt(actual) : '—'}</span>
+                        ) : (
+                          <Input
+                            type="number"
+                            defaultValue={budgeted || ''}
+                            placeholder="0"
+                            className="h-7 text-xs text-center px-1 tabular-nums"
+                            onBlur={(e) => {
+                              const val = parseFloat(e.target.value);
+                              if (!isNaN(val) && incomeCategoryId && val !== budgeted) {
+                                saveBudget(incomeCategoryId, i, val);
+                              }
+                            }}
+                          />
+                        )}
+                      </td>
+                    );
+                  })}
+                  <td className="px-3 py-2 text-right tabular-nums font-bold text-emerald-600">{fmt(incomeYearTotal)}</td>
+                </tr>
 
-      {/* Category budgets */}
-      <div className="space-y-2">
-        {budgetItems.map(item => {
-          const isOver = item.pct > 100;
-          const isWarning = item.pct > 80 && !isOver;
-          const color = getCategoryColor(item.cat?.name, item.cat?.color);
+                {/* Fixed costs (recurring) row */}
+                <tr className="border-b border-border bg-primary/5">
+                  <td className="px-3 py-2 sticky left-0 bg-primary/5 z-10 font-semibold text-foreground">
+                    🔒 Gastos fijos
+                  </td>
+                  {MONTHS.map((_, i) => (
+                    <td key={i} className={cn('px-2 py-2 text-center tabular-nums text-foreground', isCurrent(i) && 'bg-primary/10')}>
+                      {fmt(recurringMonthlyTotal)}
+                    </td>
+                  ))}
+                  <td className="px-3 py-2 text-right tabular-nums font-bold text-foreground">{fmt(recurringYearTotal)}</td>
+                </tr>
 
-          return (
-            <Card key={item.id} className={isOver ? 'border-destructive/30' : ''}>
-              <CardContent className="py-3.5">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-base">{getCategoryIcon(item.cat?.name, item.cat?.icon)}</span>
-                    <span className="text-sm font-semibold text-foreground">{item.cat?.name || 'Unknown'}</span>
-                    {isOver && <Badge variant="destructive" className="text-[9px] h-4 px-1.5">Over!</Badge>}
-                    {isWarning && <Badge variant="secondary" className="text-[9px] h-4 px-1.5">⚠️ {Math.round(item.pct)}%</Badge>}
-                  </div>
-                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => deleteBudget.mutateAsync(item.id).then(() => toast.success('Removed'))}>
-                    <Trash2 className="h-3 w-3 text-muted-foreground" />
-                  </Button>
-                </div>
-                <Progress value={Math.min(item.pct, 100)} className="h-2 mb-2" />
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span className="tabular-nums">{formatUSD(item.spent)} spent</span>
-                  <span className="tabular-nums">
-                    {item.remaining >= 0
-                      ? `${formatUSD(item.remaining)} left`
-                      : `${formatUSD(Math.abs(item.remaining))} over`
-                    }
-                  </span>
-                  <span className="tabular-nums">{formatUSD(Number(item.amount))} budget</span>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
+                {/* Separator */}
+                <tr>
+                  <td colSpan={14} className="h-2 bg-muted/30 border-y border-border" />
+                </tr>
 
-      {/* Unbudgeted spending */}
-      {Object.entries(spendingByCategory).filter(([catId]) => !budgetItems.find(b => b.category_id === catId)).length > 0 && (
-        <div className="space-y-2">
-          <p className="text-sm font-semibold text-muted-foreground px-1">Unbudgeted Spending</p>
-          {Object.entries(spendingByCategory)
-            .filter(([catId]) => !budgetItems.find(b => b.category_id === catId))
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 5)
-            .map(([catId, spent]) => {
-              const cat = categories?.find(c => c.id === catId);
-              return (
-                <Card key={catId} className="border-dashed">
-                  <CardContent className="flex items-center justify-between py-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-base">{getCategoryIcon(cat?.name, cat?.icon)}</span>
-                      <span className="text-sm text-foreground">{cat?.name || 'Uncategorized'}</span>
-                    </div>
-                    <span className="text-sm font-bold text-foreground tabular-nums">{formatUSD(spent)}</span>
-                  </CardContent>
-                </Card>
-              );
-            })}
-        </div>
-      )}
+                {/* Variable budget rows */}
+                {variableCategories.map(cat => {
+                  const yearTotal = MONTHS.reduce((s, _, i) => {
+                    const v = isPast(i) ? getActualSpending(cat.id, i) : getBudgetAmount(cat.id, i);
+                    return s + v;
+                  }, 0);
+                  return (
+                    <tr key={cat.id} className="border-b border-border hover:bg-muted/20">
+                      <td className="px-3 py-2 sticky left-0 bg-background z-10">
+                        <div className="flex items-center gap-1.5">
+                          <span>{cat.icon}</span>
+                          <span className="text-foreground truncate">{cat.name}</span>
+                        </div>
+                      </td>
+                      {MONTHS.map((_, i) => {
+                        const actual = getActualSpending(cat.id, i);
+                        const budgeted = getBudgetAmount(cat.id, i);
+                        const isOver = budgeted > 0 && actual > budgeted;
+                        return (
+                          <td
+                            key={i}
+                            className={cn(
+                              'px-1 py-1 text-center tabular-nums align-middle',
+                              isCurrent(i) && 'bg-primary/5'
+                            )}
+                          >
+                            {isPast(i) ? (
+                              <span className={cn(actual > 0 ? 'text-foreground' : 'text-muted-foreground')}>
+                                {actual > 0 ? fmt(actual) : '—'}
+                              </span>
+                            ) : isCurrent(i) ? (
+                              <div className="space-y-0.5">
+                                <div className={cn('text-[10px]', isOver ? 'text-destructive font-semibold' : 'text-muted-foreground')}>
+                                  {actual > 0 ? fmt(actual) : '—'}
+                                </div>
+                                <Input
+                                  type="number"
+                                  defaultValue={budgeted || ''}
+                                  placeholder="0"
+                                  className="h-6 text-[11px] text-center px-1 tabular-nums"
+                                  onBlur={(e) => {
+                                    const val = parseFloat(e.target.value);
+                                    if (!isNaN(val) && val !== budgeted) saveBudget(cat.id, i, val);
+                                  }}
+                                />
+                              </div>
+                            ) : (
+                              <Input
+                                type="number"
+                                defaultValue={budgeted || ''}
+                                placeholder="0"
+                                className="h-7 text-xs text-center px-1 tabular-nums"
+                                onBlur={(e) => {
+                                  const val = parseFloat(e.target.value);
+                                  if (!isNaN(val) && val !== budgeted) saveBudget(cat.id, i, val);
+                                }}
+                              />
+                            )}
+                          </td>
+                        );
+                      })}
+                      <td className="px-3 py-2 text-right tabular-nums font-semibold text-foreground">{fmt(yearTotal)}</td>
+                    </tr>
+                  );
+                })}
 
-      {budgetItems.length === 0 && (
-        <div className="text-center py-12">
-          <Target className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
-          <p className="text-muted-foreground">No budgets set yet.</p>
-          <p className="text-sm text-muted-foreground/70">Set monthly limits for your spending categories.</p>
-        </div>
-      )}
+                {/* Total egresos row */}
+                <tr className="border-y-2 border-border bg-muted/40">
+                  <td className="px-3 py-2 sticky left-0 bg-muted/40 z-10 font-semibold text-foreground">
+                    Total egresos
+                  </td>
+                  {MONTHS.map((_, i) => {
+                    const variable = variableCategories.reduce(
+                      (s, cat) => s + (isPast(i) ? getActualSpending(cat.id, i) : getBudgetAmount(cat.id, i)),
+                      0
+                    );
+                    const total = recurringMonthlyTotal + variable;
+                    return (
+                      <td key={i} className={cn('px-2 py-2 text-center tabular-nums font-bold text-foreground', isCurrent(i) && 'bg-primary/10')}>
+                        {fmt(total)}
+                      </td>
+                    );
+                  })}
+                  <td className="px-3 py-2 text-right tabular-nums font-bold text-foreground">
+                    {fmt(
+                      MONTHS.reduce((s, _, i) => {
+                        const variable = variableCategories.reduce(
+                          (a, cat) => a + (isPast(i) ? getActualSpending(cat.id, i) : getBudgetAmount(cat.id, i)),
+                          0
+                        );
+                        return s + recurringMonthlyTotal + variable;
+                      }, 0)
+                    )}
+                  </td>
+                </tr>
+
+                {/* Result row */}
+                <tr className="bg-muted/60">
+                  <td className="px-3 py-2 sticky left-0 bg-muted/60 z-10 font-bold text-foreground">
+                    = Resultado
+                  </td>
+                  {MONTHS.map((_, i) => {
+                    const income = isPast(i) ? getActualIncome(i) : getBudgetAmount(incomeCategoryId, i);
+                    const variable = variableCategories.reduce(
+                      (s, cat) => s + (isPast(i) ? getActualSpending(cat.id, i) : getBudgetAmount(cat.id, i)),
+                      0
+                    );
+                    const result = income - recurringMonthlyTotal - variable;
+                    return (
+                      <td
+                        key={i}
+                        className={cn(
+                          'px-2 py-2 text-center tabular-nums font-bold',
+                          result >= 0 ? 'text-emerald-600' : 'text-destructive',
+                          isCurrent(i) && 'bg-primary/10'
+                        )}
+                      >
+                        {result >= 0 ? '+' : ''}{Math.round(result).toLocaleString('en-US')}
+                      </td>
+                    );
+                  })}
+                  <td className="px-3 py-2 text-right tabular-nums font-bold">
+                    {(() => {
+                      const yearResult = MONTHS.reduce((s, _, i) => {
+                        const income = isPast(i) ? getActualIncome(i) : getBudgetAmount(incomeCategoryId, i);
+                        const variable = variableCategories.reduce(
+                          (a, cat) => a + (isPast(i) ? getActualSpending(cat.id, i) : getBudgetAmount(cat.id, i)),
+                          0
+                        );
+                        return s + (income - recurringMonthlyTotal - variable);
+                      }, 0);
+                      return (
+                        <span className={yearResult >= 0 ? 'text-emerald-600' : 'text-destructive'}>
+                          {yearResult >= 0 ? '+' : ''}{Math.round(yearResult).toLocaleString('en-US')}
+                        </span>
+                      );
+                    })()}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
