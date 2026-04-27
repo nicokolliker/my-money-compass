@@ -6,7 +6,8 @@ import { useBudgets, useUpsertBudget } from '@/hooks/useBudgets';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useCategories } from '@/hooks/useCategories';
 import { useRecurringExpenses } from '@/hooks/useRecurringExpenses';
-import { toMonthlyAmount } from '@/lib/money';
+import { useFxRates } from '@/hooks/useFxRates';
+import { toMonthlyAmount, toUSD, type FxRateRow } from '@/lib/money';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -30,6 +31,7 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
   const { data: budgets } = useBudgets();
   const { data: categories } = useCategories();
   const { data: recurringItems } = useRecurringExpenses();
+  const { data: fxRates } = useFxRates();
   const upsertBudget = useUpsertBudget();
 
   const incomeCategoryId = useMemo(
@@ -94,8 +96,15 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
   const recurringMonthlyTotal = useMemo(() => {
     return (recurringItems || [])
       .filter(r => r.is_active)
-      .reduce((s, r) => s + toMonthlyAmount(Math.abs(Number(r.amount)), r.frequency), 0);
-  }, [recurringItems]);
+      .reduce((s, r) => {
+        const amountUsd = toUSD(
+          Math.abs(Number(r.amount)),
+          r.currency || 'USD',
+          fxRates as FxRateRow[] | undefined
+        );
+        return s + toMonthlyAmount(amountUsd, r.frequency);
+      }, 0);
+  }, [recurringItems, fxRates]);
 
   // ----- Save handlers -----
   const saveBudget = async (categoryId: string, monthIndex: number, value: number) => {
