@@ -1,12 +1,15 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { Tables, TablesUpdate } from '@/integrations/supabase/types';
+import { useUserId } from '@/hooks/useAuthUser';
 
 export type Merchant = Tables<'merchants'>;
 
 export function useMerchants() {
+  const userId = useUserId();
   return useQuery({
-    queryKey: ['merchants'],
+    queryKey: ['merchants', userId],
+    enabled: !!userId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('merchants')
