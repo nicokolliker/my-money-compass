@@ -471,6 +471,11 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
                               <p className="text-sm font-semibold text-foreground truncate">{item.name}</p>
                               <p className="text-xs text-muted-foreground truncate">
                                 {acc?.name || '—'} · <span className="capitalize">{item.frequency}</span>
+                                {item.type === 'digital' && item.subtype && DIGITAL_SUBTYPES[item.subtype] && (
+                                  <span className="ml-1.5 inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-foreground/70 align-middle">
+                                    {DIGITAL_SUBTYPES[item.subtype].icon} {DIGITAL_SUBTYPES[item.subtype].label}
+                                  </span>
+                                )}
                               </p>
                             </div>
                             <div className="text-right shrink-0">
