@@ -66,9 +66,9 @@ export function useRecurringInstances(filters?: { from?: string; to?: string }) 
         .from('recurring_instances')
         .select(`
           *,
-          recurring_expenses!inner(id, name, type, frequency, category_id, payment_method_id,
+          recurring_expenses(id, name, type, frequency, category_id, payment_method_id,
             categories(name, icon, color),
-            accounts!recurring_expenses_account_id_fkey(name, currency, type),
+            accounts(name, currency, type),
             payment_methods(name, type, icon)
           ),
           transactions(id, date, amount, currency, description, merchant)
