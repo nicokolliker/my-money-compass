@@ -180,51 +180,54 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-semibold capitalize">
-            {new Date(currentYear, currentMonth).toLocaleString('es', { month: 'long', year: 'numeric' })} — Presupuestado vs Real
+            {new Date(currentYear, currentMonth).toLocaleString('es', { month: 'long', year: 'numeric' })} — Seguimiento del mes
           </CardTitle>
         </CardHeader>
         <CardContent>
           {chartData.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-6 text-center">
-              Definí presupuestos para ver el comparativo.
-            </p>
+            <div className="py-6 text-center space-y-1">
+              <p className="text-sm text-muted-foreground">No hay presupuestos definidos para este mes.</p>
+              <p className="text-xs text-muted-foreground">Usá la tabla de abajo para definir tu presupuesto mensual.</p>
+            </div>
           ) : (
             <div className="space-y-4">
               {chartData.map(item => {
-                const isOver = item.deviation > 0;
-                const max = Math.max(item.budgeted, item.spent, 1);
+                const pctUsed = item.budgeted > 0 ? Math.min((item.spent / item.budgeted) * 100, 100) : 0;
+                const isOver = item.spent > item.budgeted && item.budgeted > 0;
+                const remaining = item.budgeted - item.spent;
+                const barColor = isOver ? 'bg-destructive' : pctUsed > 80 ? 'bg-amber-500' : 'bg-emerald-500';
+
                 return (
                   <div key={item.id}>
                     <div className="flex items-center justify-between mb-1.5">
-                      <div className="flex items-center gap-2 text-sm font-medium">
+                      <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                         <span>{item.icon}</span>
                         <span>{item.name}</span>
                       </div>
-                      <span className={`text-xs font-semibold tabular-nums ${isOver ? 'text-destructive' : 'text-emerald-600'}`}>
-                        {isOver ? '+' : ''}{item.pct}% ({isOver ? '+' : ''}{fmt(item.deviation)})
-                      </span>
+                      <div className="text-xs tabular-nums">
+                        <span className={cn('font-semibold', isOver ? 'text-destructive' : 'text-foreground')}>
+                          {fmt(item.spent)}
+                        </span>
+                        <span className="text-muted-foreground"> / {fmt(item.budgeted)}</span>
+                      </div>
                     </div>
 
-                    {/* Budget bar */}
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-[10px] text-muted-foreground w-16 text-right shrink-0">Budget</span>
-                      <div className="flex-1 h-3 bg-muted rounded-full overflow-hidden">
-                        <div className="h-full bg-primary/40 rounded-full" style={{ width: '100%' }} />
-                      </div>
-                      <span className="text-[10px] tabular-nums text-muted-foreground w-14 text-right shrink-0">{fmt(item.budgeted)}</span>
+                    <div className="relative h-2 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className={cn('h-full rounded-full transition-all', barColor)}
+                        style={{ width: `${pctUsed}%` }}
+                      />
+                      {isOver && (
+                        <div className="absolute inset-0 rounded-full ring-1 ring-destructive/40 pointer-events-none" />
+                      )}
                     </div>
 
-                    {/* Actual bar */}
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] text-muted-foreground w-16 text-right shrink-0">Gastado</span>
-                      <div className="flex-1 h-3 bg-muted rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full ${isOver ? 'bg-destructive' : 'bg-emerald-500'}`}
-                          style={{ width: `${Math.min((item.spent / max) * 100, 100)}%` }}
-                        />
-                      </div>
-                      <span className={`text-[10px] tabular-nums font-semibold w-14 text-right shrink-0 ${isOver ? 'text-destructive' : 'text-emerald-600'}`}>
-                        {fmt(item.spent)}
+                    <div className="flex items-center justify-between mt-1 text-[10px] text-muted-foreground">
+                      <span>{Math.round(pctUsed)}% usado</span>
+                      <span className={cn(isOver && 'text-destructive font-semibold')}>
+                        {isOver
+                          ? `+${fmt(Math.abs(remaining))} sobre presupuesto`
+                          : `${fmt(remaining)} restante`}
                       </span>
                     </div>
                   </div>
