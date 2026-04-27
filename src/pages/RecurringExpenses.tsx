@@ -356,6 +356,46 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
                 {TYPE_KEYS.map(k => {
                   const v = breakdown[k] || 0;
                   const pct = totalFijosUsd > 0 ? (v / totalFijosUsd) * 100 : 0;
+
+                  if (k === 'digital') {
+                    const digitalItems = (items || []).filter(i => i.is_active && i.type === 'digital');
+                    return (
+                      <div key={k}>
+                        <div
+                          className="flex items-center justify-between text-sm cursor-pointer select-none"
+                          onClick={() => setDigitalExpanded(x => !x)}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="inline-block w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: TYPE_LABELS[k].color }} />
+                            <span className="text-foreground truncate font-medium">{TYPE_LABELS[k].icon} {TYPE_LABELS[k].label}</span>
+                            <span className="text-[10px] text-muted-foreground">{digitalExpanded ? '▲' : '▼'}</span>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="text-xs text-muted-foreground tabular-nums">{pct.toFixed(0)}%</span>
+                            <span className="font-semibold tabular-nums text-foreground">{formatUSD(v)}</span>
+                          </div>
+                        </div>
+                        {digitalExpanded && Object.entries(DIGITAL_SUBTYPES).map(([subKey, sub]) => {
+                          const subItems = digitalItems.filter((i: any) => i.subtype === subKey);
+                          const subTotal = subItems.reduce((s, i: any) => {
+                            const m = toMonthlyAmount(Math.abs(Number(i.amount)), i.frequency);
+                            return s + toUSD(m, i.currency, fxList);
+                          }, 0);
+                          if (subTotal === 0 && subItems.length === 0) return null;
+                          return (
+                            <div key={subKey} className="flex items-center justify-between text-sm pl-6 mt-1">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="text-xs">{sub.icon}</span>
+                                <span className="text-xs text-muted-foreground truncate">{sub.label}</span>
+                              </div>
+                              <span className="text-xs font-medium tabular-nums text-foreground shrink-0">{formatUSD(subTotal)}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  }
+
                   return (
                     <div key={k} className="flex items-center justify-between text-sm">
                       <div className="flex items-center gap-2 min-w-0">
