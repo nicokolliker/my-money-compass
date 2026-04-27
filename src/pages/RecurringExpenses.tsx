@@ -83,10 +83,11 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
   const [showAdd, setShowAdd] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [topTab, setTopTab] = useState<'library' | 'tracking'>('library');
+  const [digitalExpanded, setDigitalExpanded] = useState(false);
   const { hasDemoData, onCleared: onDemoCleared } = useDemoData();
 
   const emptyForm = {
-    name: '', type: 'casa', category_id: '', account_id: '', amount: '',
+    name: '', type: 'casa', subtype: '', category_id: '', account_id: '', amount: '',
     currency: 'USD', frequency: 'monthly', due_day: '1', notes: '', end_date: '', renewal_notes: '',
   };
   const [form, setForm] = useState(emptyForm);
