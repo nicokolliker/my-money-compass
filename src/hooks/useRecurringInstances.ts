@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { deriveInstanceState, type DerivedInstanceState } from '@/lib/money';
+import { useUserId } from '@/hooks/useAuthUser';
 
 export type RecurringInstance = {
   id: string;
