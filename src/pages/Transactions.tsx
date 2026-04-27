@@ -93,7 +93,7 @@ export default function Transactions() {
   const [uncategorizedOnly, setUncategorizedOnly] = useState(false);
   const [editTx, setEditTx] = useState<any>(null);
 
-  const { data: transactions, isLoading } = useTransactions({
+  const { data: transactions, isLoading, error } = useTransactions({
     search: search || undefined,
     type: typeFilter !== 'all' ? typeFilter : undefined,
     accountId: accountFilter !== 'all' ? accountFilter : undefined,
@@ -210,6 +210,7 @@ export default function Transactions() {
       </div>
 
       {/* List */}
+      {error && <p className="text-center py-4 text-destructive text-sm">Error: {error.message}</p>}
       {isLoading ? (
         <div className="text-center py-8 text-muted-foreground">Loading...</div>
       ) : grouped.length === 0 ? (
