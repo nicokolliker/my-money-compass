@@ -13,7 +13,7 @@ export function MerchantLogo({ name, domain, size = 40, className = '' }: Props)
 
   // Priority: explicit domain > auto-detected from name
   const logoUrl = domain
-    ? `https://logo.clearbit.com/${domain}`
+    ? `https://www.google.com/s2/favicons?domain=${domain}&sz=128`
     : getBrandLogoUrl(name);
 
   const dim = { width: size, height: size };
@@ -27,9 +27,7 @@ export function MerchantLogo({ name, domain, size = 40, className = '' }: Props)
         <img
           src={logoUrl}
           alt={name}
-          width={size}
-          height={size}
-          className="w-full h-full object-contain"
+          style={{ width: '60%', height: '60%', objectFit: 'contain' }}
           onError={() => setImgError(true)}
           loading="lazy"
         />
