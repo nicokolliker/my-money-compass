@@ -1,7 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -13,28 +12,35 @@ import { useDerivedInstances } from '@/hooks/useRecurringInstances';
 import { useCategories } from '@/hooks/useCategories';
 import { useAccounts } from '@/hooks/useAccounts';
 import { useFxRates } from '@/hooks/useFxRates';
-import { formatCurrency, formatUSD } from '@/lib/constants';
-import { toMonthlyAmount, isDerivedPaid, toUSD, deriveInstanceState, type FxRateRow, type DerivedInstanceState } from '@/lib/money';
-import { getBrandLogo, getInitialsColor } from '@/lib/brandLogos';
-import { Plus, Trash2, CheckCircle2, AlertCircle, Clock, CalendarDays, Repeat, Building, FileText, CreditCard, Wallet, TrendingUp, Pencil } from 'lucide-react';
+import { formatUSD } from '@/lib/constants';
+import { toMonthlyAmount, isDerivedPaid, toUSD, type FxRateRow, type DerivedInstanceState } from '@/lib/money';
+import { Plus, Trash2, Pencil, Repeat } from 'lucide-react';
 import { toast } from 'sonner';
-import { format, isBefore, addMonths, addYears, addWeeks } from 'date-fns';
+import { format, addMonths, addYears, addWeeks } from 'date-fns';
 import { DemoDataBanner } from '@/components/DemoDataBanner';
 import { useDemoData } from '@/hooks/useDemoData';
 import RecurringTracking from '@/components/recurring/RecurringTracking';
-import { RecurringStatusBadge } from '@/components/recurring/RecurringStatusBadge';
 
-const TYPE_LABELS: Record<string, { label: string; icon: typeof Repeat }> = {
-  subscription: { label: 'Subscriptions', icon: Repeat },
-  fixed_cost: { label: 'Fixed Costs', icon: Building },
-  tax_fee: { label: 'Taxes & Fees', icon: FileText },
+// New 6 recurring expense types
+const TYPE_LABELS: Record<string, { label: string; icon: string; color: string }> = {
+  casa:           { label: 'Casa',                    icon: '🏠', color: '#FAECE7' },
+  auto:           { label: 'Auto',                    icon: '🚗', color: '#E1F5EE' },
+  salud:          { label: 'Salud',                   icon: '❤️', color: '#FBEAF0' },
+  personal_care:  { label: 'Personal Care',           icon: '✨', color: '#EAF3DE' },
+  obligaciones:   { label: 'Obligaciones',            icon: '📋', color: '#F1EFE8' },
+  ocio:           { label: 'Ocio',                    icon: '🎉', color: '#FAEEDA' },
 };
 
-const STATUS_CONFIG: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline'; icon: typeof CheckCircle2 }> = {
-  paid: { label: 'Paid', variant: 'default', icon: CheckCircle2 },
-  expected: { label: 'Pending', variant: 'secondary', icon: Clock },
-  overdue: { label: 'Overdue', variant: 'destructive', icon: AlertCircle },
-  missing: { label: 'Missing', variant: 'outline', icon: AlertCircle },
+const TYPE_KEYS = Object.keys(TYPE_LABELS);
+
+// Status badge tones (Library list)
+const STATUS_STYLES: Record<DerivedInstanceState | 'none', { label: string; bg: string; color: string }> = {
+  matched:      { label: 'Matched',  bg: '#EAF3DE', color: '#3B6D11' },
+  paid_manual:  { label: 'Matched',  bg: '#EAF3DE', color: '#3B6D11' },
+  upcoming:     { label: 'Upcoming', bg: '#FAEEDA', color: '#854F0B' },
+  needs_review: { label: 'Upcoming', bg: '#FAEEDA', color: '#854F0B' },
+  missing:      { label: 'Missing',  bg: '#FCEBEB', color: '#A32D2D' },
+  none:         { label: 'Sin instancias', bg: 'hsl(var(--muted))', color: 'hsl(var(--muted-foreground))' },
 };
 
 function getNextDate(current: Date, frequency: string): Date {
@@ -46,7 +52,13 @@ function getNextDate(current: Date, frequency: string): Date {
   }
 }
 
-// Monthly normalization lives in lib/money (toMonthlyAmount)
+function monthBounds() {
+  const now = new Date();
+  const start = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+  const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const end = `${last.getFullYear()}-${String(last.getMonth() + 1).padStart(2, '0')}-${String(last.getDate()).padStart(2, '0')}`;
+  return { start, end };
+}
 
 export default function RecurringExpenses({ embedded = false }: { embedded?: boolean } = {}) {
   const { data: items, isLoading, error: itemsError } = useRecurringExpenses();
@@ -61,30 +73,86 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
   const deleteItem = useDeleteRecurringExpense();
   const [showAdd, setShowAdd] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'monthly' | 'yearly'>('monthly');
-  const [activeTab, setActiveTab] = useState('all');
+  const [topTab, setTopTab] = useState<'library' | 'tracking'>('library');
   const { hasDemoData, onCleared: onDemoCleared } = useDemoData();
 
   const emptyForm = {
-    name: '', type: 'subscription', category_id: '', account_id: '', amount: '',
+    name: '', type: 'casa', category_id: '', account_id: '', amount: '',
     currency: 'USD', frequency: 'monthly', due_day: '1', notes: '', end_date: '', renewal_notes: '',
   };
   const [form, setForm] = useState(emptyForm);
 
-  // Per-item derived state from canonical recurring_instances.
-  // Picks the most relevant instance: latest paid/matched OR nearest upcoming/missing.
-  const reconciled = useMemo(() => {
-    if (!items || !instances) return {};
-    const map: Record<string, {
-      derived: DerivedInstanceState;
-      txId?: string;
-      txDate?: string;
-      txAmount?: number;
-      diff?: number;
-    }> = {};
+  const fxList = fxRates as FxRateRow[] | undefined;
+  const { start: monthStart, end: monthEnd } = monthBounds();
+
+  // ----- Top metrics -----
+  const totalFijosUsd = useMemo(() => {
+    if (!items) return 0;
+    return items.filter(i => i.is_active).reduce((s, i) => {
+      const m = toMonthlyAmount(Math.abs(Number(i.amount)), i.frequency);
+      return s + toUSD(m, i.currency, fxList);
+    }, 0);
+  }, [items, fxList]);
+
+  const monthInstances = useMemo(() => {
+    if (!instances) return [];
+    return instances.filter(i => i.expected_date >= monthStart && i.expected_date <= monthEnd);
+  }, [instances, monthStart, monthEnd]);
+
+  const pagadoMesUsd = useMemo(() => {
+    return monthInstances
+      .filter(i => isDerivedPaid(i.derived))
+      .reduce((s, i) => s + toUSD(Number(i.expected_amount), i.expected_currency, fxList), 0);
+  }, [monthInstances, fxList]);
+
+  const pendienteMesUsd = useMemo(() => {
+    return monthInstances
+      .filter(i => i.derived === 'upcoming' || i.derived === 'needs_review' || i.derived === 'missing')
+      .reduce((s, i) => s + toUSD(Number(i.expected_amount), i.expected_currency, fxList), 0);
+  }, [monthInstances, fxList]);
+
+  const monthIncome = useMemo(() => {
+    if (!transactions) return 0;
+    return Math.abs(transactions
+      .filter(t => t.type === 'income' && t.date >= monthStart && t.date <= monthEnd)
+      .reduce((s, t) => s + Number(t.amount_usd), 0));
+  }, [transactions, monthStart, monthEnd]);
+
+  const disponibleUsd = monthIncome - totalFijosUsd;
+
+  // ----- Breakdown por tipo -----
+  const breakdown = useMemo(() => {
+    const map: Record<string, number> = {};
+    TYPE_KEYS.forEach(k => { map[k] = 0; });
+    (items || []).filter(i => i.is_active).forEach(i => {
+      const m = toMonthlyAmount(Math.abs(Number(i.amount)), i.frequency);
+      const usd = toUSD(m, i.currency, fxList);
+      const key = TYPE_KEYS.includes(i.type) ? i.type : 'casa';
+      map[key] = (map[key] || 0) + usd;
+    });
+    return map;
+  }, [items, fxList]);
+
+  // ----- Timeline del mes -----
+  const timeline = useMemo(() => {
+    if (!items || !monthInstances.length) return [];
+    const itemMap: Record<string, any> = {};
+    items.forEach(i => { itemMap[i.id] = i; });
+    return [...monthInstances]
+      .sort((a, b) => (a.expected_date > b.expected_date ? 1 : -1))
+      .map(i => ({
+        instance: i,
+        item: itemMap[i.recurring_id],
+      }));
+  }, [items, monthInstances]);
+
+  // ----- Per-item state for grouped list -----
+  const itemState = useMemo(() => {
+    const map: Record<string, DerivedInstanceState | 'none'> = {};
+    if (!items) return map;
     items.forEach(item => {
-      const own = instances.filter(i => i.recurring_id === item.id);
-      // Prefer latest paid; else nearest upcoming/needs_review; else most recent missing.
+      const own = (instances || []).filter(i => i.recurring_id === item.id);
+      if (!own.length) { map[item.id] = 'none'; return; }
       const paid = own.filter(i => isDerivedPaid(i.derived))
         .sort((a, b) => (b.expected_date > a.expected_date ? 1 : -1))[0];
       const upcoming = own.filter(i => i.derived === 'upcoming' || i.derived === 'needs_review')
@@ -92,54 +160,33 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
       const missing = own.filter(i => i.derived === 'missing')
         .sort((a, b) => (b.expected_date > a.expected_date ? 1 : -1))[0];
       const pick = paid || upcoming || missing;
-      if (!pick) { map[item.id] = { derived: 'upcoming' }; return; }
-      const tx = (pick as any).transactions;
-      const expected = Math.abs(Number(item.amount));
-      map[item.id] = {
-        derived: pick.derived,
-        txId: tx?.id,
-        txDate: tx?.date,
-        txAmount: tx ? Math.abs(Number(tx.amount)) : undefined,
-        diff: tx ? Math.abs(Number(tx.amount)) - expected : undefined,
-      };
+      map[item.id] = pick ? pick.derived : 'none';
     });
     return map;
   }, [items, instances]);
 
-  const filtered = useMemo(() => {
-    if (!items) return [];
-    if (activeTab === 'all') return items;
-    return items.filter(i => i.type === activeTab);
-  }, [items, activeTab]);
-
-  const totals = useMemo(() => {
-    if (!items) return { monthly: 0, yearly: 0, active: 0, overdue: 0, subMonthly: 0, fixedMonthly: 0 };
-    const active = items.filter(i => i.is_active);
-    let monthly = 0, subMonthly = 0, fixedMonthly = 0;
-    active.forEach(i => {
-      const m = toMonthlyAmount(Math.abs(Number(i.amount)), i.frequency);
-      monthly += m;
-      if (i.type === 'subscription') subMonthly += m;
-      else fixedMonthly += m;
+  // ----- Grouped list -----
+  const grouped = useMemo(() => {
+    const g: Record<string, { items: any[]; totalUsd: number }> = {};
+    TYPE_KEYS.forEach(k => { g[k] = { items: [], totalUsd: 0 }; });
+    (items || []).forEach(i => {
+      const key = TYPE_KEYS.includes(i.type) ? i.type : 'casa';
+      g[key].items.push(i);
+      if (i.is_active) {
+        const m = toMonthlyAmount(Math.abs(Number(i.amount)), i.frequency);
+        g[key].totalUsd += toUSD(m, i.currency, fxList);
+      }
     });
-    // "Overdue" label = derived `missing` state
-    const overdue = (instances || []).filter(i => i.derived === 'missing').length;
-    return { monthly, yearly: monthly * 12, active: active.length, overdue, subMonthly, fixedMonthly };
-  }, [items, instances]);
-
-  const monthIncome = useMemo(() => {
-    if (!transactions) return 0;
-    const now = new Date();
-    const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
-    return Math.abs(transactions.filter(t => t.type === 'income' && t.date >= monthStart).reduce((s, t) => s + Number(t.amount_usd), 0));
-  }, [transactions]);
-
-  const incomePercent = monthIncome > 0 ? (totals.monthly / monthIncome * 100) : 0;
+    return g;
+  }, [items, fxList]);
 
   const openEdit = (item: any) => {
     setForm({
-      name: item.name, type: item.type, category_id: item.category_id || '',
-      account_id: item.account_id || '', amount: String(Math.abs(Number(item.amount))),
+      name: item.name,
+      type: TYPE_KEYS.includes(item.type) ? item.type : 'casa',
+      category_id: item.category_id || '',
+      account_id: item.account_id || '',
+      amount: String(Math.abs(Number(item.amount))),
       currency: item.currency, frequency: item.frequency, due_day: String(item.due_day || 1),
       notes: item.notes || '', end_date: item.end_date || '', renewal_notes: item.renewal_notes || '',
     });
@@ -175,21 +222,6 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
     } catch (e: any) { toast.error(e.message); }
   };
 
-  const handleConfirmPaid = async (item: any) => {
-    const rec = reconciled[item.id];
-    try {
-      await updateItem.mutateAsync({
-        id: item.id, status: 'paid',
-        last_paid_date: rec?.txDate || new Date().toISOString().split('T')[0],
-        last_matched_transaction_id: rec?.txId || null,
-        next_due_date: getNextDate(new Date(item.next_due_date || new Date()), item.frequency).toISOString().split('T')[0],
-      });
-      toast.success(`${item.name} marked as paid`);
-    } catch (e: any) { toast.error(e.message); }
-  };
-
-  const [topTab, setTopTab] = useState<'library' | 'tracking'>('library');
-
   if (isLoading) return <div className="flex items-center justify-center h-64 text-muted-foreground">Loading recurring expenses...</div>;
 
   return (
@@ -210,9 +242,9 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
                   <Select value={form.type} onValueChange={v => setForm(f => ({ ...f, type: v }))}>
                     <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="subscription">Subscription</SelectItem>
-                      <SelectItem value="fixed_cost">Fixed Cost</SelectItem>
-                      <SelectItem value="tax_fee">Tax / Fee</SelectItem>
+                      {TYPE_KEYS.map(k => (
+                        <SelectItem key={k} value={k}>{TYPE_LABELS[k].icon} {TYPE_LABELS[k].label}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -279,164 +311,154 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
         </TabsContent>
         <TabsContent value="library" className="mt-4 space-y-5">
 
-      {/* View toggle */}
-      <div className="flex items-center gap-2">
-        <div className="flex rounded-xl overflow-hidden border">
-          <Button variant={viewMode === 'monthly' ? 'secondary' : 'ghost'} size="sm" className="rounded-none h-8 text-xs" onClick={() => setViewMode('monthly')}>Monthly</Button>
-          <Button variant={viewMode === 'yearly' ? 'secondary' : 'ghost'} size="sm" className="rounded-none h-8 text-xs" onClick={() => setViewMode('yearly')}>Yearly</Button>
-        </div>
-      </div>
+          {itemsError && <p className="text-destructive text-sm text-center py-4">Error loading: {(itemsError as any).message}</p>}
 
-      {/* Summary cards */}
-      <div className="grid grid-cols-2 gap-3">
-        <Card className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground border-0">
-          <CardContent className="pt-4 pb-4">
-            <p className="text-xs opacity-80">Est. {viewMode === 'yearly' ? 'Yearly' : 'Monthly'}</p>
-            <p className="text-2xl font-extrabold mt-0.5">{formatUSD(viewMode === 'yearly' ? totals.yearly : totals.monthly)}</p>
-            <p className="text-[10px] opacity-70 mt-1">{totals.active} active · {incomePercent > 0 ? `${incomePercent.toFixed(0)}% of income` : ''}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4 pb-4">
-            <div className="flex items-center gap-2 mb-1">
-              <AlertCircle className="h-4 w-4 text-destructive" />
-              <p className="text-xs text-muted-foreground">Overdue</p>
-            </div>
-            <p className="text-2xl font-extrabold text-foreground">{totals.overdue}</p>
-            <p className="text-[10px] text-muted-foreground mt-1">items need attention</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Financial Impact Breakdown */}
-      <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Financial Impact</CardTitle></CardHeader>
-        <CardContent className="space-y-2">
-          <div className="flex items-center justify-between text-sm">
-            <div className="flex items-center gap-2"><Repeat className="h-3.5 w-3.5 text-primary" /><span className="text-muted-foreground">Subscriptions</span></div>
-            <span className="font-semibold text-foreground tabular-nums">{formatUSD(viewMode === 'yearly' ? totals.subMonthly * 12 : totals.subMonthly)}</span>
+          {/* Top metrics */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <MetricCard label="Total fijos" value={formatUSD(totalFijosUsd)} hint="monthly · USD" />
+            <MetricCard label="Pagado este mes" value={formatUSD(pagadoMesUsd)} hint={`${monthInstances.filter(i => isDerivedPaid(i.derived)).length} matched`} valueColor="#3B6D11" />
+            <MetricCard label="Pendiente" value={formatUSD(pendienteMesUsd)} hint={`${monthInstances.filter(i => i.derived !== 'matched' && i.derived !== 'paid_manual').length} items`} valueColor="#854F0B" />
+            <MetricCard label="Disponible" value={formatUSD(disponibleUsd)} hint={monthIncome > 0 ? `income ${formatUSD(monthIncome)}` : 'no income tracked'} valueColor={disponibleUsd < 0 ? '#A32D2D' : undefined} />
           </div>
-          <div className="flex items-center justify-between text-sm">
-            <div className="flex items-center gap-2"><Building className="h-3.5 w-3.5 text-primary" /><span className="text-muted-foreground">Fixed Costs</span></div>
-            <span className="font-semibold text-foreground tabular-nums">{formatUSD(viewMode === 'yearly' ? totals.fixedMonthly * 12 : totals.fixedMonthly)}</span>
-          </div>
-          {monthIncome > 0 && (
-            <div className="pt-2 border-t">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">% of Income</span>
-                <span className={`font-bold ${incomePercent > 70 ? 'text-destructive' : incomePercent > 50 ? 'text-amber-500' : 'text-success'}`}>
-                  {incomePercent.toFixed(0)}%
-                </span>
-              </div>
-              <div className="w-full h-2 bg-muted rounded-full overflow-hidden mt-1">
-                <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.min(incomePercent, 100)}%` }} />
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
 
-      {/* Tabs by type */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="w-full">
-          <TabsTrigger value="all" className="flex-1 text-xs">All</TabsTrigger>
-          <TabsTrigger value="subscription" className="flex-1 text-xs">Subscriptions</TabsTrigger>
-          <TabsTrigger value="fixed_cost" className="flex-1 text-xs">Fixed</TabsTrigger>
-          <TabsTrigger value="tax_fee" className="flex-1 text-xs">Taxes</TabsTrigger>
-        </TabsList>
-      </Tabs>
-
-      {/* Items list */}
-      <div className="space-y-2">
-        {itemsError && <p className="text-destructive text-sm text-center py-4">Error loading: {(itemsError as any).message}</p>}
-        {filtered.length === 0 && (
-          <div className="text-center py-12">
-            <Repeat className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
-            <p className="text-muted-foreground">No recurring expenses yet.</p>
-          </div>
-        )}
-        {filtered.map(item => {
-          const cat = (item as any).categories;
-          const acc = (item as any).accounts;
-          const pm = (item as any).payment_methods;
-          const brand = getBrandLogo(item.name);
-          const initials = getInitialsColor(item.name);
-          const rec = reconciled[item.id];
-          const derived: DerivedInstanceState = rec?.derived || 'upcoming';
-          const isPaid = isDerivedPaid(derived);
-          const isMissing = derived === 'missing';
-          const monthlyAmt = toMonthlyAmount(Math.abs(Number(item.amount)), item.frequency);
-          const usd = toUSD(Math.abs(Number(item.amount)), item.currency, fxRates as FxRateRow[] | undefined);
-
-          return (
-            <Card key={item.id} className={isMissing ? 'border-destructive/30' : isPaid ? 'border-success/30' : derived === 'needs_review' ? 'border-amber-500/30' : ''}>
-              <CardContent className="flex items-center gap-3 py-3.5">
-                {brand ? (
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg ${brand.bg}`}>{brand.icon}</div>
-                ) : cat?.icon ? (
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center text-lg" style={{ backgroundColor: cat.color ? `hsl(${cat.color} / 0.15)` : undefined }}>
-                    {cat.icon}
-                  </div>
-                ) : (
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${initials.bg} ${initials.text}`}>
-                    {item.name[0]?.toUpperCase()}
-                  </div>
-                )}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="text-sm font-semibold text-foreground truncate">{item.name}</p>
-                    <RecurringStatusBadge state={derived} />
-                  </div>
-                  <div className="flex items-center gap-1.5 mt-0.5 flex-wrap text-xs text-muted-foreground">
-                    {cat && <span>{cat.icon} {cat.name}</span>}
-                    {pm && <><span>·</span><span className="flex items-center gap-0.5"><CreditCard className="h-3 w-3" />{pm.name}</span></>}
-                    {acc && <><span>·</span><span className="flex items-center gap-0.5"><Wallet className="h-3 w-3" />{acc.name}</span></>}
-                    {item.next_due_date && <><span>·</span><span className="flex items-center gap-0.5"><CalendarDays className="h-3 w-3" />Due {format(new Date(item.next_due_date + 'T12:00:00'), 'MMM d')}</span></>}
-                  </div>
-                  {/* Reconciliation info */}
-                  {isPaid && rec?.txDate && (
-                    <p className="text-[10px] text-success mt-0.5 flex items-center gap-1">
-                      <CheckCircle2 className="h-3 w-3" /> Matched {format(new Date(rec.txDate + 'T12:00:00'), 'MMM d')} · {formatCurrency(rec.txAmount!, item.currency)}
-                      {rec.diff !== undefined && Math.abs(rec.diff) > 0.01 && (
-                        <span className={rec.diff > 0 ? 'text-destructive' : 'text-success'}>
-                          ({rec.diff > 0 ? '+' : ''}{formatCurrency(rec.diff, item.currency)})
-                        </span>
-                      )}
-                    </p>
-                  )}
-                  {isMissing && (
-                    <p className="text-[10px] text-destructive mt-0.5">No matching transaction found</p>
-                  )}
-                </div>
-                <div className="text-right shrink-0 space-y-0.5">
-                  <p className="text-sm font-bold text-foreground tabular-nums">
-                    {formatCurrency(Math.abs(Number(item.amount)), item.currency)}
-                  </p>
-                  {item.currency !== 'USD' && (
-                    <p className="text-[10px] text-muted-foreground tabular-nums">~{formatUSD(usd)}</p>
-                  )}
-                  <Badge variant="secondary" className="text-[10px] h-4 px-1.5 capitalize">{item.frequency}</Badge>
-                </div>
+          {/* Two columns */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {/* Breakdown */}
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Breakdown por tipo</CardTitle></CardHeader>
+              <CardContent className="space-y-2">
+                {TYPE_KEYS.map(k => {
+                  const v = breakdown[k] || 0;
+                  const pct = totalFijosUsd > 0 ? (v / totalFijosUsd) * 100 : 0;
+                  return (
+                    <div key={k} className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="inline-block w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: TYPE_LABELS[k].color }} />
+                        <span className="text-foreground truncate">{TYPE_LABELS[k].icon} {TYPE_LABELS[k].label}</span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-xs text-muted-foreground tabular-nums">{pct.toFixed(0)}%</span>
+                        <span className="font-semibold tabular-nums text-foreground">{formatUSD(v)}</span>
+                      </div>
+                    </div>
+                  );
+                })}
               </CardContent>
-              <div className="px-4 pb-3 flex gap-2">
-                {!isPaid && (
-                  <Button size="sm" variant="outline" className="flex-1 h-7 text-xs" onClick={() => handleConfirmPaid(item)}>
-                    <CheckCircle2 className="h-3 w-3 mr-1" /> Mark Paid
-                  </Button>
-                )}
-                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => openEdit(item)}>
-                  <Pencil className="h-3 w-3" />
-                </Button>
-                <Button size="sm" variant="ghost" className="h-7 text-xs text-destructive" onClick={() => deleteItem.mutateAsync(item.id).then(() => toast.success('Deleted'))}>
-                  <Trash2 className="h-3 w-3" />
-                </Button>
-              </div>
             </Card>
-          );
-        })}
-      </div>
+
+            {/* Timeline */}
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Timeline del mes</CardTitle></CardHeader>
+              <CardContent className="space-y-2">
+                {timeline.length === 0 && <p className="text-xs text-muted-foreground py-2">Sin instancias este mes.</p>}
+                {timeline.map(({ instance, item }) => {
+                  const dot =
+                    isDerivedPaid(instance.derived) ? '#3B6D11' :
+                    instance.derived === 'missing' ? '#A32D2D' :
+                    '#D97706';
+                  return (
+                    <div key={instance.id} className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: dot }} />
+                        <span className="text-xs text-muted-foreground tabular-nums w-12 shrink-0">{format(new Date(instance.expected_date + 'T12:00:00'), 'MMM d')}</span>
+                        <span className="text-foreground truncate">{item?.name || '—'}</span>
+                      </div>
+                      <span className="font-semibold tabular-nums text-foreground shrink-0">
+                        {formatUSD(toUSD(Number(instance.expected_amount), instance.expected_currency, fxList))}
+                      </span>
+                    </div>
+                  );
+                })}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Grouped list by type */}
+          <div className="space-y-4">
+            {TYPE_KEYS.map(k => {
+              const group = grouped[k];
+              if (!group || group.items.length === 0) return null;
+              const meta = TYPE_LABELS[k];
+              return (
+                <div key={k} className="space-y-2">
+                  <div className="flex items-center justify-between px-1">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-base" style={{ backgroundColor: meta.color }}>{meta.icon}</span>
+                      <span className="font-semibold text-foreground text-sm">{meta.label}</span>
+                      <span className="text-xs text-muted-foreground">· {group.items.length}</span>
+                    </div>
+                    <span className="text-sm font-bold tabular-nums text-foreground">{formatUSD(group.totalUsd)}</span>
+                  </div>
+                  <div className="space-y-2">
+                    {group.items.map((item: any) => {
+                      const cat = item.categories;
+                      const acc = item.accounts;
+                      const state = itemState[item.id] || 'none';
+                      const badge = STATUS_STYLES[state];
+                      return (
+                        <Card key={item.id}>
+                          <CardContent className="flex items-center gap-3 py-3">
+                            <div className="w-9 h-9 rounded-lg flex items-center justify-center text-base shrink-0" style={{ backgroundColor: meta.color }}>
+                              {cat?.icon || meta.icon}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-semibold text-foreground truncate">{item.name}</p>
+                              <p className="text-xs text-muted-foreground truncate">
+                                {acc?.name || '—'} · <span className="capitalize">{item.frequency}</span>
+                              </p>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <p className="text-sm font-bold text-foreground tabular-nums">
+                                {Number(item.amount).toLocaleString('en-US', { style: 'currency', currency: item.currency, maximumFractionDigits: item.currency === 'ARS' ? 0 : 2 })}
+                              </p>
+                              <span
+                                className="inline-block mt-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                                style={{ backgroundColor: badge.bg, color: badge.color }}
+                              >
+                                {badge.label}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => openEdit(item)} aria-label="Edit">
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-destructive" onClick={() => deleteItem.mutateAsync(item.id).then(() => toast.success('Deleted'))} aria-label="Delete">
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+
+            {(items?.length || 0) === 0 && (
+              <div className="text-center py-12">
+                <Repeat className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
+                <p className="text-muted-foreground">No recurring expenses yet.</p>
+              </div>
+            )}
+          </div>
         </TabsContent>
       </Tabs>
     </div>
   );
 }
+
+function MetricCard({ label, value, hint, valueColor }: { label: string; value: string; hint?: string; valueColor?: string }) {
+  return (
+    <Card>
+      <CardContent className="pt-4 pb-4">
+        <p className="text-xs text-muted-foreground">{label}</p>
+        <p className="text-2xl font-extrabold mt-0.5 tabular-nums" style={valueColor ? { color: valueColor } : undefined}>{value}</p>
+        {hint && <p className="text-[10px] text-muted-foreground mt-1">{hint}</p>}
+      </CardContent>
+    </Card>
+  );
+}
+
+// Re-export helper kept for other modules that may import it
+export { getNextDate };
