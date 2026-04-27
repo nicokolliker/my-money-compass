@@ -51,7 +51,8 @@ function getNextDate(current: Date, frequency: string): Date {
 export default function RecurringExpenses({ embedded = false }: { embedded?: boolean } = {}) {
   const { data: items, isLoading } = useRecurringExpenses();
   const { data: transactions } = useTransactions();
-  const { data: instances } = useDerivedInstances();
+  const { data: instances, error: instancesError } = useDerivedInstances();
+  if (instancesError) console.error('Recurring instances error:', instancesError);
   const { data: categories } = useCategories();
   const { data: accounts } = useAccounts();
   const { data: fxRates } = useFxRates();
