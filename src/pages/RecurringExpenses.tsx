@@ -447,16 +447,22 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
               const group = grouped[k];
               if (!group || group.items.length === 0) return null;
               const meta = TYPE_LABELS[k];
+              const collapsed = !!collapsedGroups[k];
               return (
                 <div key={k} className="space-y-2">
-                  <div className="flex items-center justify-between px-1">
+                  <div
+                    className="flex items-center justify-between px-1 cursor-pointer select-none"
+                    onClick={() => toggleGroup(k)}
+                  >
                     <div className="flex items-center gap-2">
                       <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-base" style={{ backgroundColor: meta.color }}>{meta.icon}</span>
                       <span className="font-semibold text-foreground text-sm">{meta.label}</span>
                       <span className="text-xs text-muted-foreground">· {group.items.length}</span>
+                      <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${collapsed ? '' : 'rotate-180'}`} />
                     </div>
                     <span className="text-sm font-bold tabular-nums text-foreground">{formatUSD(group.totalUsd)}</span>
                   </div>
+                  {!collapsed && (
                   <div className="space-y-2">
                     {group.items.map((item: any) => {
                       const cat = item.categories;
