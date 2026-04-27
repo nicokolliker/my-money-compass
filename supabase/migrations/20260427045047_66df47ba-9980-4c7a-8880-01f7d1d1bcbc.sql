@@ -1,0 +1,24 @@
+ALTER TABLE public.merchants ADD COLUMN IF NOT EXISTS domain text;
+
+UPDATE public.merchants SET domain = 'netflix.com' WHERE lower(name) LIKE '%netflix%' AND domain IS NULL;
+UPDATE public.merchants SET domain = 'spotify.com' WHERE lower(name) LIKE '%spotify%' AND domain IS NULL;
+UPDATE public.merchants SET domain = 'openai.com' WHERE lower(name) IN ('openai','chatgpt','chatgpt plus') AND domain IS NULL;
+UPDATE public.merchants SET domain = 'anthropic.com' WHERE (lower(name) LIKE '%claude%' OR lower(name) LIKE '%anthropic%') AND domain IS NULL;
+UPDATE public.merchants SET domain = 'google.com' WHERE lower(name) LIKE '%google%' AND domain IS NULL;
+UPDATE public.merchants SET domain = 'amazon.com' WHERE lower(name) LIKE '%amazon%' AND domain IS NULL;
+UPDATE public.merchants SET domain = 'uber.com' WHERE lower(name) LIKE '%uber%' AND domain IS NULL;
+UPDATE public.merchants SET domain = 'didi.com' WHERE lower(name) LIKE '%didi%' AND domain IS NULL;
+UPDATE public.merchants SET domain = 'rappi.com' WHERE lower(name) LIKE '%rappi%' AND domain IS NULL;
+UPDATE public.merchants SET domain = 'adobe.com' WHERE lower(name) LIKE '%adobe%' AND domain IS NULL;
+UPDATE public.merchants SET domain = 'notion.so' WHERE lower(name) LIKE '%notion%' AND domain IS NULL;
+UPDATE public.merchants SET domain = 'figma.com' WHERE lower(name) LIKE '%figma%' AND domain IS NULL;
+UPDATE public.merchants SET domain = 'gamma.app' WHERE lower(name) LIKE '%gamma%' AND domain IS NULL;
+UPDATE public.merchants SET domain = 'perplexity.ai' WHERE lower(name) LIKE '%perplexity%' AND domain IS NULL;
+UPDATE public.merchants SET domain = 'runwayml.com' WHERE lower(name) LIKE '%runway%' AND domain IS NULL;
+UPDATE public.merchants SET domain = 'disneyplus.com' WHERE lower(name) LIKE '%disney%' AND domain IS NULL;
+UPDATE public.merchants SET domain = 'youtube.com' WHERE lower(name) LIKE '%youtube%' AND domain IS NULL;
+UPDATE public.merchants SET domain = 'apple.com' WHERE lower(name) LIKE '%apple%' AND domain IS NULL;
+UPDATE public.merchants SET domain = 'icloud.com' WHERE lower(name) LIKE '%icloud%' AND domain IS NULL;
+UPDATE public.merchants SET domain = 'mercadopago.com' WHERE (lower(name) LIKE '%mercado pago%' OR lower(name) = 'mp') AND domain IS NULL;
+UPDATE public.merchants SET domain = 'mercadolibre.com.ar' WHERE (lower(name) LIKE '%mercado libre%' OR lower(name) LIKE '%mercadolibre%') AND domain IS NULL;
+UPDATE public.merchants SET domain = 'wise.com' WHERE lower(name) LIKE '%wise%' AND domain IS NULL;
