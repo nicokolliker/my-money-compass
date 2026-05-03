@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
+import * as pdfjsLib from 'pdfjs-dist';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useTransactions, useDeleteTransaction, useUpdateTransaction } from '@/hooks/useTransactions';
@@ -6,10 +7,8 @@ import { useAccounts } from '@/hooks/useAccounts';
 import { useCategories } from '@/hooks/useCategories';
 import { useTransactionRecurringMap } from '@/hooks/useTransactionRecurringMap';
 import { formatCurrency, formatUSD, TRANSACTION_TYPE_LABELS } from '@/lib/constants';
-import { getCategoryColor } from '@/lib/categoryColors';
-import { getCategoryIcon } from '@/lib/brandLogos';
 import { MerchantLogo } from '@/components/MerchantLogo';
-import { Search, Trash2, ArrowLeftRight, Repeat, Calendar, Link2 } from 'lucide-react';
+import { Search, Trash2, ArrowLeftRight, Repeat, Calendar, Link2, Upload, ChevronLeft, ChevronRight, FileSpreadsheet, X } from 'lucide-react';
 import { DemoDataBanner } from '@/components/DemoDataBanner';
 import { useDemoData } from '@/hooks/useDemoData';
 import { toast } from 'sonner';
@@ -21,7 +20,76 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { TransactionForm } from '@/components/transactions/TransactionForm';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useImportLog } from '@/hooks/useImportLog';
+import { useLatestFxRate } from '@/hooks/useFxRates';
+import { format, subMonths } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { parseMercadoPago } from '@/lib/importers/mercadoPagoParser';
+import { parseArqStatements } from '@/lib/importers/arqParser';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.js`;
+
+async function extractPdfText(file: File): Promise<string> {
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  let text = '';
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    text += content.items.map((it: any) => it.str).join(' ') + '\n';
+  }
+  return text;
+}
+
+const MONTH_LABELS_FULL = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+
+function detectPredominantMonth(txs: { date: string }[]): string {
+  const counts = new Map<string, number>();
+  for (const t of txs) {
+    const m = (t.date || '').slice(0, 7);
+    if (!m) continue;
+    counts.set(m, (counts.get(m) || 0) + 1);
+  }
+  let best = '';
+  let max = 0;
+  for (const [m, c] of counts) {
+    if (c > max) { max = c; best = m; }
+  }
+  return best || new Date().toISOString().slice(0, 7);
+}
+
+function shiftMonth(ym: string, delta: number): string {
+  const [y, m] = ym.split('-').map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function formatMonthLabel(ym: string): string {
+  const [y, m] = ym.split('-').map(Number);
+  return `${MONTH_LABELS_FULL[m - 1]} ${y}`;
+}
+
+function MonthConfirm({ month, onChange, count }: { month: string; onChange: (m: string) => void; count: number }) {
+  return (
+    <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm">
+      <span className="text-muted-foreground text-xs">Resumen detectado:</span>
+      <span className="font-medium text-foreground">{formatMonthLabel(month)}</span>
+      <div className="flex items-center gap-1">
+        <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => onChange(shiftMonth(month, -1))}>
+          <ChevronLeft className="h-3.5 w-3.5" />
+        </Button>
+        <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => onChange(shiftMonth(month, 1))}>
+          <ChevronRight className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+      <span className="text-xs text-muted-foreground">— {count} transacciones</span>
+    </div>
+  );
+}
 
 function formatDateGroupLabel(dateStr: string): string {
   const d = new Date(dateStr + 'T12:00:00');
@@ -54,6 +122,56 @@ function MerchantAvatar({ tx }: { tx: any; cat?: any }) {
   return <MerchantLogo name={name} domain={domain} size={40} />;
 }
 
+const IMPORT_REQUIRED: Record<string, string> = {
+  'arq': 'arq',
+  'dolarapp': 'arq',
+  'mercado pago': 'mercadopago',
+  'mercadopago': 'mercadopago',
+  'galicia': 'galicia',
+};
+
+function getImportSource(accountName: string): string | null {
+  const lower = (accountName || '').toLowerCase();
+  for (const [key, src] of Object.entries(IMPORT_REQUIRED)) {
+    if (lower.includes(key)) return src;
+  }
+  return null;
+}
+
+function ConcilRow({ row, onImport }: { row: any; onImport: () => void }) {
+  return (
+    <div className="flex items-center gap-3 py-2">
+      <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center shrink-0">
+        <ArrowLeftRight className="h-3.5 w-3.5 text-muted-foreground" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-foreground truncate">
+          {row.fromName} → {row.toName}
+        </p>
+        <p className="text-xs text-muted-foreground">
+          {format(new Date(row.date + 'T12:00:00'), "d MMM", { locale: es })}
+        </p>
+      </div>
+      <div className="text-sm font-semibold tabular-nums text-foreground shrink-0">
+        {row.currency !== 'USD'
+          ? `${row.currency} ${row.amount.toLocaleString('es-AR', { maximumFractionDigits: 0 })}`
+          : `$${row.amountUSD.toFixed(0)}`}
+      </div>
+      {row.isImported === true && (
+        <Badge variant="secondary" className="text-[10px] shrink-0">✓ conciliado</Badge>
+      )}
+      {row.isImported === false && (
+        <Button size="sm" variant="outline" className="h-7 text-xs shrink-0" onClick={onImport}>
+          ⚠ importar
+        </Button>
+      )}
+      {row.isImported === null && (
+        <Badge variant="outline" className="text-[10px] shrink-0">efectivo</Badge>
+      )}
+    </div>
+  );
+}
+
 export default function Transactions() {
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
@@ -79,13 +197,65 @@ export default function Transactions() {
   const deleteTx = useDeleteTransaction();
   const updateTx = useUpdateTransaction();
   const { hasDemoData, onCleared: onDemoCleared } = useDemoData();
+  const { data: importLog } = useImportLog();
+  const arsToUsd = useLatestFxRate('ARS', 'USD');
+  const qc = useQueryClient();
+
+  // Outgoing transfers (last 2 months)
+  const { data: transferTxs } = useQuery({
+    queryKey: ['outgoing-transfers'],
+    queryFn: async () => {
+      const twoMonthsAgo = format(subMonths(new Date(), 2), 'yyyy-MM-01');
+      const { data } = await supabase
+        .from('transactions')
+        .select('id, date, amount, amount_usd, currency, account_id, description, linked_transfer_id')
+        .eq('type', 'transfer')
+        .lt('amount', 0)
+        .gte('date', twoMonthsAgo)
+        .order('date', { ascending: false });
+      return data || [];
+    },
+  });
+
+  const concilRows = useMemo(() => {
+    if (!transferTxs || !accounts) return [];
+    return transferTxs.map((tx: any) => {
+      const fromAcc = accounts.find(a => a.id === tx.account_id);
+      const counterTx = transferTxs.find((ct: any) =>
+        ct.linked_transfer_id === tx.id || tx.linked_transfer_id === ct.id
+      );
+      const toAcc = accounts.find(a => a.id === counterTx?.account_id);
+      const month = tx.date.slice(0, 7);
+      const importSource = getImportSource(toAcc?.name || '');
+      const isImported = importSource
+        ? (importLog?.some(l => l.source === importSource && l.month === month) ?? false)
+        : null;
+
+      return {
+        date: tx.date,
+        month,
+        fromName: fromAcc?.name || 'Cuenta',
+        toName: toAcc?.name || tx.description || '—',
+        amountUSD: Math.abs(Number(tx.amount_usd)),
+        amount: Math.abs(Number(tx.amount)),
+        currency: fromAcc?.currency || 'USD',
+        importSource,
+        isImported,
+        toAccName: toAcc?.name || '',
+      };
+    });
+  }, [transferTxs, accounts, importLog]);
+
+  const filtered = useMemo(() => {
+    return (transactions || []).filter(tx => {
+      if (tx.type === 'transfer' || (tx.type as any) === 'adjustment') return false;
+      if (uncategorizedOnly && tx.category_id) return false;
+      return true;
+    });
+  }, [transactions, uncategorizedOnly]);
 
   const grouped = useMemo(() => {
-    if (!transactions) return [];
-    const filtered = uncategorizedOnly
-      ? transactions.filter(tx => !tx.category_id)
-      : transactions;
-    const groups: { date: string; label: string; txs: typeof transactions }[] = [];
+    const groups: { date: string; label: string; txs: typeof filtered }[] = [];
     let currentDate = '';
     filtered.forEach(tx => {
       if (tx.date !== currentDate) {
@@ -95,7 +265,93 @@ export default function Transactions() {
       groups[groups.length - 1].txs.push(tx);
     });
     return groups;
-  }, [transactions, uncategorizedOnly]);
+  }, [filtered]);
+
+  // Inline import dialog state
+  const [importTarget, setImportTarget] = useState<any>(null);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importRows, setImportRows] = useState<any[]>([]);
+  const [importProcessing, setImportProcessing] = useState(false);
+  const [importingNow, setImportingNow] = useState(false);
+  const [importMonth, setImportMonth] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleInlineProcess() {
+    if (!importFile || !importTarget) return;
+    setImportProcessing(true);
+    try {
+      let parsed: any[] = [];
+      if (importTarget.importSource === 'mercadopago') {
+        const buf = await importFile.arrayBuffer();
+        parsed = parseMercadoPago(buf, arsToUsd || 0);
+      } else if (importTarget.importSource === 'arq') {
+        const text = await extractPdfText(importFile);
+        parsed = parseArqStatements('', text, arsToUsd || 0);
+      }
+      const ids = parsed.map(p => p.external_id);
+      const { data: existing } = await supabase
+        .from('transactions')
+        .select('external_id')
+        .in('external_id', ids);
+      const dupSet = new Set((existing || []).map((r: any) => r.external_id));
+      setImportRows(parsed.map(p => ({ ...p, duplicate: dupSet.has(p.external_id) })));
+      setImportMonth(detectPredominantMonth(parsed));
+    } catch (e: any) {
+      toast.error(e.message || 'Error al procesar');
+    } finally {
+      setImportProcessing(false);
+    }
+  }
+
+  async function handleInlineImport() {
+    if (!importTarget || !importMonth) return;
+    setImportingNow(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+      const toImport = importRows.filter(r => !r.duplicate);
+      const targetAcc = accounts?.find(a =>
+        a.name.toLowerCase().includes((importTarget.toAccName || '').toLowerCase().split(' ')[0])
+      );
+      if (!targetAcc) { toast.error('No se encontró la cuenta destino'); return; }
+
+      const payload = toImport.map(r => ({
+        user_id: user.id,
+        account_id: targetAcc.id,
+        date: r.date,
+        description: r.description,
+        amount: r.amountARS > 0 ? -r.amountARS : -r.amountUSD,
+        currency: r.amountARS > 0 ? 'ARS' : 'USD',
+        fx_rate: arsToUsd || 0,
+        amount_usd: -r.amountUSD,
+        type: (r.type === 'transfer' ? 'transfer' : 'expense') as any,
+        external_id: r.external_id,
+      }));
+
+      const { error } = await supabase.from('transactions').insert(payload);
+      if (error) throw error;
+
+      await supabase.from('import_log').upsert({
+        user_id: user.id,
+        source: importTarget.importSource,
+        month: importMonth,
+        transaction_count: toImport.length,
+        imported_at: new Date().toISOString(),
+      }, { onConflict: 'user_id,source,month' });
+
+      qc.invalidateQueries({ queryKey: ['transactions'] });
+      qc.invalidateQueries({ queryKey: ['import-log'] });
+      qc.invalidateQueries({ queryKey: ['outgoing-transfers'] });
+      toast.success(`${toImport.length} transacciones importadas`);
+      setImportTarget(null);
+      setImportFile(null);
+      setImportRows([]);
+    } catch (e: any) {
+      toast.error(e.message || 'Error al importar');
+    } finally {
+      setImportingNow(false);
+    }
+  }
 
   const handleDelete = async (id: string) => {
     try { await deleteTx.mutateAsync(id); toast.success('Transaction deleted'); }
@@ -116,6 +372,23 @@ export default function Transactions() {
     <div className="space-y-5">
       {hasDemoData && <DemoDataBanner onCleared={onDemoCleared} />}
       <h1 className="text-2xl font-bold text-foreground">Transactions</h1>
+
+      {/* Reconciliation Panel */}
+      {concilRows.length > 0 && (
+        <div className="rounded-xl border border-border bg-card p-4">
+          <div className="flex items-baseline justify-between mb-2">
+            <h2 className="text-sm font-semibold text-foreground">Transferencias entre cuentas</h2>
+            <span className="text-xs text-muted-foreground capitalize">
+              {format(new Date(), 'MMMM yyyy', { locale: es })}
+            </span>
+          </div>
+          <div className="divide-y divide-border">
+            {concilRows.map((row, i) => (
+              <ConcilRow key={i} row={row} onImport={() => setImportTarget(row)} />
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="space-y-2">
@@ -307,6 +580,93 @@ export default function Transactions() {
               onSuccess={() => setEditTx(null)}
             />
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Inline Import Dialog */}
+      <Dialog
+        open={!!importTarget}
+        onOpenChange={(o) => {
+          if (!o) {
+            setImportTarget(null);
+            setImportFile(null);
+            setImportRows([]);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Importar extracto — {importTarget?.toAccName}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div
+              className="border-2 border-dashed border-border rounded-lg p-4 flex flex-col items-center gap-2 hover:bg-muted/30 transition-colors cursor-pointer"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <FileSpreadsheet className="h-7 w-7 text-muted-foreground" />
+              <p className="text-xs font-medium text-foreground">
+                {importFile
+                  ? importFile.name
+                  : importTarget?.importSource === 'mercadopago'
+                    ? 'Reporte MercadoPago (.xlsx)'
+                    : 'Estado ARS (.pdf)'}
+              </p>
+              {importFile && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); setImportFile(null); setImportRows([]); }}
+                  className="text-muted-foreground hover:text-destructive"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={importTarget?.importSource === 'mercadopago' ? '.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : 'application/pdf'}
+                className="hidden"
+                onChange={(e) => { setImportFile(e.target.files?.[0] || null); setImportRows([]); }}
+              />
+            </div>
+
+            {importFile && importRows.length === 0 && (
+              <Button onClick={handleInlineProcess} disabled={importProcessing} className="w-full">
+                {importProcessing ? 'Procesando...' : 'Procesar archivo'}
+              </Button>
+            )}
+
+            {importRows.length > 0 && (
+              <>
+                <MonthConfirm month={importMonth} onChange={setImportMonth} count={importRows.length} />
+                <div className="rounded-lg border border-border overflow-hidden max-h-80 overflow-y-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Fecha</TableHead>
+                        <TableHead>Descripción</TableHead>
+                        <TableHead className="text-right">Monto</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {importRows.slice(0, 20).map((r, i) => (
+                        <TableRow key={i} className={r.duplicate ? 'opacity-50' : ''}>
+                          <TableCell className="text-xs">{r.date}</TableCell>
+                          <TableCell className="text-xs truncate max-w-[200px]">{r.description}</TableCell>
+                          <TableCell className="text-xs text-right tabular-nums">
+                            {r.amountARS > 0
+                              ? `ARS ${r.amountARS.toLocaleString('es-AR', { maximumFractionDigits: 0 })}`
+                              : `$${r.amountUSD.toFixed(2)}`}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+                <Button onClick={handleInlineImport} disabled={importingNow} className="w-full">
+                  {importingNow ? 'Importando...' : `Importar ${importRows.filter(r => !r.duplicate).length} transacciones`}
+                </Button>
+              </>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>
