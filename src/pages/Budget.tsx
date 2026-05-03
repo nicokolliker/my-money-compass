@@ -290,8 +290,8 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                     return s + cat.recurringMonthly + variable;
                   }, 0);
                   return (
-                    <>
-                      <tr key={cat.id} className="border-b border-border hover:bg-muted/20">
+                    <React.Fragment key={cat.id}>
+                      <tr className="border-b border-border hover:bg-muted/20">
                         <td
                           className="px-3 py-2 sticky left-0 z-10"
                           style={{ background: 'hsl(var(--card))', boxShadow: '2px 0 4px -2px rgba(0,0,0,0.08)' }}
