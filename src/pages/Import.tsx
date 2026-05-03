@@ -406,11 +406,6 @@ export default function ImportPage() {
   const mpDupCount = mpRows.filter((r) => r.duplicate).length;
 
   // ---- Splitwise state ----
-
-
-
-
-  // ---- Splitwise state ----
   const [swFile, setSwFile] = useState<File | null>(null);
   const [swProcessing, setSwProcessing] = useState(false);
   const [swRows, setSwRows] = useState<(SplitwiseRow & { selected: boolean; duplicate: boolean })[]>([]);
