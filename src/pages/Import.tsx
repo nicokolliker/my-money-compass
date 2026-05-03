@@ -262,10 +262,25 @@ export default function ImportPage() {
       const { error } = await supabase.from('transactions').insert(payload);
       if (error) throw error;
 
+      if (arqMonth) {
+        await supabase.from('import_log').upsert(
+          {
+            user_id: user.id,
+            source: 'arq',
+            month: arqMonth,
+            transaction_count: toImport.length,
+            imported_at: new Date().toISOString(),
+          },
+          { onConflict: 'user_id,source,month' },
+        );
+        qc.invalidateQueries({ queryKey: ['import-log'] });
+      }
+
       const dupCount = rows.filter((r) => r.duplicate).length;
       setResultMsg(`${toImport.length} transacciones importadas, ${dupCount} duplicados ignorados`);
       toast.success('Importación completa');
       setRows([]);
+      setArqMonth('');
       setArsFile(null);
       setUsdFile(null);
     } catch (e: any) {
