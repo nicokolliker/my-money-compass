@@ -21,6 +21,11 @@ import { DemoDataBanner } from '@/components/DemoDataBanner';
 import { useDemoData } from '@/hooks/useDemoData';
 import { Badge } from '@/components/ui/badge';
 import { FundFlowDiagram } from '@/components/accounts/FundFlowDiagram';
+import { useQueryClient } from '@tanstack/react-query';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 
 
@@ -54,27 +59,46 @@ export default function Accounts() {
 
 
 
+  const qc = useQueryClient();
+
   const sections = useMemo(() => {
     if (!accounts) return [];
+    const visibleAccounts = accounts.filter(a =>
+      !/deel/i.test(a.name) &&
+      !/deel/i.test((a as any).institution || '') &&
+      !['debt', 'credit_card'].includes(a.type)
+    );
     const result: { key: string; label: string; icon: string; isCustomGroup: boolean; accounts: typeof accounts }[] = [];
     const assignedIds = new Set<string>();
 
     if (groups && groups.length > 0) {
       for (const g of groups) {
-        const groupAccounts = accounts.filter(a => a.group_id === g.id);
+        const groupAccounts = visibleAccounts.filter(a => a.group_id === g.id);
         result.push({ key: g.id, label: g.name, icon: g.icon || '📁', isCustomGroup: true, accounts: groupAccounts });
         groupAccounts.forEach(a => assignedIds.add(a.id));
       }
-      const ungrouped = accounts.filter(a => !assignedIds.has(a.id));
+      const ungrouped = visibleAccounts.filter(a => !assignedIds.has(a.id));
       if (ungrouped.length > 0) {
         result.push({ key: 'ungrouped', label: 'Ungrouped', icon: '📦', isCustomGroup: false, accounts: ungrouped });
       }
     } else {
-      result.push({ key: 'all', label: 'All Accounts', icon: '🏦', isCustomGroup: false, accounts });
+      result.push({ key: 'all', label: 'All Accounts', icon: '🏦', isCustomGroup: false, accounts: visibleAccounts });
     }
 
     return result;
   }, [accounts, groups]);
+
+  async function handleDeleteAccount(id: string) {
+    try {
+      const { error } = await supabase.from('accounts').update({ is_active: false }).eq('id', id);
+      if (error) throw error;
+      toast.success('Cuenta eliminada');
+      qc.invalidateQueries({ queryKey: ['accounts'] });
+      qc.invalidateQueries({ queryKey: ['account-balances'] });
+    } catch (e: any) {
+      toast.error(e.message || 'Error al eliminar');
+    }
+  }
 
   const handleSave = async () => {
     try {
