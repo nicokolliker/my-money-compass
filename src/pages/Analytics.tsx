@@ -158,10 +158,15 @@ export default function Analytics() {
     if (!allTransactions) return [];
     const expMap: Record<string, number> = {};
     const incMap: Record<string, number> = {};
-    filterTx(allTransactions, '2000-01-01', '2099-12-31').forEach(t => {
+    allTransactions.forEach(t => {
+      if (accountFilter !== 'all' && t.account_id !== accountFilter) return;
       const month = t.date.substring(0, 7);
-      if (t.type === 'expense') expMap[month] = (expMap[month] || 0) + Math.abs(Number(t.amount_usd));
-      if (t.type === 'income') incMap[month] = (incMap[month] || 0) + Number(t.amount_usd);
+      if (t.type === 'expense') {
+        if (categoryFilter !== 'all' && t.category_id !== categoryFilter) return;
+        expMap[month] = (expMap[month] || 0) + Math.abs(Number(t.amount_usd));
+      } else if (t.type === 'income') {
+        incMap[month] = (incMap[month] || 0) + Number(t.amount_usd);
+      }
     });
     const months = new Set([...Object.keys(expMap), ...Object.keys(incMap)]);
     return Array.from(months).sort().slice(-12).map(month => ({
@@ -179,7 +184,9 @@ export default function Analytics() {
     }
     const catTotals: Record<string, Record<string, number>> = {};
     allTransactions
-      .filter(t => t.type === 'expense' && (!accountFilter || accountFilter === 'all' || t.account_id === accountFilter))
+      .filter(t => t.type === 'expense'
+        && (!accountFilter || accountFilter === 'all' || t.account_id === accountFilter)
+        && (categoryFilter === 'all' || (subcatToParent[t.category_id] || t.category_id) === categoryFilter))
       .forEach(t => {
         const month = t.date.substring(0, 7);
         if (!months.includes(month)) return;
@@ -199,7 +206,7 @@ export default function Analytics() {
       });
       return entry;
     });
-  }, [allTransactions, categoryTree, subcatToParent, accountFilter]);
+  }, [allTransactions, categoryTree, subcatToParent, accountFilter, categoryFilter]);
 
   const visibleCategoriesForChart = useMemo(
     () => categoryTree.filter(cat => categoryMonthly.some(m => (m[cat.id] || 0) > 0)),
