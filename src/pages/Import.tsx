@@ -387,7 +387,8 @@ export default function ImportPage() {
       setBcResultMsg(`${toImport.length} consumos importados, ${dups} duplicados ignorados`);
       toast.success('Importación completa');
       setBcRows([]);
-      setBcFile(null);
+      setBcIebraFile(null);
+      setBcKollikerFile(null);
     } catch (e: any) {
       toast.error(e.message || 'Error al importar');
     } finally {
