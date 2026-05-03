@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useRules, useCreateRule, useDeleteRule } from '@/hooks/useRules';
@@ -107,9 +107,9 @@ function RulesPanel() {
         )}
       </div>
 
-      <Sheet open={showForm} onOpenChange={setShowForm}>
-        <SheetContent side="bottom" className="rounded-t-2xl">
-          <SheetHeader><SheetTitle>New rule</SheetTitle></SheetHeader>
+      <Dialog open={showForm} onOpenChange={setShowForm}>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>New rule</DialogTitle></DialogHeader>
           <div className="space-y-3 mt-4">
             <div>
               <Label className="text-xs">Keyword</Label>
@@ -136,8 +136,8 @@ function RulesPanel() {
             </div>
             <Button className="w-full" onClick={handleSave} disabled={createRule.isPending}>Save rule</Button>
           </div>
-        </SheetContent>
-      </Sheet>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

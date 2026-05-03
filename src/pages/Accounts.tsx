@@ -2,7 +2,6 @@ import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -209,9 +208,9 @@ export default function Accounts() {
       })}
 
       {/* Group Form */}
-      <Sheet open={showGroupForm} onOpenChange={setShowGroupForm}>
-        <SheetContent side="bottom" className="h-auto rounded-t-2xl">
-          <SheetHeader><SheetTitle>{editGroupId ? 'Edit Group' : 'New Account Group'}</SheetTitle></SheetHeader>
+      <Dialog open={showGroupForm} onOpenChange={setShowGroupForm}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>{editGroupId ? 'Edit Group' : 'New Account Group'}</DialogTitle></DialogHeader>
           <div className="space-y-4 mt-4 pb-4">
             <div><Label>Group Name</Label><Input value={newGroupName} onChange={e => setNewGroupName(e.target.value)} className="mt-1 rounded-xl" placeholder="e.g. Foreign Accounts" /></div>
             <div className="flex gap-2">
@@ -225,14 +224,14 @@ export default function Accounts() {
               </Button>
             </div>
           </div>
-        </SheetContent>
-      </Sheet>
+        </DialogContent>
+      </Dialog>
 
       {/* Account Form */}
-      <Sheet open={showForm} onOpenChange={setShowForm}>
-        <SheetContent side="bottom" className="h-[80vh] rounded-t-2xl">
-          <SheetHeader><SheetTitle>{editId ? 'Edit Account' : 'New Account'}</SheetTitle></SheetHeader>
-          <div className="space-y-4 mt-4 overflow-y-auto">
+      <Dialog open={showForm} onOpenChange={setShowForm}>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>{editId ? 'Edit Account' : 'New Account'}</DialogTitle></DialogHeader>
+          <div className="space-y-4 mt-4">
             <div><Label>Name</Label><Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="mt-1 rounded-xl" /></div>
             <div>
               <Label>Group</Label>
@@ -265,8 +264,8 @@ export default function Accounts() {
             <div><Label>Notes</Label><Input value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} className="mt-1 rounded-xl" /></div>
             <Button className="w-full h-12 rounded-xl" onClick={handleSave} disabled={createAccount.isPending || updateAccount.isPending}>Save</Button>
           </div>
-        </SheetContent>
-      </Sheet>
+        </DialogContent>
+      </Dialog>
 
       {/* Add Account Choice Dialog */}
       <Dialog open={showAddChoice} onOpenChange={setShowAddChoice}>
