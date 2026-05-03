@@ -639,6 +639,7 @@ export default function ImportPage() {
   const [swResultMsg, setSwResultMsg] = useState<string | null>(null);
   const [swMonth, setSwMonth] = useState<string>('');
   const [swCutoff, setSwCutoff] = useState<string>('2026-05-01');
+  const { data: categories } = useCategories();
 
   const cashUsdAccount = useMemo(
     () =>
