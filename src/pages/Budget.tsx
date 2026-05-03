@@ -393,8 +393,8 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                   </tr>
                 )}
 
-                {/* Variable category rows */}
-                {variableExpanded && tree.map(cat => {
+                {/* Variable category rows (split view) */}
+                {tableView === 'split' && variableExpanded && tree.map(cat => {
                   const yearTotal = MONTHS.reduce((s, _, i) => {
                     const variable = isPast(i) ? getActualSpending(cat.id, i) : getBudgetAmount(cat.id, i);
                     return s + variable;
@@ -420,52 +420,36 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                             )}
                           </div>
                         </td>
-                        {MONTHS.map((_, i) => {
-                          const variable = getBudgetAmount(cat.id, i);
-                          const actual = getActualSpending(cat.id, i);
-                          const isOver = variable > 0 && actual > variable;
-                          return (
-                            <td
-                              key={i}
-                              className={cn('px-1 py-1 text-center tabular-nums align-middle', isCurrent(i) && 'bg-primary/5')}
-                            >
-                              {isPast(i) ? (
-                                <div className={cn('text-[11px]', actual > 0 ? 'text-foreground' : 'text-muted-foreground')}>
-                                  {actual > 0 ? fmt(actual) : '—'}
-                                </div>
-                              ) : isCurrent(i) ? (
-                                <div className="space-y-0.5">
-                                  <div className={cn('text-[10px]', isOver ? 'text-destructive font-semibold' : 'text-muted-foreground')}>
-                                    {actual > 0 ? fmt(actual) : '—'}
-                                  </div>
-                                  <Input
-                                    key={`${cat.id}-cur-${selectedYear}-${i}-${variable}`}
-                                    type="number"
-                                    defaultValue={variable || ''}
-                                    placeholder="0"
-                                    className={cn('h-6 text-[11px] text-center px-1 tabular-nums', noSpinClass)}
-                                    onBlur={(e) => {
-                                      const v = parseFloat(e.target.value);
-                                      if (!isNaN(v)) saveBudget(cat.id, i, v);
-                                    }}
-                                  />
-                                </div>
-                              ) : (
-                                <Input
-                                  key={`${cat.id}-fut-${selectedYear}-${i}-${variable}`}
-                                  type="number"
-                                  defaultValue={variable || ''}
-                                  placeholder="0"
-                                  className={cn('h-6 text-[11px] text-center px-1 tabular-nums', noSpinClass)}
-                                  onBlur={(e) => {
-                                    const v = parseFloat(e.target.value);
-                                    if (!isNaN(v)) saveBudget(cat.id, i, v);
-                                  }}
-                                />
-                              )}
-                            </td>
-                          );
-                        })}
+                        {MONTHS.map((_, i) => (
+                          <td
+                            key={i}
+                            className={cn('px-1 py-1 text-center tabular-nums align-middle', isCurrent(i) && 'bg-primary/5')}
+                          >
+                            {isCurrent(i) ? (
+                              <Input
+                                key={`${cat.id}-${selectedYear}-${i}-${getBudgetAmount(cat.id, i)}`}
+                                type="number"
+                                defaultValue={getBudgetAmount(cat.id, i) || ''}
+                                placeholder={getActualSpending(cat.id, i) > 0 ? String(Math.round(getActualSpending(cat.id, i))) : '0'}
+                                className={cn('h-7 text-xs text-center px-1 tabular-nums bg-primary/5', noSpinClass)}
+                                onBlur={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) saveBudget(cat.id, i, v); }}
+                              />
+                            ) : isPast(i) ? (
+                              <span className={cn('tabular-nums text-[11px]', getActualSpending(cat.id, i) > 0 ? 'text-foreground' : 'text-muted-foreground')}>
+                                {getActualSpending(cat.id, i) > 0 ? fmt(getActualSpending(cat.id, i)) : '—'}
+                              </span>
+                            ) : (
+                              <Input
+                                key={`${cat.id}-future-${selectedYear}-${i}-${getBudgetAmount(cat.id, i)}`}
+                                type="number"
+                                defaultValue={getBudgetAmount(cat.id, i) || ''}
+                                placeholder="0"
+                                className={cn('h-7 text-xs text-center px-1 tabular-nums', noSpinClass)}
+                                onBlur={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) saveBudget(cat.id, i, v); }}
+                              />
+                            )}
+                          </td>
+                        ))}
                         <td className="px-3 py-2 text-right tabular-nums font-semibold text-foreground">{fmt(yearTotal)}</td>
                       </tr>
 
@@ -511,6 +495,43 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                         );
                       })}
                     </React.Fragment>
+                  );
+                })}
+
+                {/* Consolidated rows */}
+                {tableView === 'consolidated' && tree.map(cat => {
+                  const yearTotal = MONTHS.reduce((s, _, i) => {
+                    const fixed = cat.recurringMonthly;
+                    const variable = isPast(i) ? getActualSpending(cat.id, i) : getBudgetAmount(cat.id, i);
+                    return s + fixed + variable;
+                  }, 0);
+                  return (
+                    <tr key={`cons-${cat.id}`} className="border-b border-border hover:bg-muted/20">
+                      <td
+                        className="px-3 py-2 sticky left-0 z-10"
+                        style={{ background: 'hsl(var(--card))', boxShadow: '2px 0 4px -2px rgba(0,0,0,0.06)' }}
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span>{cat.icon}</span>
+                          <span className="text-xs font-medium">{cat.name}</span>
+                        </div>
+                      </td>
+                      {MONTHS.map((_, i) => {
+                        const fixed = cat.recurringMonthly;
+                        const variable = isPast(i) ? getActualSpending(cat.id, i) : getBudgetAmount(cat.id, i);
+                        const total = fixed + variable;
+                        return (
+                          <td key={i} className={cn('px-2 py-2 text-center tabular-nums text-xs', isCurrent(i) && 'bg-primary/5')}>
+                            {total > 0 ? (
+                              <span className={isPast(i) ? 'text-foreground' : 'text-muted-foreground'}>
+                                {fmt(total)}
+                              </span>
+                            ) : '—'}
+                          </td>
+                        );
+                      })}
+                      <td className="px-2 py-2 text-right tabular-nums text-xs font-medium">{fmt(yearTotal)}</td>
+                    </tr>
                   );
                 })}
 
