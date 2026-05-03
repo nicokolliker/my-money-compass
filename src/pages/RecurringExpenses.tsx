@@ -512,84 +512,112 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
                   </div>
                   {!collapsed && (
                   <div className="space-y-2">
-                    {c.isDigital && (
-                      <>
-                        <div
-                          className="px-3 py-2 rounded-lg bg-muted/20 border border-border/50 flex items-center justify-between cursor-pointer"
-                          onClick={() => setDigitalSubExpanded(v => !v)}
-                        >
-                          <span className="text-xs text-muted-foreground">Ver por subcategoría</span>
-                          <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${digitalSubExpanded ? 'rotate-180' : ''}`} />
-                        </div>
-                        {digitalSubExpanded && (
-                          <div className="px-4 py-3 rounded-lg bg-muted/10 border border-border/50 space-y-1.5">
-                            {Object.entries(DIGITAL_SUBTYPES).map(([subKey, sub]) => {
-                              const subItems = group.items.filter((i: any) =>
-                                i.is_active && getDigitalSubtype(i.name) === subKey
-                              );
-                              const subTotal = subItems.reduce((s: number, i: any) => {
-                                const amountUsd = toUSD(Math.abs(Number(i.amount)), i.currency || 'USD', fxList);
-                                return s + toMonthlyAmount(amountUsd, i.frequency);
-                              }, 0);
-                              if (subTotal === 0 && subItems.length === 0) return null;
-                              return (
-                                <div key={subKey} className="flex items-center justify-between text-xs">
-                                  <div className="flex items-center gap-1.5 text-muted-foreground">
-                                    <span>{sub.icon}</span>
-                                    <span>{sub.label}</span>
-                                    <span className="text-muted-foreground/60">· {subItems.length} item{subItems.length !== 1 ? 's' : ''}</span>
-                                  </div>
-                                  <span className="font-medium text-foreground tabular-nums">{formatUSD(subTotal)}/mo</span>
-                                </div>
-                              );
-                            })}
+                    {c.isDigital ? (
+                      Object.entries(DIGITAL_SUBTYPES).map(([subKey, sub]) => {
+                        const subItems = group.items.filter((i: any) => getDigitalSubtype(i.name) === subKey);
+                        if (subItems.length === 0) return null;
+                        const subTotal = subItems.reduce((s: number, i: any) => {
+                          const amountUsd = toUSD(Math.abs(Number(i.amount)), i.currency || 'USD', fxList);
+                          return s + toMonthlyAmount(amountUsd, i.frequency);
+                        }, 0);
+                        const subCollapsed = !!collapsedSubgroups[subKey];
+                        return (
+                          <div key={subKey} className="space-y-2 ml-3 pl-3 border-l-2 border-border/40">
+                            <div
+                              className="flex items-center justify-between px-1 cursor-pointer select-none"
+                              onClick={() => toggleSubgroup(subKey)}
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="inline-flex items-center justify-center w-6 h-6 rounded-md text-sm bg-muted">{sub.icon}</span>
+                                <span className="font-medium text-foreground text-sm">{sub.label}</span>
+                                <span className="text-xs text-muted-foreground">· {subItems.length}</span>
+                                <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${subCollapsed ? '' : 'rotate-180'}`} />
+                              </div>
+                              <span className="text-sm font-semibold tabular-nums text-foreground">{formatUSD(subTotal)}</span>
+                            </div>
+                            {!subCollapsed && (
+                              <div className="space-y-2">
+                                {subItems.map((item: any) => {
+                                  const acc = item.accounts;
+                                  const state = itemState[item.id] || 'none';
+                                  const badge = STATUS_STYLES[state];
+                                  return (
+                                    <Card key={item.id}>
+                                      <CardContent className="flex items-center gap-3 py-3">
+                                        <MerchantLogo name={item.name} size={36} />
+                                        <div className="flex-1 min-w-0">
+                                          <p className="text-sm font-semibold text-foreground truncate">{item.name}</p>
+                                          <p className="text-xs text-muted-foreground truncate">
+                                            {acc?.name || '—'} · <span className="capitalize">{item.frequency}</span>
+                                          </p>
+                                        </div>
+                                        <div className="text-right shrink-0">
+                                          <p className="text-sm font-bold text-foreground tabular-nums">
+                                            {Number(item.amount).toLocaleString('en-US', { style: 'currency', currency: item.currency, maximumFractionDigits: item.currency === 'ARS' ? 0 : 2 })}
+                                          </p>
+                                          <span
+                                            className="inline-block mt-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                                            style={{ backgroundColor: badge.bg, color: badge.color }}
+                                          >
+                                            {badge.label}
+                                          </span>
+                                        </div>
+                                        <div className="flex items-center gap-1 shrink-0">
+                                          <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => openEdit(item)} aria-label="Edit">
+                                            <Pencil className="h-3.5 w-3.5" />
+                                          </Button>
+                                          <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-destructive" onClick={() => deleteItem.mutateAsync(item.id).then(() => toast.success('Deleted'))} aria-label="Delete">
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                          </Button>
+                                        </div>
+                                      </CardContent>
+                                    </Card>
+                                  );
+                                })}
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </>
+                        );
+                      })
+                    ) : (
+                      group.items.map((item: any) => {
+                        const acc = item.accounts;
+                        const state = itemState[item.id] || 'none';
+                        const badge = STATUS_STYLES[state];
+                        return (
+                          <Card key={item.id}>
+                            <CardContent className="flex items-center gap-3 py-3">
+                              <MerchantLogo name={item.name} size={36} />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-semibold text-foreground truncate">{item.name}</p>
+                                <p className="text-xs text-muted-foreground truncate">
+                                  {acc?.name || '—'} · <span className="capitalize">{item.frequency}</span>
+                                </p>
+                              </div>
+                              <div className="text-right shrink-0">
+                                <p className="text-sm font-bold text-foreground tabular-nums">
+                                  {Number(item.amount).toLocaleString('en-US', { style: 'currency', currency: item.currency, maximumFractionDigits: item.currency === 'ARS' ? 0 : 2 })}
+                                </p>
+                                <span
+                                  className="inline-block mt-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                                  style={{ backgroundColor: badge.bg, color: badge.color }}
+                                >
+                                  {badge.label}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1 shrink-0">
+                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => openEdit(item)} aria-label="Edit">
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-destructive" onClick={() => deleteItem.mutateAsync(item.id).then(() => toast.success('Deleted'))} aria-label="Delete">
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        );
+                      })
                     )}
-                    {group.items.map((item: any) => {
-                      const acc = item.accounts;
-                      const state = itemState[item.id] || 'none';
-                      const badge = STATUS_STYLES[state];
-                      const subLabel = c.isDigital && item.subtype ? subcatNameById[item.subtype] : null;
-                      return (
-                        <Card key={item.id}>
-                          <CardContent className="flex items-center gap-3 py-3">
-                            <MerchantLogo name={item.name} size={36} />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-semibold text-foreground truncate">{item.name}</p>
-                              <p className="text-xs text-muted-foreground truncate">
-                                {acc?.name || '—'} · <span className="capitalize">{item.frequency}</span>
-                                {subLabel && (
-                                  <span className="ml-1.5 inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-foreground/70 align-middle">
-                                    {subLabel}
-                                  </span>
-                                )}
-                              </p>
-                            </div>
-                            <div className="text-right shrink-0">
-                              <p className="text-sm font-bold text-foreground tabular-nums">
-                                {Number(item.amount).toLocaleString('en-US', { style: 'currency', currency: item.currency, maximumFractionDigits: item.currency === 'ARS' ? 0 : 2 })}
-                              </p>
-                              <span
-                                className="inline-block mt-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
-                                style={{ backgroundColor: badge.bg, color: badge.color }}
-                              >
-                                {badge.label}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-1 shrink-0">
-                              <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => openEdit(item)} aria-label="Edit">
-                                <Pencil className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-destructive" onClick={() => deleteItem.mutateAsync(item.id).then(() => toast.success('Deleted'))} aria-label="Delete">
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      );
-                    })}
                   </div>
                   )}
                 </div>
