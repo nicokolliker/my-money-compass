@@ -142,7 +142,15 @@ export default function Analytics() {
   const incomeTotal = displayIncomes.reduce((s, t) => s + Number(t.amount_usd), 0);
   const savingsRate = incomeTotal > 0 ? ((incomeTotal - totalExpenses) / incomeTotal * 100) : 0;
 
-  const fixedAmount = totalRecurringMonthly;
+  const periodMonths = useMemo(() => {
+    if (period === 'this_month' || period === 'last_month') return 1;
+    if (period === 'last_3') return 3;
+    if (period === 'ytd') return new Date().getMonth() + 1;
+    if (period === 'q1' || period === 'q2' || period === 'q3' || period === 'q4') return 3;
+    return 1;
+  }, [period]);
+
+  const fixedAmount = totalRecurringMonthly * (period === 'all' ? 1 : periodMonths);
   const variableAmount = Math.max(0, totalExpenses - fixedAmount);
   const fixedPct = totalExpenses > 0 ? Math.min((fixedAmount / totalExpenses) * 100, 100) : 0;
 
