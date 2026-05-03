@@ -3,6 +3,7 @@
 
 export const BRAND_DOMAINS: Record<string, string> = {
   // Financial
+  'splitwise':          'splitwise.com',
   'wise':               'wise.com',
   'mercado pago':       'mercadopago.com',
   'mercadopago':        'mercadopago.com',
