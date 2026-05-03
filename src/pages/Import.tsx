@@ -372,10 +372,24 @@ export default function ImportPage() {
       });
       const { error } = await supabase.from('transactions').insert(payload);
       if (error) throw error;
+      if (mpMonth) {
+        await supabase.from('import_log').upsert(
+          {
+            user_id: user.id,
+            source: 'mercadopago',
+            month: mpMonth,
+            transaction_count: toImport.length,
+            imported_at: new Date().toISOString(),
+          },
+          { onConflict: 'user_id,source,month' },
+        );
+        qc.invalidateQueries({ queryKey: ['import-log'] });
+      }
       const dups = mpRows.filter((r) => r.duplicate).length;
       setMpResultMsg(`${toImport.length} transacciones importadas, ${dups} duplicados ignorados`);
       toast.success('Importación completa');
       setMpRows([]);
+      setMpMonth('');
       setMpFile(null);
     } catch (e: any) {
       toast.error(e.message || 'Error al importar');
