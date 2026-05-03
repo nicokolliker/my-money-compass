@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 import { DemoDataBanner } from '@/components/DemoDataBanner';
 import { useDemoData } from '@/hooks/useDemoData';
 import { Badge } from '@/components/ui/badge';
+import { FundFlowDiagram } from '@/components/accounts/FundFlowDiagram';
 
 function AccountLogo({ name, institution }: { name: string; institution?: string | null }) {
   // Try institution name first (e.g. "Wise", "Banco Galicia"), then fall back to account name
@@ -141,6 +142,8 @@ export default function Accounts() {
           <p className="text-3xl font-extrabold mt-1 tracking-tight">{formatUSD(totalNetWorth)}</p>
         </CardContent>
       </Card>
+
+      <FundFlowDiagram />
 
       {sections.map(section => {
         const sectionTotal = section.accounts.reduce((s, a) => s + a.computed_balance_usd, 0);
