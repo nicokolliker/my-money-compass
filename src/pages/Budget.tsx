@@ -281,7 +281,7 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                             type="number"
                             defaultValue={budgeted || ''}
                             placeholder="0"
-                            className="h-7 text-xs text-center px-1 tabular-nums"
+                            className={cn('h-7 text-xs text-center px-1 tabular-nums', noSpinClass)}
                             onBlur={(e) => {
                               const val = parseFloat(e.target.value);
                               if (!isNaN(val) && incomeCategoryId) saveBudget(incomeCategoryId, i, val);
