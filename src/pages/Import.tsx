@@ -466,6 +466,8 @@ export default function ImportPage() {
         <p className="text-sm text-muted-foreground">Importá estados de cuenta de tus integraciones</p>
       </div>
 
+      <ImportStatusPanel />
+
       {/* ARQ */}
       <Card>
         <CardHeader className="pb-2">
