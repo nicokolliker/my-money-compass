@@ -483,34 +483,60 @@ export default function Analytics() {
         </Card>
       )}
 
-      {/* TOP GASTOS DEL PERÍODO */}
-      {topExpenses.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Top gastos del período</CardTitle></CardHeader>
-          <CardContent className="space-y-3">
-            {topExpenses.map(t => {
-              const cat = categoryTree.find(c => c.id === (subcatToParent[t.category_id] || t.category_id));
-              const color = cat ? (getCategoryHex(cat.name, cat.color) || CATEGORY_COLORS[0]) : 'hsl(var(--muted-foreground))';
-              const name = t.merchant || t.description || 'Sin descripción';
-              return (
-                <div key={t.id} className="flex items-center gap-3">
-                  <MerchantLogo name={name} size={32} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">{name}</p>
-                    {cat && (
-                      <p className="text-xs text-muted-foreground flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color }} />
-                        {cat.name}
-                      </p>
-                    )}
+      {/* TOP GASTOS + TOP MERCHANTS — grid 2 cols */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {topExpenses.length > 0 && (
+          <Card>
+            <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Top gastos del período</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              {topExpenses.map(t => {
+                const cat = categoryTree.find(c => c.id === (subcatToParent[t.category_id] || t.category_id));
+                const color = cat ? (getCategoryHex(cat.name, cat.color) || CATEGORY_COLORS[0]) : 'hsl(var(--muted-foreground))';
+                const name = t.merchant || t.description || 'Sin descripción';
+                return (
+                  <div key={t.id} className="flex items-center gap-3">
+                    <MerchantLogo name={name} size={32} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">{name}</p>
+                      {cat && (
+                        <span
+                          className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md font-medium mt-0.5"
+                          style={{ backgroundColor: `${color}20`, color }}
+                        >
+                          {cat.name}
+                        </span>
+                      )}
+                    </div>
+                    <span className="font-bold text-foreground tabular-nums shrink-0">{formatUSD(Math.abs(Number(t.amount_usd)))}</span>
                   </div>
-                  <span className="font-bold text-foreground tabular-nums shrink-0">{formatUSD(Math.abs(Number(t.amount_usd)))}</span>
+                );
+              })}
+            </CardContent>
+          </Card>
+        )}
+
+        {topMerchants.length > 0 && (
+          <Card>
+            <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Top merchants</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              {topMerchants.map(m => (
+                <div key={m.name} className="flex items-center gap-3">
+                  <MerchantLogo name={m.name} size={32} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-foreground font-medium truncate">{m.name}</span>
+                      <span className="font-bold text-foreground tabular-nums shrink-0">{formatUSD(m.total)}</span>
+                    </div>
+                    <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden mt-1">
+                      <div className="h-full rounded-full bg-primary transition-all duration-500" style={{ width: `${(m.total / maxMerchant) * 100}%` }} />
+                    </div>
+                  </div>
                 </div>
-              );
-            })}
-          </CardContent>
-        </Card>
-      )}
+              ))}
+            </CardContent>
+          </Card>
+        )}
+      </div>
 
       {/* FIJOS vs VARIABLES */}
       <Card>
@@ -537,36 +563,11 @@ export default function Analytics() {
         </CardContent>
       </Card>
 
-      {/* TOP MERCHANTS */}
-      {topMerchants.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Top merchants</CardTitle></CardHeader>
-          <CardContent className="space-y-3">
-            {topMerchants.map(m => (
-              <div key={m.name} className="flex items-center gap-3">
-                <MerchantLogo name={m.name} size={32} />
-                <div className="flex-1 min-w-0">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-foreground font-medium truncate">{m.name}</span>
-                    <span className="font-bold text-foreground tabular-nums shrink-0">{formatUSD(m.total)}</span>
-                  </div>
-                  <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden mt-1">
-                    <div className="h-full rounded-full bg-primary transition-all duration-500" style={{ width: `${(m.total / maxMerchant) * 100}%` }} />
-                  </div>
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
       {/* SECCIÓN 2 — EVOLUCIÓN */}
-      <div className="pt-4 border-t border-border">
-        <h2 className="text-lg font-semibold text-foreground mb-1">Evolución · últimos 6 meses</h2>
-        <p className="text-xs text-muted-foreground mb-4">Tendencia independiente del filtro de período</p>
-      </div>
+      <Separator className="my-2" />
+      <h2 className="text-base font-semibold text-foreground">Evolución · últimos 6 meses</h2>
 
-      {/* EVOLUCIÓN MENSUAL */}
+      {/* INGRESOS VS GASTOS */}
       <Card>
         <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Ingresos vs Gastos</CardTitle></CardHeader>
         <CardContent>
@@ -601,27 +602,101 @@ export default function Analytics() {
               <span className="w-2.5 h-2.5 rounded-sm bg-destructive" /> Gastos
             </span>
           </div>
+          <div className="grid grid-cols-3 gap-3 mt-4 pt-3 border-t border-border">
+            <div>
+              <p className="text-xs text-muted-foreground">Promedio gastos</p>
+              <p className="text-sm font-bold text-destructive tabular-nums">{formatUSD(monthlyAverages.expenses)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Promedio ingresos</p>
+              <p className="text-sm font-bold text-emerald-600 tabular-nums">{formatUSD(monthlyAverages.income)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Ahorro promedio</p>
+              <p className={cn('text-sm font-bold tabular-nums', monthlyAverages.savings >= 0 ? 'text-emerald-600' : 'text-destructive')}>
+                {formatUSD(monthlyAverages.savings)}
+              </p>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
-      {/* TENDENCIAS POR CATEGORÍA */}
-      {categoryTrends.length > 0 && (
+      {/* EVOLUCIÓN % POR CATEGORÍA */}
+      {visibleCategoriesForChart.length > 0 && categoryShareLast6.length >= 2 && (
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Tendencias por categoría</CardTitle></CardHeader>
-          <CardContent className="space-y-2">
-            {categoryTrends.map(c => {
-              const isUp = c.delta > 0;
-              return (
-                <div key={c.id} className="flex items-center gap-2 text-sm py-1">
-                  <span className="text-base">{getCategoryIcon(c.name, c.icon)}</span>
-                  <span className="text-foreground font-medium flex-1 truncate">{c.name}</span>
-                  <span className={cn('flex items-center gap-1 font-semibold tabular-nums', isUp ? 'text-destructive' : 'text-emerald-600')}>
-                    {isUp ? <ArrowUp className="h-3.5 w-3.5" /> : <ArrowDown className="h-3.5 w-3.5" />}
-                    {Math.abs(c.delta).toFixed(0)}%
+          <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Evolución % por categoría</CardTitle></CardHeader>
+          <CardContent>
+            <div className="h-60">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={categoryShareLast6}>
+                  <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+                  <YAxis
+                    tick={{ fontSize: 10 }}
+                    tickCount={5}
+                    domain={[0, 100]}
+                    tickFormatter={v => `${v}%`}
+                  />
+                  <Tooltip
+                    formatter={(v: number, name: string) => {
+                      const cat = categoryTree.find(c => c.id === name);
+                      return [`${v.toFixed(1)}%`, cat ? `${cat.icon} ${cat.name}` : name];
+                    }}
+                    contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid hsl(var(--border))' }}
+                  />
+                  {visibleCategoriesForChart.map((cat, idx) => (
+                    <Line
+                      key={cat.id}
+                      type="monotone"
+                      dataKey={cat.id}
+                      stroke={getCategoryHex(cat.name, cat.color) || CATEGORY_COLORS[idx % CATEGORY_COLORS.length]}
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                  ))}
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="flex flex-wrap gap-x-3 gap-y-1 mt-3">
+              {visibleCategoriesForChart.map((cat, idx) => (
+                <span key={cat.id} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <span
+                    className="w-2.5 h-2.5 rounded-sm"
+                    style={{ backgroundColor: getCategoryHex(cat.name, cat.color) || CATEGORY_COLORS[idx % CATEGORY_COLORS.length] }}
+                  />
+                  {cat.icon} {cat.name}
+                </span>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* INSIGHTS */}
+      {categoryInsights.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Insights del período</CardTitle></CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              {categoryInsights.map(i => {
+                const isUp = i.delta > 0;
+                return (
+                  <span
+                    key={i.id}
+                    className={cn(
+                      'inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-medium',
+                      isUp ? 'bg-destructive/10 text-destructive' : 'bg-emerald-500/10 text-emerald-600'
+                    )}
+                  >
+                    {isUp ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
+                    <span>{i.icon} {i.name}</span>
+                    <span className="tabular-nums font-semibold">
+                      {isUp ? '+' : ''}{i.delta.toFixed(0)}%
+                    </span>
+                    <span className="text-muted-foreground font-normal">vs mes anterior</span>
                   </span>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </CardContent>
         </Card>
       )}
