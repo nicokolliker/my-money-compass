@@ -485,6 +485,25 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
                   </div>
                   {!collapsed && (
                   <div className="space-y-2">
+                    {c.isDigital && c.children.length > 0 && (
+                      <div className="px-3 py-2 rounded-lg bg-muted/30 border border-border/50">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                          {c.children.map(sub => {
+                            const subItems = group.items.filter((i: any) => i.is_active && i.subtype === sub.id);
+                            const subTotal = subItems.reduce((s: number, i: any) => {
+                              const m = toMonthlyAmount(Math.abs(Number(i.amount)), i.frequency);
+                              return s + toUSD(m, i.currency || 'USD', fxList);
+                            }, 0);
+                            return (
+                              <div key={sub.id} className="text-xs">
+                                <span className="text-muted-foreground">{sub.name}</span>
+                                <span className="ml-1 font-medium tabular-nums">{formatUSD(subTotal)}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                     {group.items.map((item: any) => {
                       const acc = item.accounts;
                       const state = itemState[item.id] || 'none';
