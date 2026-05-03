@@ -331,6 +331,7 @@ export default function ImportPage() {
           selected: !dupSet.has(p.external_id),
         })),
       );
+      setMpMonth(detectPredominantMonth(parsed));
       toast.success(`${parsed.length} transacciones detectadas`);
     } catch (e: any) {
       toast.error(e.message || 'Error al procesar archivo');
