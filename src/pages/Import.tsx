@@ -864,15 +864,61 @@ export default function ImportPage() {
         </CardContent>
       </Card>
 
-      {/* Wise */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Wise</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">Próximamente</p>
-        </CardContent>
-      </Card>
+      {/* Wise CSV (manual) */}
+      <div ref={wiseSectionRef}>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Wise (manual)</CardTitle>
+            <p className="text-xs text-muted-foreground pt-1">
+              Si la integración API falla, importá el CSV exportado desde wise.com.
+              Las cuentas se identifican por moneda (USD/EUR).
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <FileDropzone
+                label="Wise statement (.csv)"
+                file={wiseFile}
+                onFile={setWiseFile}
+                accept=".csv,text/csv"
+                acceptLabel="CSV"
+              />
+            </div>
+            <div className="flex items-center gap-3">
+              <Button onClick={handleWiseProcess} disabled={!wiseFile || wiseProcessing}>
+                <Upload className="h-4 w-4 mr-2" />
+                {wiseProcessing ? 'Procesando...' : 'Procesar'}
+              </Button>
+            </div>
+
+            {wiseResultMsg && (
+              <div className="flex items-center gap-2 text-sm text-success">
+                <CheckCircle2 className="h-4 w-4" /> {wiseResultMsg}
+              </div>
+            )}
+
+            {wiseRows.length > 0 && (
+              <div className="space-y-3">
+                <MonthConfirm month={wiseMonth} onChange={setWiseMonth} count={wiseRows.length} />
+                <div className="flex gap-2 flex-wrap">
+                  <Badge>{wiseSelectedCount} seleccionadas</Badge>
+                  {wiseDupCount > 0 && <Badge variant="secondary">{wiseDupCount} duplicadas</Badge>}
+                </div>
+                {renderPreviewTable(wiseRows as PreviewRow[], (i) =>
+                  setWiseRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, selected: !r.selected } : r))),
+                )}
+                <Button
+                  onClick={handleWiseImport}
+                  disabled={wiseImporting || wiseSelectedCount === 0 || !wiseMonth}
+                  className="w-full"
+                >
+                  {wiseImporting ? 'Importando...' : `Importar ${wiseSelectedCount} seleccionadas`}
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
