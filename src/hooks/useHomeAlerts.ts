@@ -101,5 +101,5 @@ export function useHomeAlerts() {
     }
 
     return alerts;
-  }, [importLog, instances, budgets, transactions, suggestions]);
+  }, [importLog, instances, budgets, transactions, suggestions, currentMonthStr, monthStart]);
 }
