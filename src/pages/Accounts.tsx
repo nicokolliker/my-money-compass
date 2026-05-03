@@ -211,14 +211,6 @@ export default function Accounts() {
                             </div>
                           </div>
                         </button>
-                        {isHub(a.name) && (
-                          <ReconciliationPanel
-                            account={a}
-                            transfers={recentTransfers || []}
-                            importLog={importLog || []}
-                            allAccounts={accounts || []}
-                          />
-                        )}
                       </div>
                     );
                   })}
