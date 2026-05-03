@@ -770,10 +770,10 @@ export default function ImportPage() {
   );
 }
 
-const SOURCES: { key: 'arq' | 'mercadopago' | 'splitwise'; label: string }[] = [
+const SOURCES: { key: 'arq' | 'mercadopago' | 'wise'; label: string }[] = [
   { key: 'arq', label: 'ARQ ARS' },
   { key: 'mercadopago', label: 'MercadoPago' },
-  { key: 'splitwise', label: 'Splitwise' },
+  { key: 'wise', label: 'Wise (manual)' },
 ];
 
 const MONTH_LABELS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
