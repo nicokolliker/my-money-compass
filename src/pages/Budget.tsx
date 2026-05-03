@@ -146,11 +146,19 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
       {/* Section 1: Chart for selected month */}
       <div className="relative left-1/2 w-screen -translate-x-1/2 px-4 lg:w-[calc(100vw-16rem)] lg:px-6">
         <Card>
-          <CardHeader className="pb-2 flex flex-row items-center justify-between gap-2 space-y-0">
-            <CardTitle className="text-sm font-semibold capitalize">
-              {monthLabel} — Seguimiento del mes
-            </CardTitle>
-            <div className="flex items-center gap-2">
+          <div
+            className="flex items-center justify-between px-6 py-4 cursor-pointer border-b border-border gap-3"
+            onClick={() => setTrackingExpanded(v => !v)}
+          >
+            <div className="min-w-0">
+              <h3 className="text-sm font-semibold capitalize">
+                {monthLabel} — Seguimiento del mes
+              </h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {fmt(chartData.reduce((s, d) => s + d.spent, 0))} gastado de {fmt(chartData.reduce((s, d) => s + d.budgeted, 0))} presupuestado
+              </p>
+            </div>
+            <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
               <select
                 value={selectedChartMonth}
                 onChange={e => setSelectedChartMonth(Number(e.target.value))}
@@ -169,51 +177,54 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                   <ChevronRight className="h-3.5 w-3.5" />
                 </Button>
               </div>
+              <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', trackingExpanded && 'rotate-180')} />
             </div>
-          </CardHeader>
-          <CardContent>
-            {chartData.length === 0 ? (
-              <div className="py-6 text-center space-y-1">
-                <p className="text-sm text-muted-foreground">No hay presupuestos definidos para este mes.</p>
-                <p className="text-xs text-muted-foreground">Usá la tabla de abajo para definir tu presupuesto mensual.</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {chartData.map(item => {
-                  const pctUsed = item.budgeted > 0 ? Math.min((item.spent / item.budgeted) * 100, 100) : 0;
-                  const isOver = item.spent > item.budgeted && item.budgeted > 0;
-                  const remaining = item.budgeted - item.spent;
-                  const barColor = isOver ? 'bg-destructive' : pctUsed > 80 ? 'bg-amber-500' : 'bg-emerald-500';
-                  return (
-                    <div key={item.id}>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-                          <span>{item.icon}</span>
-                          <span>{item.name}</span>
+          </div>
+          {trackingExpanded && (
+            <CardContent>
+              {chartData.length === 0 ? (
+                <div className="py-6 text-center space-y-1">
+                  <p className="text-sm text-muted-foreground">No hay presupuestos definidos para este mes.</p>
+                  <p className="text-xs text-muted-foreground">Usá la tabla de abajo para definir tu presupuesto mensual.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {chartData.map(item => {
+                    const pctUsed = item.budgeted > 0 ? Math.min((item.spent / item.budgeted) * 100, 100) : 0;
+                    const isOver = item.spent > item.budgeted && item.budgeted > 0;
+                    const remaining = item.budgeted - item.spent;
+                    const barColor = isOver ? 'bg-destructive' : pctUsed > 80 ? 'bg-amber-500' : 'bg-emerald-500';
+                    return (
+                      <div key={item.id}>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                            <span>{item.icon}</span>
+                            <span>{item.name}</span>
+                          </div>
+                          <div className="text-xs tabular-nums">
+                            <span className={cn('font-semibold', isOver ? 'text-destructive' : 'text-foreground')}>
+                              {fmt(item.spent)}
+                            </span>
+                            <span className="text-muted-foreground"> / {fmt(item.budgeted)}</span>
+                          </div>
                         </div>
-                        <div className="text-xs tabular-nums">
-                          <span className={cn('font-semibold', isOver ? 'text-destructive' : 'text-foreground')}>
-                            {fmt(item.spent)}
+                        <div className="relative h-2 bg-muted rounded-full overflow-hidden">
+                          <div className={cn('h-full rounded-full transition-all', barColor)} style={{ width: `${pctUsed}%` }} />
+                          {isOver && <div className="absolute inset-0 rounded-full ring-1 ring-destructive/40 pointer-events-none" />}
+                        </div>
+                        <div className="flex items-center justify-between mt-1 text-[10px] text-muted-foreground">
+                          <span>{Math.round(pctUsed)}% usado</span>
+                          <span className={cn(isOver && 'text-destructive font-semibold')}>
+                            {isOver ? `+${fmt(Math.abs(remaining))} sobre presupuesto` : `${fmt(remaining)} restante`}
                           </span>
-                          <span className="text-muted-foreground"> / {fmt(item.budgeted)}</span>
                         </div>
                       </div>
-                      <div className="relative h-2 bg-muted rounded-full overflow-hidden">
-                        <div className={cn('h-full rounded-full transition-all', barColor)} style={{ width: `${pctUsed}%` }} />
-                        {isOver && <div className="absolute inset-0 rounded-full ring-1 ring-destructive/40 pointer-events-none" />}
-                      </div>
-                      <div className="flex items-center justify-between mt-1 text-[10px] text-muted-foreground">
-                        <span>{Math.round(pctUsed)}% usado</span>
-                        <span className={cn(isOver && 'text-destructive font-semibold')}>
-                          {isOver ? `+${fmt(Math.abs(remaining))} sobre presupuesto` : `${fmt(remaining)} restante`}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </CardContent>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          )}
         </Card>
       </div>
 
