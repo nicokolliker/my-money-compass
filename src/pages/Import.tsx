@@ -12,8 +12,6 @@ import { useAccounts } from '@/hooks/useAccounts';
 import { useLatestFxRate } from '@/hooks/useFxRates';
 import { parseArqStatements, type ParsedTransaction } from '@/lib/importers/arqParser';
 import { parseMercadoPago } from '@/lib/importers/mercadoPagoParser';
-import { parseBancoCiudad, parseBancoCiudadObSoc } from '@/lib/importers/bancoCiudadParser';
-import { parseSantander } from '@/lib/importers/santanderParser';
 import { parseSplitwise, type SplitwiseRow } from '@/lib/importers/splitwiseParser';
 import { useImportLog } from '@/hooks/useImportLog';
 import { MerchantLogo } from '@/components/MerchantLogo';
