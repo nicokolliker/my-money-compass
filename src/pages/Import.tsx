@@ -1039,11 +1039,9 @@ export default function ImportPage() {
   );
 }
 
-const SOURCES: { key: 'arq' | 'mercadopago' | 'banco_ciudad' | 'santander' | 'splitwise'; label: string }[] = [
+const SOURCES: { key: 'arq' | 'mercadopago' | 'splitwise'; label: string }[] = [
   { key: 'arq', label: 'ARQ ARS' },
   { key: 'mercadopago', label: 'MercadoPago' },
-  { key: 'banco_ciudad', label: 'Banco Ciudad' },
-  { key: 'santander', label: 'Santander' },
   { key: 'splitwise', label: 'Splitwise' },
 ];
 
