@@ -195,12 +195,15 @@ export function AppLayout({ children }: { children: ReactNode }) {
         </div>
       </nav>
 
-      {/* Quick Add Sheet */}
-      <Sheet open={showQuickAdd} onOpenChange={setShowQuickAdd}>
-        <SheetContent side="bottom" className="h-[85vh] rounded-t-2xl overflow-y-auto">
+      {/* Quick Add Dialog */}
+      <Dialog open={showQuickAdd} onOpenChange={setShowQuickAdd}>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Nueva transacción</DialogTitle>
+          </DialogHeader>
           <TransactionForm onSuccess={() => setShowQuickAdd(false)} />
-        </SheetContent>
-      </Sheet>
+        </DialogContent>
+      </Dialog>
       <DebugPanel />
     </div>
   );
