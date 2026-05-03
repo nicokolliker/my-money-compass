@@ -44,43 +44,60 @@ async function extractPdfText(file: File): Promise<string> {
 
 export default function DebtsPage() {
   const { data: accounts } = useAccountBalances();
+  const { data: importLog } = useImportLog();
   const [openViejo, setOpenViejo] = useState(false);
   const [openSw, setOpenSw] = useState(false);
   const [transferTarget, setTransferTarget] = useState<any>(null);
 
-  const debtAccounts = useMemo(() => {
-    return (accounts || []).filter((a: any) =>
-      ['debt', 'credit_card', 'receivable'].includes(a.type) ||
-      /splitwise/i.test(a.name) ||
-      /viejo|tarjeta.*viejo/i.test(a.name),
-    );
-  }, [accounts]);
+  const viejoAccount = useMemo(() =>
+    accounts?.find((a: any) => /viejo/i.test(a.name)) || null,
+  [accounts]);
+
+  const splitwiseAccount = useMemo(() =>
+    accounts?.find((a: any) => /splitwise/i.test(a.name)) || null,
+  [accounts]);
+
+  const otherDebts = useMemo(() =>
+    (accounts || []).filter((a: any) =>
+      ['debt', 'credit_card'].includes(a.type) &&
+      !/viejo|splitwise/i.test(a.name)
+    ),
+  [accounts]);
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Deudas</h1>
-        <p className="text-sm text-muted-foreground">Seguimiento y liquidación de deudas</p>
+        <p className="text-sm text-muted-foreground">Revisión y liquidación mensual</p>
       </div>
 
-      <div className="space-y-3">
-        {debtAccounts.length === 0 && (
-          <Card><CardContent className="p-6 text-sm text-muted-foreground text-center">
-            No tenés cuentas de deuda activas.
-          </CardContent></Card>
-        )}
-        {debtAccounts.map((account: any) => (
-          <DebtCard
-            key={account.id}
-            account={account}
-            onLiquidarViejo={() => setOpenViejo(true)}
-            onLiquidarSplitwise={() => setOpenSw(true)}
-            onTransfer={() => setTransferTarget(account)}
-          />
-        ))}
-      </div>
+      {viejoAccount && (
+        <ViejoDebtCard
+          account={viejoAccount}
+          importLog={importLog || []}
+          onOpen={() => setOpenViejo(true)}
+        />
+      )}
 
-      <DebtImportStatus />
+      {splitwiseAccount && (
+        <SplitwiseDebtCard
+          account={splitwiseAccount}
+          importLog={importLog || []}
+          onOpen={() => setOpenSw(true)}
+        />
+      )}
+
+      {otherDebts.map((a: any) => (
+        <SimpleDebtCard key={a.id} account={a} onTransfer={() => setTransferTarget(a)} />
+      ))}
+
+      {!viejoAccount && !splitwiseAccount && otherDebts.length === 0 && (
+        <Card>
+          <CardContent className="p-6 text-sm text-muted-foreground text-center">
+            No tenés cuentas de deuda activas. Creá una en Accounts con tipo "Debt".
+          </CardContent>
+        </Card>
+      )}
 
       <ViejoSettlementWizard open={openViejo} onOpenChange={setOpenViejo} />
       <SplitwiseSettlementWizard open={openSw} onOpenChange={setOpenSw} />
@@ -89,82 +106,157 @@ export default function DebtsPage() {
   );
 }
 
-const DEBT_SOURCES: { key: 'banco_ciudad' | 'santander'; label: string }[] = [
-  { key: 'banco_ciudad', label: 'Banco Ciudad' },
-  { key: 'santander', label: 'Santander' },
-];
-const DEBT_MONTH_LABELS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+function StepRow({ n, label, done, note }: { n: number; label: string; done: boolean; note: string }) {
+  return (
+    <div className="flex items-start gap-3">
+      <div className={cn(
+        'shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold',
+        done ? 'bg-success/20 text-success' : 'bg-muted text-muted-foreground'
+      )}>
+        {done ? '✓' : n}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className={cn('text-sm', done ? 'text-foreground' : 'text-muted-foreground')}>{label}</p>
+        <p className="text-xs text-muted-foreground">{note}</p>
+      </div>
+    </div>
+  );
+}
 
-function DebtImportStatus() {
-  const { data } = useImportLog();
-  const today = new Date();
-  const months = Array.from({ length: 6 }, (_, i) => {
-    const d = new Date(today.getFullYear(), today.getMonth() - (5 - i), 1);
-    return {
-      key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
-      label: DEBT_MONTH_LABELS[d.getMonth()],
-    };
+function ViejoDebtCard({ account, importLog, onOpen }: {
+  account: any;
+  importLog: any[];
+  onOpen: () => void;
+}) {
+  const currentMonth = format(new Date(), 'yyyy-MM');
+  const balance = Number(account.computed_balance_usd || 0);
+  const isDebt = balance < -0.5;
+
+  const bcImportado = importLog.some(l =>
+    ['banco_ciudad', 'santander'].includes(l.source) && l.month === currentMonth
+  );
+
+  const { data: liquidacionTxs } = useQuery({
+    queryKey: ['liquidacion-check', currentMonth],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('transactions')
+        .select('id, description, amount_usd')
+        .ilike('description', '%Liquidación%')
+        .gte('date', currentMonth + '-01');
+      return data || [];
+    },
   });
+
+  const yaLiquidado = (liquidacionTxs || []).length > 0;
+  const liquidadoUSD = yaLiquidado ? Math.abs(Number(liquidacionTxs?.[0]?.amount_usd || 0)) : 0;
+
+  const ctaLabel = yaLiquidado
+    ? 'Ver liquidación del mes'
+    : bcImportado
+      ? 'Continuar — completar y liquidar →'
+      : 'Empezar ciclo del mes →';
 
   return (
     <Card>
-      <CardContent className="p-4 space-y-2">
-        <p className="text-sm font-medium">Estado de importaciones</p>
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="text-muted-foreground">
-                <th className="text-left font-medium pb-2 pr-3"></th>
-                {months.map((m) => (
-                  <th key={m.key} className="text-center font-medium pb-2 px-2 min-w-[44px]">{m.label}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {DEBT_SOURCES.map((src) => {
-                const monthsWithData = new Set((data || []).filter((t: any) => t.source === src.key).map((t: any) => t.month));
-                return (
-                  <tr key={src.key} className="border-t border-border">
-                    <td className="py-2 pr-3 font-medium text-foreground">{src.label}</td>
-                    {months.map((m) => (
-                      <td key={m.key} className="text-center py-2 px-2">
-                        {monthsWithData.has(m.key) ? (
-                          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-500/15 text-green-600 dark:text-green-400 text-sm">✓</span>
-                        ) : (
-                          <span className="inline-block text-muted-foreground/50">—</span>
-                        )}
-                      </td>
-                    ))}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+      <CardContent className="p-5 space-y-4">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <MerchantLogo name={account.name} size={40} />
+            <div className="min-w-0">
+              <p className="font-semibold text-base">Viejo</p>
+              <p className="text-xs text-muted-foreground capitalize">
+                Ciclo {format(new Date(), 'MMMM yyyy', { locale: es })}
+              </p>
+            </div>
+          </div>
+          <div className="text-right shrink-0">
+            <p className={cn('text-xl font-bold font-mono', isDebt ? 'text-destructive' : 'text-success')}>
+              {isDebt ? '-' : ''}{formatUSD(Math.abs(balance))}
+            </p>
+            <p className="text-[10px] text-muted-foreground">deuda acumulada</p>
+          </div>
         </div>
+
+        <div className="space-y-2 border-t pt-3">
+          <StepRow n={1} label="Importar PDFs (BC + Santander)" done={bcImportado} note={bcImportado ? 'Importado' : 'Pendiente'} />
+          <StepRow n={2} label="Completar ítems manuales" done={yaLiquidado} note="Préstamo, expensas, patente..." />
+          <StepRow n={3} label="Liquidar con el viejo" done={yaLiquidado} note={yaLiquidado ? `Pagado ${formatUSD(liquidadoUSD)}` : 'Pendiente'} />
+        </div>
+
+        <Button onClick={onOpen} className="w-full">{ctaLabel}</Button>
       </CardContent>
     </Card>
   );
 }
 
-function DebtCard({ account, onLiquidarViejo, onLiquidarSplitwise, onTransfer }: any) {
+function SplitwiseDebtCard({ account, importLog, onOpen }: {
+  account: any;
+  importLog: any[];
+  onOpen: () => void;
+}) {
+  const currentMonth = format(new Date(), 'yyyy-MM');
   const balance = Number(account.computed_balance_usd || 0);
-  const balanceLocal = Number(account.computed_balance || 0);
-  const isDebt = balance < -0.5;
-  const name = (account.name || '').toLowerCase();
+  const teDebenAVos = balance > 0.5;
+  const vosDebes = balance < -0.5;
 
-  let actionBtn: React.ReactNode = null;
-  if (/viejo|ciudad|santander/.test(name)) {
-    actionBtn = <Button size="sm" onClick={onLiquidarViejo}>Liquidar este mes</Button>;
-  } else if (/splitwise/.test(name)) {
-    actionBtn = <Button size="sm" onClick={onLiquidarSplitwise}>Liquidar</Button>;
-  } else {
-    actionBtn = <Button size="sm" variant="outline" onClick={onTransfer}>Registrar pago</Button>;
-  }
+  const swImports = importLog
+    .filter(l => l.source === 'splitwise')
+    .sort((a, b) => b.month.localeCompare(a.month));
+  const lastImport = swImports[0];
+  const importadoEsteMes = lastImport?.month === currentMonth;
 
   return (
     <Card>
+      <CardContent className="p-5 space-y-4">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <MerchantLogo name="Splitwise" domain="splitwise.com" size={40} />
+            <div className="min-w-0">
+              <p className="font-semibold text-base">Splitwise</p>
+              <p className="text-xs text-muted-foreground">
+                {lastImport ? `Última actualización: ${lastImport.month}` : 'Sin datos aún'}
+              </p>
+            </div>
+          </div>
+          <div className="text-right shrink-0">
+            {!teDebenAVos && !vosDebes && (
+              <Badge variant="secondary">Al día ✓</Badge>
+            )}
+            {teDebenAVos && (
+              <>
+                <p className="text-xl font-bold font-mono text-success">+{formatUSD(balance)}</p>
+                <p className="text-[10px] text-muted-foreground">te deben</p>
+              </>
+            )}
+            {vosDebes && (
+              <>
+                <p className="text-xl font-bold font-mono text-destructive">-{formatUSD(Math.abs(balance))}</p>
+                <p className="text-[10px] text-muted-foreground">debés</p>
+              </>
+            )}
+          </div>
+        </div>
+
+        <p className="text-xs text-muted-foreground border-t pt-3">
+          Cargá el CSV mensual para actualizar el saldo y ver en qué gastaste con el grupo.
+        </p>
+
+        <Button onClick={onOpen} className="w-full" variant={importadoEsteMes ? 'default' : 'default'}>
+          {importadoEsteMes ? 'Actualizar / saldar →' : 'Cargar CSV de este mes →'}
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+function SimpleDebtCard({ account, onTransfer }: { account: any; onTransfer: () => void }) {
+  const balance = Number(account.computed_balance_usd || 0);
+  const isDebt = balance < -0.5;
+  return (
+    <Card>
       <CardContent className="p-4 flex items-center gap-4">
-        <MerchantLogo name={account.name} domain={(account as any).domain} size={40} />
+        <MerchantLogo name={account.name} size={40} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <p className="font-medium text-sm truncate">{account.name}</p>
@@ -172,14 +264,11 @@ function DebtCard({ account, onLiquidarViejo, onLiquidarSplitwise, onTransfer }:
               {isDebt ? 'Pendiente' : 'Al día ✓'}
             </Badge>
           </div>
-          <p className={`text-sm font-mono mt-0.5 ${isDebt ? 'text-destructive' : 'text-success'}`}>
-            {balanceLocal.toLocaleString('es-AR', { maximumFractionDigits: 0 })} {account.currency}
-            {account.currency !== 'USD' && (
-              <span className="text-muted-foreground ml-2 text-xs">≈ {formatUSD(balance)}</span>
-            )}
+          <p className={cn('text-sm font-mono mt-0.5', isDebt ? 'text-destructive' : 'text-success')}>
+            {formatUSD(Math.abs(balance))}
           </p>
         </div>
-        {actionBtn}
+        <Button size="sm" variant="outline" onClick={onTransfer}>Registrar pago</Button>
       </CardContent>
     </Card>
   );
