@@ -121,9 +121,20 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
     }
   };
 
-  // ----- Chart data: budgeted vs actual for current month -----
+  // ----- Chart month: fall back to last month if current has no transactions -----
+  const chartMonth = useMemo(() => {
+    if (!transactions?.length) return { year: currentYear, month: currentMonth };
+    const currentPrefix = monthPrefix(currentYear, currentMonth);
+    const hasCurrent = transactions.some(t => t.date.startsWith(currentPrefix));
+    if (hasCurrent) return { year: currentYear, month: currentMonth };
+    const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+    const lastMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+    return { year: lastMonthYear, month: lastMonth };
+  }, [transactions, currentYear, currentMonth]);
+
+  // ----- Chart data: budgeted vs actual for chart month -----
   const chartData = useMemo(() => {
-    const prefix = monthPrefix(currentYear, currentMonth);
+    const prefix = monthPrefix(chartMonth.year, chartMonth.month);
     return variableCategories
       .map(cat => {
         const b = (budgets || []).find(
@@ -143,7 +154,7 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
       .filter(Boolean) as Array<{
         id: string; name: string; icon: string | null; budgeted: number; spent: number; deviation: number; pct: number;
       }>;
-  }, [variableCategories, budgets, transactions, currentYear, currentMonth]);
+  }, [variableCategories, budgets, transactions, chartMonth]);
 
   // ----- Annual totals per row -----
   const incomeYearTotal = useMemo(() => {
@@ -180,7 +191,7 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-semibold capitalize">
-            {new Date(currentYear, currentMonth).toLocaleString('es', { month: 'long', year: 'numeric' })} — Seguimiento del mes
+            {new Date(chartMonth.year, chartMonth.month).toLocaleString('es', { month: 'long', year: 'numeric' })} — Seguimiento del mes
           </CardTitle>
         </CardHeader>
         <CardContent>
