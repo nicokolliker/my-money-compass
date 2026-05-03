@@ -117,11 +117,11 @@ export default function CategoriesTab() {
         ))}
       </div>
 
-      <Sheet open={showForm} onOpenChange={setShowForm}>
-        <SheetContent side="bottom" className="h-auto rounded-t-2xl max-h-[80vh] overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>{editId ? 'Edit Category' : 'New Category'}</SheetTitle>
-          </SheetHeader>
+      <Dialog open={showForm} onOpenChange={setShowForm}>
+        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editId ? 'Edit Category' : 'New Category'}</DialogTitle>
+          </DialogHeader>
           <div className="space-y-5 mt-4 pb-4">
             {/* Preview */}
             <div className="flex items-center gap-3 p-4 rounded-xl bg-accent/30">
@@ -197,8 +197,8 @@ export default function CategoriesTab() {
               </Button>
             </div>
           </div>
-        </SheetContent>
-      </Sheet>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
