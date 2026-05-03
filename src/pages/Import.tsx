@@ -675,6 +675,7 @@ export default function ImportPage() {
 
           {mpRows.length > 0 && (
             <div className="space-y-3">
+              <MonthConfirm month={mpMonth} onChange={setMpMonth} count={mpRows.length} />
               <div className="flex gap-2 flex-wrap">
                 <Badge>{mpSelectedCount} seleccionadas</Badge>
                 {mpDupCount > 0 && <Badge variant="secondary">{mpDupCount} duplicadas</Badge>}
@@ -684,7 +685,7 @@ export default function ImportPage() {
               )}
               <Button
                 onClick={handleMpImport}
-                disabled={mpImporting || mpSelectedCount === 0 || !mpAccount}
+                disabled={mpImporting || mpSelectedCount === 0 || !mpAccount || !mpMonth}
                 className="w-full"
               >
                 {mpImporting ? 'Importando...' : `Importar ${mpSelectedCount} seleccionadas`}
