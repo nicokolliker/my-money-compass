@@ -291,6 +291,54 @@ export default function Analytics() {
 
   const monthlyLast6 = useMemo(() => monthly.slice(-6), [monthly]);
 
+  const monthlyAverages = useMemo(() => {
+    const n = monthlyLast6.length || 1;
+    const totalExp = monthlyLast6.reduce((s, m) => s + (m.expenses || 0), 0);
+    const totalInc = monthlyLast6.reduce((s, m) => s + (m.income || 0), 0);
+    return {
+      expenses: totalExp / n,
+      income: totalInc / n,
+      savings: (totalInc - totalExp) / n,
+    };
+  }, [monthlyLast6]);
+
+  const categoryShareLast6 = useMemo(() => {
+    return categoryMonthly.slice(-6).map(m => {
+      const totalMonth = visibleCategoriesForChart.reduce((s, c) => s + (m[c.id] || 0), 0);
+      const entry: Record<string, any> = { month: m.month, label: m.label };
+      visibleCategoriesForChart.forEach(c => {
+        entry[c.id] = totalMonth > 0 ? ((m[c.id] || 0) / totalMonth) * 100 : 0;
+      });
+      return entry;
+    });
+  }, [categoryMonthly, visibleCategoriesForChart]);
+
+  const categoryInsights = useMemo(() => {
+    const last6 = categoryMonthly.slice(-6);
+    if (last6.length < 2) return [];
+    const insights: Array<{ id: string; name: string; icon: string | null; delta: number }> = [];
+    visibleCategoriesForChart.forEach(cat => {
+      // find most recent month with data and the previous month with data
+      let thisIdx = -1;
+      for (let i = last6.length - 1; i >= 0; i--) {
+        if ((last6[i][cat.id] || 0) > 0) { thisIdx = i; break; }
+      }
+      if (thisIdx <= 0) return;
+      let prevIdx = -1;
+      for (let i = thisIdx - 1; i >= 0; i--) {
+        if ((last6[i][cat.id] || 0) > 0) { prevIdx = i; break; }
+      }
+      if (prevIdx === -1) return;
+      const thisVal = last6[thisIdx][cat.id];
+      const prevVal = last6[prevIdx][cat.id];
+      const delta = ((thisVal - prevVal) / prevVal) * 100;
+      if (Math.abs(delta) > 15) {
+        insights.push({ id: cat.id, name: cat.name, icon: cat.icon, delta });
+      }
+    });
+    return insights.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
+  }, [categoryMonthly, visibleCategoriesForChart]);
+
   if (isLoading) return <div className="flex items-center justify-center h-64 text-muted-foreground">Cargando...</div>;
 
   return (
