@@ -11,6 +11,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAccounts } from '@/hooks/useAccounts';
 import { useLatestFxRate } from '@/hooks/useFxRates';
 import { parseArqStatements, type ParsedTransaction } from '@/lib/importers/arqParser';
+import { parseMercadoPago } from '@/lib/importers/mercadoPagoParser';
+import { parseBancoCiudad } from '@/lib/importers/bancoCiudadParser';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
@@ -31,7 +33,19 @@ interface PreviewRow extends ParsedTransaction {
   duplicate: boolean;
 }
 
-function PdfDropzone({ label, file, onFile }: { label: string; file: File | null; onFile: (f: File | null) => void }) {
+function FileDropzone({
+  label,
+  file,
+  onFile,
+  accept = 'application/pdf',
+  acceptLabel = 'PDF',
+}: {
+  label: string;
+  file: File | null;
+  onFile: (f: File | null) => void;
+  accept?: string;
+  acceptLabel?: string;
+}) {
   const inputRef = useRef<HTMLInputElement>(null);
   return (
     <div
@@ -41,7 +55,7 @@ function PdfDropzone({ label, file, onFile }: { label: string; file: File | null
       onDrop={(e) => {
         e.preventDefault();
         const f = e.dataTransfer.files?.[0];
-        if (f && f.type === 'application/pdf') onFile(f);
+        if (f) onFile(f);
       }}
     >
       <FileSpreadsheet className="h-7 w-7 text-muted-foreground" />
@@ -54,18 +68,22 @@ function PdfDropzone({ label, file, onFile }: { label: string; file: File | null
           </button>
         </div>
       ) : (
-        <p className="text-[11px] text-muted-foreground">Arrastrá o hacé click para seleccionar</p>
+        <p className="text-[11px] text-muted-foreground">Arrastrá o hacé click ({acceptLabel})</p>
       )}
       <input
         ref={inputRef}
         type="file"
-        accept="application/pdf"
+        accept={accept}
         className="hidden"
         onChange={(e) => onFile(e.target.files?.[0] || null)}
       />
     </div>
   );
 }
+
+const PdfDropzone = (props: { label: string; file: File | null; onFile: (f: File | null) => void }) => (
+  <FileDropzone {...props} accept="application/pdf" acceptLabel="PDF" />
+);
 
 export default function ImportPage() {
   const { data: accounts } = useAccounts();
@@ -186,6 +204,251 @@ export default function ImportPage() {
   const selectedCount = rows.filter((r) => r.selected && !r.duplicate).length;
   const dupCount = rows.filter((r) => r.duplicate).length;
 
+  // ---- MercadoPago state ----
+  const [mpFile, setMpFile] = useState<File | null>(null);
+  const [mpProcessing, setMpProcessing] = useState(false);
+  const [mpRows, setMpRows] = useState<PreviewRow[]>([]);
+  const [mpImporting, setMpImporting] = useState(false);
+  const [mpResultMsg, setMpResultMsg] = useState<string | null>(null);
+
+  const mpAccount = useMemo(
+    () => accounts?.find((a) => /mercado\s*pago|mercadopago/i.test(a.name)) || null,
+    [accounts],
+  );
+
+  async function handleMpProcess() {
+    if (!mpFile) return;
+    setMpProcessing(true);
+    setMpResultMsg(null);
+    try {
+      const buf = await mpFile.arrayBuffer();
+      const parsed = parseMercadoPago(buf, arsToUsd || 0);
+      if (parsed.length === 0) {
+        toast.error('No se encontraron transacciones');
+        setMpRows([]);
+        return;
+      }
+      const ids = parsed.map((p) => p.external_id);
+      const { data: existing } = await supabase
+        .from('transactions')
+        .select('external_id')
+        .in('external_id', ids);
+      const dupSet = new Set((existing || []).map((r: any) => r.external_id));
+      setMpRows(
+        parsed.map((p) => ({
+          ...p,
+          duplicate: dupSet.has(p.external_id),
+          selected: !dupSet.has(p.external_id),
+        })),
+      );
+      toast.success(`${parsed.length} transacciones detectadas`);
+    } catch (e: any) {
+      toast.error(e.message || 'Error al procesar archivo');
+    } finally {
+      setMpProcessing(false);
+    }
+  }
+
+  async function handleMpImport() {
+    if (!mpAccount) {
+      toast.error('No se encontró cuenta MercadoPago');
+      return;
+    }
+    const toImport = mpRows.filter((r) => r.selected && !r.duplicate);
+    if (toImport.length === 0) return;
+    setMpImporting(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+      const fxRate = arsToUsd || 0;
+      const payload = toImport.map((r) => {
+        const isIncome = r.type === 'income';
+        const sign = isIncome ? 1 : -1;
+        return {
+          user_id: user.id,
+          account_id: mpAccount.id,
+          date: r.date,
+          description: r.description,
+          merchant: r.description,
+          amount: sign * r.amountARS,
+          currency: 'ARS',
+          fx_rate: fxRate,
+          amount_usd: sign * r.amountUSD,
+          type: (isIncome ? 'income' : 'expense') as any,
+          external_id: r.external_id,
+          raw_imported_description: r.description,
+        };
+      });
+      const { error } = await supabase.from('transactions').insert(payload);
+      if (error) throw error;
+      const dups = mpRows.filter((r) => r.duplicate).length;
+      setMpResultMsg(`${toImport.length} transacciones importadas, ${dups} duplicados ignorados`);
+      toast.success('Importación completa');
+      setMpRows([]);
+      setMpFile(null);
+    } catch (e: any) {
+      toast.error(e.message || 'Error al importar');
+    } finally {
+      setMpImporting(false);
+    }
+  }
+
+  const mpSelectedCount = mpRows.filter((r) => r.selected && !r.duplicate).length;
+  const mpDupCount = mpRows.filter((r) => r.duplicate).length;
+
+  // ---- Banco Ciudad state ----
+  const [bcFile, setBcFile] = useState<File | null>(null);
+  const [bcProcessing, setBcProcessing] = useState(false);
+  const [bcRows, setBcRows] = useState<PreviewRow[]>([]);
+  const [bcImporting, setBcImporting] = useState(false);
+  const [bcResultMsg, setBcResultMsg] = useState<string | null>(null);
+
+  const bcAccount = useMemo(
+    () =>
+      accounts?.find((a) => /tarjeta/i.test(a.name) && /ciudad/i.test(a.name)) ||
+      accounts?.find((a) => /tarjeta/i.test(a.name)) ||
+      null,
+    [accounts],
+  );
+
+  async function handleBcProcess() {
+    if (!bcFile) return;
+    setBcProcessing(true);
+    setBcResultMsg(null);
+    try {
+      const text = await extractPdfText(bcFile);
+      const parsed = parseBancoCiudad(text, arsToUsd || 0);
+      if (parsed.length === 0) {
+        toast.error('No se encontraron consumos de la tarjeta 1689');
+        setBcRows([]);
+        return;
+      }
+      const ids = parsed.map((p) => p.external_id);
+      const { data: existing } = await supabase
+        .from('transactions')
+        .select('external_id')
+        .in('external_id', ids);
+      const dupSet = new Set((existing || []).map((r: any) => r.external_id));
+      setBcRows(
+        parsed.map((p) => ({
+          ...p,
+          duplicate: dupSet.has(p.external_id),
+          selected: !dupSet.has(p.external_id),
+        })),
+      );
+      toast.success(`${parsed.length} consumos detectados`);
+    } catch (e: any) {
+      toast.error(e.message || 'Error al procesar PDF');
+    } finally {
+      setBcProcessing(false);
+    }
+  }
+
+  async function handleBcImport() {
+    if (!bcAccount) {
+      toast.error('No se encontró cuenta de tarjeta');
+      return;
+    }
+    const toImport = bcRows.filter((r) => r.selected && !r.duplicate);
+    if (toImport.length === 0) return;
+    setBcImporting(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+      const payload = toImport.map((r) => {
+        const fxRate = r.amountARS > 0 && r.amountUSD > 0 ? r.amountUSD / r.amountARS : (arsToUsd || 0);
+        return {
+          user_id: user.id,
+          account_id: bcAccount.id,
+          date: r.date,
+          description: r.description,
+          merchant: r.description,
+          amount: -r.amountARS,
+          currency: 'ARS',
+          fx_rate: fxRate,
+          amount_usd: -r.amountUSD,
+          type: 'expense' as const,
+          external_id: r.external_id,
+          raw_imported_description: r.description,
+        };
+      });
+      const { error } = await supabase.from('transactions').insert(payload);
+      if (error) throw error;
+      const dups = bcRows.filter((r) => r.duplicate).length;
+      setBcResultMsg(`${toImport.length} consumos importados, ${dups} duplicados ignorados`);
+      toast.success('Importación completa');
+      setBcRows([]);
+      setBcFile(null);
+    } catch (e: any) {
+      toast.error(e.message || 'Error al importar');
+    } finally {
+      setBcImporting(false);
+    }
+  }
+
+  const bcSelectedCount = bcRows.filter((r) => r.selected && !r.duplicate).length;
+  const bcDupCount = bcRows.filter((r) => r.duplicate).length;
+
+  function renderPreviewTable(
+    items: PreviewRow[],
+    onToggle: (i: number) => void,
+    showCuotas = false,
+  ) {
+    return (
+      <div className="border rounded-lg max-h-[420px] overflow-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-8"></TableHead>
+              <TableHead className="text-xs">Fecha</TableHead>
+              <TableHead className="text-xs">Descripción</TableHead>
+              <TableHead className="text-xs text-right">ARS</TableHead>
+              <TableHead className="text-xs text-right">USD</TableHead>
+              <TableHead className="text-xs">Tipo</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {items.map((r, i) => (
+              <TableRow key={r.external_id} className={r.duplicate ? 'opacity-50' : ''}>
+                <TableCell>
+                  <Checkbox
+                    checked={r.selected}
+                    disabled={r.duplicate}
+                    onCheckedChange={() => onToggle(i)}
+                  />
+                </TableCell>
+                <TableCell className="text-xs">{r.date}</TableCell>
+                <TableCell className="text-xs max-w-[260px] truncate">{r.description}</TableCell>
+                <TableCell className="text-xs text-right font-mono tabular-nums">
+                  {r.amountARS.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </TableCell>
+                <TableCell className="text-xs text-right font-mono tabular-nums">
+                  {r.amountUSD ? r.amountUSD.toFixed(2) : '—'}
+                  {!r.matched && r.amountUSD > 0 && r.type !== 'transfer' && (
+                    <span className="ml-1 text-[10px] text-muted-foreground">est.</span>
+                  )}
+                </TableCell>
+                <TableCell>
+                  {r.duplicate ? (
+                    <Badge variant="outline" className="text-[10px] h-4 px-1.5">Ya importado</Badge>
+                  ) : r.type === 'income' ? (
+                    <Badge className="text-[10px] h-4 px-1.5 bg-green-600 hover:bg-green-600/90">Ingreso</Badge>
+                  ) : r.type === 'transfer' ? (
+                    <Badge className="text-[10px] h-4 px-1.5 bg-orange-500 hover:bg-orange-500/90">Transfer</Badge>
+                  ) : r.type === 'fee' ? (
+                    <Badge variant="secondary" className="text-[10px] h-4 px-1.5">Fee</Badge>
+                  ) : (
+                    <Badge variant="default" className="text-[10px] h-4 px-1.5">Gasto</Badge>
+                  )}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -232,55 +495,7 @@ export default function ImportPage() {
                 <Badge>{selectedCount} seleccionadas</Badge>
                 {dupCount > 0 && <Badge variant="secondary">{dupCount} duplicadas</Badge>}
               </div>
-              <div className="border rounded-lg max-h-[420px] overflow-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-8"></TableHead>
-                      <TableHead className="text-xs">Fecha</TableHead>
-                      <TableHead className="text-xs">Merchant / Descripción</TableHead>
-                      <TableHead className="text-xs text-right">ARS</TableHead>
-                      <TableHead className="text-xs text-right">USD</TableHead>
-                      <TableHead className="text-xs">Tipo</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {rows.map((r, i) => (
-                      <TableRow key={r.external_id} className={r.duplicate ? 'opacity-50' : ''}>
-                        <TableCell>
-                          <Checkbox
-                            checked={r.selected}
-                            disabled={r.duplicate}
-                            onCheckedChange={() => toggleRow(i)}
-                          />
-                        </TableCell>
-                        <TableCell className="text-xs">{r.date}</TableCell>
-                        <TableCell className="text-xs max-w-[260px] truncate">{r.description}</TableCell>
-                        <TableCell className="text-xs text-right font-mono tabular-nums">
-                          {r.amountARS.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </TableCell>
-                        <TableCell className="text-xs text-right font-mono tabular-nums">
-                          {r.amountUSD ? r.amountUSD.toFixed(2) : '—'}
-                          {!r.matched && r.amountUSD > 0 && r.type !== 'transfer' && (
-                            <span className="ml-1 text-[10px] text-muted-foreground">est.</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {r.duplicate ? (
-                            <Badge variant="outline" className="text-[10px] h-4 px-1.5">Ya importado</Badge>
-                          ) : r.type === 'transfer' ? (
-                            <Badge className="text-[10px] h-4 px-1.5 bg-orange-500 hover:bg-orange-500/90">Transfer</Badge>
-                          ) : r.type === 'fee' ? (
-                            <Badge variant="secondary" className="text-[10px] h-4 px-1.5">Fee</Badge>
-                          ) : (
-                            <Badge variant="default" className="text-[10px] h-4 px-1.5">Gasto</Badge>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+              {renderPreviewTable(rows, toggleRow)}
               <Button
                 onClick={handleImport}
                 disabled={importing || selectedCount === 0 || !arqAccount}
@@ -298,8 +513,103 @@ export default function ImportPage() {
         <CardHeader className="pb-2">
           <CardTitle className="text-base">MercadoPago</CardTitle>
         </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">Próximamente</p>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <FileDropzone
+              label="Reporte (.xlsx)"
+              file={mpFile}
+              onFile={setMpFile}
+              accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              acceptLabel="XLSX"
+            />
+          </div>
+          <div className="flex items-center gap-3">
+            <Button onClick={handleMpProcess} disabled={!mpFile || mpProcessing}>
+              <Upload className="h-4 w-4 mr-2" />
+              {mpProcessing ? 'Procesando...' : 'Procesar'}
+            </Button>
+            {!mpAccount && (
+              <Badge variant="outline" className="text-amber-600">
+                No se encontró cuenta MercadoPago
+              </Badge>
+            )}
+          </div>
+
+          {mpResultMsg && (
+            <div className="flex items-center gap-2 text-sm text-success">
+              <CheckCircle2 className="h-4 w-4" /> {mpResultMsg}
+            </div>
+          )}
+
+          {mpRows.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex gap-2 flex-wrap">
+                <Badge>{mpSelectedCount} seleccionadas</Badge>
+                {mpDupCount > 0 && <Badge variant="secondary">{mpDupCount} duplicadas</Badge>}
+              </div>
+              {renderPreviewTable(mpRows, (i) =>
+                setMpRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, selected: !r.selected } : r))),
+              )}
+              <Button
+                onClick={handleMpImport}
+                disabled={mpImporting || mpSelectedCount === 0 || !mpAccount}
+                className="w-full"
+              >
+                {mpImporting ? 'Importando...' : `Importar ${mpSelectedCount} seleccionadas`}
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Banco Ciudad — Tarjeta viejo */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Banco Ciudad — Tarjeta viejo</CardTitle>
+          <p className="text-xs text-muted-foreground pt-1">
+            Solo se importan consumos de la tarjeta 1689 (N. Kolliker)
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <PdfDropzone label="Resumen (.pdf)" file={bcFile} onFile={setBcFile} />
+          </div>
+          <div className="flex items-center gap-3">
+            <Button onClick={handleBcProcess} disabled={!bcFile || bcProcessing}>
+              <Upload className="h-4 w-4 mr-2" />
+              {bcProcessing ? 'Procesando...' : 'Procesar'}
+            </Button>
+            {!bcAccount && (
+              <Badge variant="outline" className="text-amber-600">
+                No se encontró cuenta de tarjeta
+              </Badge>
+            )}
+          </div>
+
+          {bcResultMsg && (
+            <div className="flex items-center gap-2 text-sm text-success">
+              <CheckCircle2 className="h-4 w-4" /> {bcResultMsg}
+            </div>
+          )}
+
+          {bcRows.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex gap-2 flex-wrap">
+                <Badge>{bcSelectedCount} seleccionadas</Badge>
+                {bcDupCount > 0 && <Badge variant="secondary">{bcDupCount} duplicadas</Badge>}
+              </div>
+              {renderPreviewTable(bcRows, (i) =>
+                setBcRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, selected: !r.selected } : r))),
+              )}
+              <Button
+                onClick={handleBcImport}
+                disabled={bcImporting || bcSelectedCount === 0 || !bcAccount}
+                className="w-full"
+              >
+                {bcImporting ? 'Importando...' : `Importar ${bcSelectedCount} seleccionadas`}
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
