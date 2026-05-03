@@ -1150,7 +1150,62 @@ export default function ImportPage() {
         </CardContent>
       </Card>
 
-      {/* Splitwise */}
+      {/* Santander */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base flex items-center gap-2">
+            <MerchantLogo name="Santander" domain="santander.com.ar" size={32} />
+            Santander
+          </CardTitle>
+          <p className="text-xs text-muted-foreground pt-1">
+            Solo se importan consumos de la tarjeta 5829 (N. Kolliker)
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <PdfDropzone label="Resumen Santander (.pdf)" file={santFile} onFile={setSantFile} />
+          </div>
+          <div className="flex items-center gap-3">
+            <Button onClick={handleSantProcess} disabled={!santFile || santProcessing}>
+              <Upload className="h-4 w-4 mr-2" />
+              {santProcessing ? 'Procesando...' : 'Procesar'}
+            </Button>
+            {!santAccount && (
+              <Badge variant="outline" className="text-amber-600">
+                Creá una cuenta Santander en Accounts primero
+              </Badge>
+            )}
+          </div>
+
+          {santResultMsg && (
+            <div className="flex items-center gap-2 text-sm text-success">
+              <CheckCircle2 className="h-4 w-4" /> {santResultMsg}
+            </div>
+          )}
+
+          {santRows.length > 0 && (
+            <div className="space-y-3">
+              <MonthConfirm month={santMonth} onChange={setSantMonth} count={santRows.length} />
+              <div className="flex gap-2 flex-wrap">
+                <Badge>{santSelectedCount} seleccionadas</Badge>
+                {santDupCount > 0 && <Badge variant="secondary">{santDupCount} duplicadas</Badge>}
+              </div>
+              {renderPreviewTable(santRows, (i) =>
+                setSantRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, selected: !r.selected } : r))),
+              )}
+              <Button
+                onClick={handleSantImport}
+                disabled={santImporting || santSelectedCount === 0 || !santAccount || !santMonth}
+                className="w-full"
+              >
+                {santImporting ? 'Importando...' : `Importar ${santSelectedCount} seleccionadas`}
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base flex items-center gap-2">
