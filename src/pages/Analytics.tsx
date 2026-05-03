@@ -213,6 +213,13 @@ export default function Analytics() {
     [categoryTree, categoryMonthly]
   );
 
+  const categoryChartData = useMemo(
+    () => categoryMonthly.filter(m =>
+      visibleCategoriesForChart.reduce((sum, cat) => sum + (m[cat.id] || 0), 0) > 0
+    ),
+    [categoryMonthly, visibleCategoriesForChart]
+  );
+
   const budgetVsActual = useMemo(() => {
     if (!allTransactions) return [];
     const now = new Date();
