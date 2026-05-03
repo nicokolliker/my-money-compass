@@ -53,11 +53,9 @@ export function parseMercadoPago(fileBuffer: ArrayBuffer, fxRate = 0): ParsedTra
       description: typeStr || 'MercadoPago',
       amountUSD,
       amountARS,
-      type: isIncome ? ('transfer' as any) : 'expense',
+      type: isIncome ? 'income' : 'expense',
       external_id,
       matched: false,
-      // @ts-expect-error extending lightly
-      direction: isIncome ? 'income' : 'expense',
     });
   }
 
