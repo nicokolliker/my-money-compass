@@ -36,6 +36,73 @@ interface PreviewRow extends ParsedTransaction {
   duplicate: boolean;
 }
 
+const MONTH_LABELS_FULL = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+
+function detectPredominantMonth(txs: { date: string }[]): string {
+  const counts = new Map<string, number>();
+  for (const t of txs) {
+    const m = (t.date || '').slice(0, 7);
+    if (!m) continue;
+    counts.set(m, (counts.get(m) || 0) + 1);
+  }
+  let best = '';
+  let max = 0;
+  for (const [m, c] of counts) {
+    if (c > max) {
+      max = c;
+      best = m;
+    }
+  }
+  return best || new Date().toISOString().slice(0, 7);
+}
+
+function shiftMonth(ym: string, delta: number): string {
+  const [y, m] = ym.split('-').map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function formatMonth(ym: string): string {
+  const [y, m] = ym.split('-').map(Number);
+  return `${MONTH_LABELS_FULL[m - 1]} ${y}`;
+}
+
+function MonthConfirm({
+  month,
+  onChange,
+  count,
+}: {
+  month: string;
+  onChange: (m: string) => void;
+  count: number;
+}) {
+  return (
+    <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm">
+      <span className="text-muted-foreground text-xs">Resumen detectado:</span>
+      <span className="font-medium text-foreground">{formatMonth(month)}</span>
+      <div className="flex items-center gap-1">
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-6 w-6 p-0"
+          onClick={() => onChange(shiftMonth(month, -1))}
+        >
+          <ChevronLeft className="h-3.5 w-3.5" />
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-6 w-6 p-0"
+          onClick={() => onChange(shiftMonth(month, 1))}
+        >
+          <ChevronRight className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+      <span className="text-xs text-muted-foreground">— {count} transacciones encontradas</span>
+    </div>
+  );
+}
+
 function FileDropzone({
   label,
   file,
