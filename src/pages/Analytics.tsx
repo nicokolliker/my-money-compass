@@ -349,7 +349,7 @@ export default function Analytics() {
         <CardContent>
           <div className="h-52">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={monthly}>
+              <AreaChart data={monthly}>
                 <XAxis
                   dataKey="month"
                   tick={{ fontSize: 10 }}
@@ -357,15 +357,17 @@ export default function Analytics() {
                 />
                 <YAxis
                   tick={{ fontSize: 10 }}
+                  tickCount={5}
+                  allowDecimals={false}
                   tickFormatter={v => `$${v >= 1000 ? `${(v/1000).toFixed(0)}k` : v}`}
                 />
                 <Tooltip
                   formatter={(v: number, key: string) => [formatUSD(v), key === 'income' ? 'Ingresos' : 'Gastos']}
                   contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid hsl(var(--border))' }}
                 />
-                <Bar dataKey="income" fill="hsl(var(--success, 142 71% 45%))" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="expenses" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} />
-              </BarChart>
+                <Area type="monotone" dataKey="income" stroke="hsl(var(--success, 142 71% 45%))" fill="hsl(var(--success, 142 71% 45%))" fillOpacity={0.15} strokeWidth={2} />
+                <Area type="monotone" dataKey="expenses" stroke="hsl(var(--destructive))" fill="hsl(var(--destructive))" fillOpacity={0.15} strokeWidth={2} />
+              </AreaChart>
             </ResponsiveContainer>
           </div>
           <div className="flex gap-4 justify-center mt-2">
