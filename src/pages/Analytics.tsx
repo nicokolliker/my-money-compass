@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useAccounts } from '@/hooks/useAccounts';
 import { useCategories, useSubcategories } from '@/hooks/useCategories';
@@ -11,7 +12,7 @@ import { getCategoryHex } from '@/lib/categoryColors';
 import { getCategoryIcon } from '@/lib/brandLogos';
 import { MerchantLogo } from '@/components/MerchantLogo';
 import { cn } from '@/lib/utils';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area, LineChart, Line } from 'recharts';
 import { ArrowUp, ArrowDown, ChevronDown } from 'lucide-react';
 
 type Period = 'this_month' | 'last_month' | 'last_3' | 'ytd' | 'q1' | 'q2' | 'q3' | 'q4' | 'all';
