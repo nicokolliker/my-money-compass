@@ -147,6 +147,13 @@ export default function Accounts() {
 
       <FundFlowDiagram />
 
+      <div className="flex justify-end">
+        <Button variant="outline" size="sm" onClick={() => setShowSettlement(true)}>
+          💸 Liquidar con el viejo
+        </Button>
+      </div>
+      <MonthlySettlementWizard open={showSettlement} onOpenChange={setShowSettlement} />
+
       {sections.map(section => {
         const sectionTotal = section.accounts.reduce((s, a) => s + a.computed_balance_usd, 0);
         const isOpen = !collapsed[section.key];
