@@ -12,7 +12,6 @@ import { useMerchants } from '@/hooks/useMerchants';
 import { useCreateTransaction, useCreateTransfer, useUpdateTransaction } from '@/hooks/useTransactions';
 import { useFxRates } from '@/hooks/useFxRates';
 import { CURRENCIES, TRANSACTION_TYPE_LABELS, formatUSD } from '@/lib/constants';
-import { SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { toast } from 'sonner';
 
 interface Props {
@@ -196,10 +195,6 @@ export function TransactionForm({ onSuccess, editData }: Props) {
 
   return (
     <div className="flex flex-col gap-4 overflow-y-auto">
-      <SheetHeader>
-        <SheetTitle>{isEdit ? 'Edit Transaction' : 'Add Transaction'}</SheetTitle>
-      </SheetHeader>
-
       {/* Type toggle */}
       <div className="flex gap-1 bg-muted rounded-lg p-1">
         {Object.entries(TRANSACTION_TYPE_LABELS).map(([key, label]) => (
