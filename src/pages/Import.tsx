@@ -19,6 +19,7 @@ import { useImportLog } from '@/hooks/useImportLog';
 import { MerchantLogo } from '@/components/MerchantLogo';
 import { AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useCategories } from '@/hooks/useCategories';
 import { inferCategoryName } from '@/hooks/useRuleSuggestions';
 
 
