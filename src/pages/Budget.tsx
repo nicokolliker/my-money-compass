@@ -299,11 +299,72 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                   <td colSpan={14} className="h-2 bg-muted/30 border-y border-border" />
                 </tr>
 
-                {/* Category rows (fixed + variable stacked) */}
-                {tree.map(cat => {
+                {/* Fixed section header */}
+                <tr className="bg-primary/5 cursor-pointer" onClick={() => setFixedExpanded(v => !v)}>
+                  <td
+                    className="px-3 py-2 sticky left-0 z-10 font-semibold text-primary text-xs"
+                    style={{ background: 'hsl(var(--card))', boxShadow: '2px 0 4px -2px rgba(0,0,0,0.08)' }}
+                  >
+                    <div className="flex items-center gap-1">
+                      <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', fixedExpanded && 'rotate-180')} />
+                      <span>🔒 Gastos fijos</span>
+                    </div>
+                  </td>
+                  {MONTHS.map((_, i) => (
+                    <td key={i} className={cn('px-2 py-2 text-center tabular-nums text-primary text-xs font-medium', isCurrent(i) && 'bg-primary/10')}>
+                      {fmt(totalRecurringMonthly)}
+                    </td>
+                  ))}
+                  <td className="px-3 py-2 text-right text-xs font-semibold text-primary tabular-nums">{fmt(totalRecurringMonthly * 12)}</td>
+                </tr>
+
+                {/* Fixed detail rows */}
+                {fixedExpanded && tree.filter(cat => cat.recurringMonthly > 0).map(cat => (
+                  <tr key={`fixed-${cat.id}`} className="border-b border-border/50">
+                    <td
+                      className="px-3 py-1.5 pl-8 sticky left-0 z-10 text-xs text-muted-foreground"
+                      style={{ background: 'hsl(var(--card))', boxShadow: '2px 0 4px -2px rgba(0,0,0,0.08)' }}
+                    >
+                      {cat.icon} {cat.name}
+                    </td>
+                    {MONTHS.map((_, i) => (
+                      <td key={i} className={cn('px-2 py-1.5 text-center tabular-nums text-xs text-primary/70', isCurrent(i) && 'bg-primary/5')}>
+                        {fmt(cat.recurringMonthly)}
+                      </td>
+                    ))}
+                    <td className="px-3 py-1.5 text-right text-xs text-primary/70 tabular-nums">{fmt(cat.recurringMonthly * 12)}</td>
+                  </tr>
+                ))}
+
+                {/* Variable section header */}
+                <tr className="bg-muted/40 cursor-pointer border-t-2 border-border" onClick={() => setVariableExpanded(v => !v)}>
+                  <td
+                    className="px-3 py-2 sticky left-0 z-10 font-semibold text-foreground text-xs"
+                    style={{ background: 'hsl(var(--muted))', boxShadow: '2px 0 4px -2px rgba(0,0,0,0.08)' }}
+                  >
+                    <div className="flex items-center gap-1">
+                      <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', variableExpanded && 'rotate-180')} />
+                      <span>📊 Gastos variables</span>
+                    </div>
+                  </td>
+                  {MONTHS.map((_, i) => {
+                    const varTotal = tree.reduce((s, cat) => s + (isPast(i) ? getActualSpending(cat.id, i) : getBudgetAmount(cat.id, i)), 0);
+                    return (
+                      <td key={i} className={cn('px-2 py-2 text-center tabular-nums text-xs font-medium', isCurrent(i) && 'bg-primary/5')}>
+                        {fmt(varTotal)}
+                      </td>
+                    );
+                  })}
+                  <td className="px-3 py-2 text-right text-xs font-semibold tabular-nums">
+                    {fmt(MONTHS.reduce((s, _, i) => s + tree.reduce((a, cat) => a + (isPast(i) ? getActualSpending(cat.id, i) : getBudgetAmount(cat.id, i)), 0), 0))}
+                  </td>
+                </tr>
+
+                {/* Variable category rows */}
+                {variableExpanded && tree.map(cat => {
                   const yearTotal = MONTHS.reduce((s, _, i) => {
                     const variable = isPast(i) ? getActualSpending(cat.id, i) : getBudgetAmount(cat.id, i);
-                    return s + cat.recurringMonthly + variable;
+                    return s + variable;
                   }, 0);
                   return (
                     <React.Fragment key={cat.id}>
@@ -327,56 +388,48 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                           </div>
                         </td>
                         {MONTHS.map((_, i) => {
-                          const fixed = cat.recurringMonthly;
                           const variable = getBudgetAmount(cat.id, i);
                           const actual = getActualSpending(cat.id, i);
-                          const isOver = (fixed + variable) > 0 && actual > (fixed + variable);
+                          const isOver = variable > 0 && actual > variable;
                           return (
                             <td
                               key={i}
                               className={cn('px-1 py-1 text-center tabular-nums align-middle', isCurrent(i) && 'bg-primary/5')}
                             >
-                              <div className="space-y-0.5">
-                                {fixed > 0 && (
-                                  <div className="text-[10px] text-primary font-medium tabular-nums" title="Recurring fixed">
-                                    🔒 {fmt(fixed)}
-                                  </div>
-                                )}
-                                {isPast(i) ? (
-                                  <div className={cn('text-[11px]', actual > 0 ? 'text-foreground' : 'text-muted-foreground')}>
+                              {isPast(i) ? (
+                                <div className={cn('text-[11px]', actual > 0 ? 'text-foreground' : 'text-muted-foreground')}>
+                                  {actual > 0 ? fmt(actual) : '—'}
+                                </div>
+                              ) : isCurrent(i) ? (
+                                <div className="space-y-0.5">
+                                  <div className={cn('text-[10px]', isOver ? 'text-destructive font-semibold' : 'text-muted-foreground')}>
                                     {actual > 0 ? fmt(actual) : '—'}
                                   </div>
-                                ) : isCurrent(i) ? (
-                                  <>
-                                    <div className={cn('text-[10px]', isOver ? 'text-destructive font-semibold' : 'text-muted-foreground')}>
-                                      {actual > 0 ? fmt(actual) : '—'}
-                                    </div>
-                                    <Input
-                                      key={`${cat.id}-cur-${selectedYear}-${i}-${variable}`}
-                                      type="number"
-                                      defaultValue={variable || ''}
-                                      placeholder="0"
-                                      className="h-6 text-[11px] text-center px-1 tabular-nums"
-                                      onBlur={(e) => {
-                                        const v = parseFloat(e.target.value);
-                                        if (!isNaN(v)) saveBudget(cat.id, i, v);
-                                      }}
-                                    />
-                                  </>
-                                ) : (
                                   <Input
-                                    key={`${cat.id}-fut-${selectedYear}-${i}-${variable}`}
+                                    key={`${cat.id}-cur-${selectedYear}-${i}-${variable}`}
                                     type="number"
                                     defaultValue={variable || ''}
                                     placeholder="0"
-                                    className="h-6 text-[11px] text-center px-1 tabular-nums"
+                                    className={cn('h-6 text-[11px] text-center px-1 tabular-nums', noSpinClass)}
                                     onBlur={(e) => {
                                       const v = parseFloat(e.target.value);
                                       if (!isNaN(v)) saveBudget(cat.id, i, v);
                                     }}
                                   />
-                                )}
-                              </div>
+                                </div>
+                              ) : (
+                                <Input
+                                  key={`${cat.id}-fut-${selectedYear}-${i}-${variable}`}
+                                  type="number"
+                                  defaultValue={variable || ''}
+                                  placeholder="0"
+                                  className={cn('h-6 text-[11px] text-center px-1 tabular-nums', noSpinClass)}
+                                  onBlur={(e) => {
+                                    const v = parseFloat(e.target.value);
+                                    if (!isNaN(v)) saveBudget(cat.id, i, v);
+                                  }}
+                                />
+                              )}
                             </td>
                           );
                         })}
@@ -410,7 +463,7 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                                       type="number"
                                       defaultValue={variable || ''}
                                       placeholder="0"
-                                      className="h-6 text-[11px] text-center px-1 tabular-nums"
+                                      className={cn('h-6 text-[11px] text-center px-1 tabular-nums', noSpinClass)}
                                       onBlur={(e) => {
                                         const v = parseFloat(e.target.value);
                                         if (!isNaN(v)) saveBudget(sub.id, i, v);
