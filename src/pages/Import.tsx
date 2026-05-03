@@ -13,8 +13,9 @@ import { useLatestFxRate } from '@/hooks/useFxRates';
 import { parseArqStatements, type ParsedTransaction } from '@/lib/importers/arqParser';
 import { parseMercadoPago } from '@/lib/importers/mercadoPagoParser';
 import { parseBancoCiudad, parseBancoCiudadObSoc } from '@/lib/importers/bancoCiudadParser';
-import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle } from 'lucide-react';
+import { useImportLog } from '@/hooks/useImportLog';
+import { AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
@@ -33,6 +34,73 @@ async function extractPdfText(file: File): Promise<string> {
 interface PreviewRow extends ParsedTransaction {
   selected: boolean;
   duplicate: boolean;
+}
+
+const MONTH_LABELS_FULL = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+
+function detectPredominantMonth(txs: { date: string }[]): string {
+  const counts = new Map<string, number>();
+  for (const t of txs) {
+    const m = (t.date || '').slice(0, 7);
+    if (!m) continue;
+    counts.set(m, (counts.get(m) || 0) + 1);
+  }
+  let best = '';
+  let max = 0;
+  for (const [m, c] of counts) {
+    if (c > max) {
+      max = c;
+      best = m;
+    }
+  }
+  return best || new Date().toISOString().slice(0, 7);
+}
+
+function shiftMonth(ym: string, delta: number): string {
+  const [y, m] = ym.split('-').map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function formatMonth(ym: string): string {
+  const [y, m] = ym.split('-').map(Number);
+  return `${MONTH_LABELS_FULL[m - 1]} ${y}`;
+}
+
+function MonthConfirm({
+  month,
+  onChange,
+  count,
+}: {
+  month: string;
+  onChange: (m: string) => void;
+  count: number;
+}) {
+  return (
+    <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm">
+      <span className="text-muted-foreground text-xs">Resumen detectado:</span>
+      <span className="font-medium text-foreground">{formatMonth(month)}</span>
+      <div className="flex items-center gap-1">
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-6 w-6 p-0"
+          onClick={() => onChange(shiftMonth(month, -1))}
+        >
+          <ChevronLeft className="h-3.5 w-3.5" />
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-6 w-6 p-0"
+          onClick={() => onChange(shiftMonth(month, 1))}
+        >
+          <ChevronRight className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+      <span className="text-xs text-muted-foreground">— {count} transacciones encontradas</span>
+    </div>
+  );
 }
 
 function FileDropzone({
@@ -107,6 +175,9 @@ export default function ImportPage() {
     );
   }, [accounts]);
 
+  const [arqMonth, setArqMonth] = useState<string>('');
+  const qc = useQueryClient();
+
   async function handleProcess() {
     if (!arsFile) {
       toast.error('Subí el estado ARS');
@@ -141,6 +212,7 @@ export default function ImportPage() {
           selected: !dupSet.has(p.external_id) && p.type !== 'transfer',
         })),
       );
+      setArqMonth(detectPredominantMonth(parsed));
       toast.success(`${parsed.length} transacciones detectadas`);
     } catch (e: any) {
       toast.error(e.message || 'Error al procesar PDF');
@@ -190,10 +262,25 @@ export default function ImportPage() {
       const { error } = await supabase.from('transactions').insert(payload);
       if (error) throw error;
 
+      if (arqMonth) {
+        await supabase.from('import_log').upsert(
+          {
+            user_id: user.id,
+            source: 'arq',
+            month: arqMonth,
+            transaction_count: toImport.length,
+            imported_at: new Date().toISOString(),
+          },
+          { onConflict: 'user_id,source,month' },
+        );
+        qc.invalidateQueries({ queryKey: ['import-log'] });
+      }
+
       const dupCount = rows.filter((r) => r.duplicate).length;
       setResultMsg(`${toImport.length} transacciones importadas, ${dupCount} duplicados ignorados`);
       toast.success('Importación completa');
       setRows([]);
+      setArqMonth('');
       setArsFile(null);
       setUsdFile(null);
     } catch (e: any) {
@@ -212,6 +299,7 @@ export default function ImportPage() {
   const [mpRows, setMpRows] = useState<PreviewRow[]>([]);
   const [mpImporting, setMpImporting] = useState(false);
   const [mpResultMsg, setMpResultMsg] = useState<string | null>(null);
+  const [mpMonth, setMpMonth] = useState<string>('');
 
   const mpAccount = useMemo(
     () => accounts?.find((a) => /mercado\s*pago|mercadopago/i.test(a.name)) || null,
@@ -243,6 +331,7 @@ export default function ImportPage() {
           selected: !dupSet.has(p.external_id),
         })),
       );
+      setMpMonth(detectPredominantMonth(parsed));
       toast.success(`${parsed.length} transacciones detectadas`);
     } catch (e: any) {
       toast.error(e.message || 'Error al procesar archivo');
@@ -283,10 +372,24 @@ export default function ImportPage() {
       });
       const { error } = await supabase.from('transactions').insert(payload);
       if (error) throw error;
+      if (mpMonth) {
+        await supabase.from('import_log').upsert(
+          {
+            user_id: user.id,
+            source: 'mercadopago',
+            month: mpMonth,
+            transaction_count: toImport.length,
+            imported_at: new Date().toISOString(),
+          },
+          { onConflict: 'user_id,source,month' },
+        );
+        qc.invalidateQueries({ queryKey: ['import-log'] });
+      }
       const dups = mpRows.filter((r) => r.duplicate).length;
       setMpResultMsg(`${toImport.length} transacciones importadas, ${dups} duplicados ignorados`);
       toast.success('Importación completa');
       setMpRows([]);
+      setMpMonth('');
       setMpFile(null);
     } catch (e: any) {
       toast.error(e.message || 'Error al importar');
@@ -305,6 +408,7 @@ export default function ImportPage() {
   const [bcRows, setBcRows] = useState<PreviewRow[]>([]);
   const [bcImporting, setBcImporting] = useState(false);
   const [bcResultMsg, setBcResultMsg] = useState<string | null>(null);
+  const [bcMonth, setBcMonth] = useState<string>('');
 
   const bcAccount = useMemo(
     () =>
@@ -345,6 +449,7 @@ export default function ImportPage() {
           selected: !dupSet.has(p.external_id),
         })),
       );
+      setBcMonth(detectPredominantMonth(parsed));
       toast.success(`${parsed.length} consumos detectados`);
     } catch (e: any) {
       toast.error(e.message || 'Error al procesar PDF');
@@ -383,10 +488,24 @@ export default function ImportPage() {
       });
       const { error } = await supabase.from('transactions').insert(payload);
       if (error) throw error;
+      if (bcMonth) {
+        await supabase.from('import_log').upsert(
+          {
+            user_id: user.id,
+            source: 'banco_ciudad',
+            month: bcMonth,
+            transaction_count: toImport.length,
+            imported_at: new Date().toISOString(),
+          },
+          { onConflict: 'user_id,source,month' },
+        );
+        qc.invalidateQueries({ queryKey: ['import-log'] });
+      }
       const dups = bcRows.filter((r) => r.duplicate).length;
       setBcResultMsg(`${toImport.length} consumos importados, ${dups} duplicados ignorados`);
       toast.success('Importación completa');
       setBcRows([]);
+      setBcMonth('');
       setBcIebraFile(null);
       setBcKollikerFile(null);
     } catch (e: any) {
@@ -503,6 +622,7 @@ export default function ImportPage() {
 
           {rows.length > 0 && (
             <div className="space-y-3">
+              <MonthConfirm month={arqMonth} onChange={setArqMonth} count={rows.length} />
               <div className="flex gap-2 flex-wrap">
                 <Badge>{selectedCount} seleccionadas</Badge>
                 {dupCount > 0 && <Badge variant="secondary">{dupCount} duplicadas</Badge>}
@@ -510,7 +630,7 @@ export default function ImportPage() {
               {renderPreviewTable(rows, toggleRow)}
               <Button
                 onClick={handleImport}
-                disabled={importing || selectedCount === 0 || !arqAccount}
+                disabled={importing || selectedCount === 0 || !arqAccount || !arqMonth}
                 className="w-full"
               >
                 {importing ? 'Importando...' : `Importar ${selectedCount} seleccionadas`}
@@ -555,6 +675,7 @@ export default function ImportPage() {
 
           {mpRows.length > 0 && (
             <div className="space-y-3">
+              <MonthConfirm month={mpMonth} onChange={setMpMonth} count={mpRows.length} />
               <div className="flex gap-2 flex-wrap">
                 <Badge>{mpSelectedCount} seleccionadas</Badge>
                 {mpDupCount > 0 && <Badge variant="secondary">{mpDupCount} duplicadas</Badge>}
@@ -564,7 +685,7 @@ export default function ImportPage() {
               )}
               <Button
                 onClick={handleMpImport}
-                disabled={mpImporting || mpSelectedCount === 0 || !mpAccount}
+                disabled={mpImporting || mpSelectedCount === 0 || !mpAccount || !mpMonth}
                 className="w-full"
               >
                 {mpImporting ? 'Importando...' : `Importar ${mpSelectedCount} seleccionadas`}
@@ -607,6 +728,7 @@ export default function ImportPage() {
 
           {bcRows.length > 0 && (
             <div className="space-y-3">
+              <MonthConfirm month={bcMonth} onChange={setBcMonth} count={bcRows.length} />
               <div className="flex gap-2 flex-wrap">
                 <Badge>{bcSelectedCount} seleccionadas</Badge>
                 {bcDupCount > 0 && <Badge variant="secondary">{bcDupCount} duplicadas</Badge>}
@@ -616,7 +738,7 @@ export default function ImportPage() {
               )}
               <Button
                 onClick={handleBcImport}
-                disabled={bcImporting || bcSelectedCount === 0 || !bcAccount}
+                disabled={bcImporting || bcSelectedCount === 0 || !bcAccount || !bcMonth}
                 className="w-full"
               >
                 {bcImporting ? 'Importando...' : `Importar ${bcSelectedCount} seleccionadas`}
@@ -639,31 +761,20 @@ export default function ImportPage() {
   );
 }
 
-const SOURCES: { key: string; label: string; prefix: string }[] = [
-  { key: 'arq', label: 'ARQ ARS', prefix: 'arq-' },
-  { key: 'mp', label: 'MercadoPago', prefix: 'mp-' },
-  { key: 'bc', label: 'Banco Ciudad', prefix: 'bc1689-' },
+const SOURCES: { key: 'arq' | 'mercadopago' | 'banco_ciudad'; label: string }[] = [
+  { key: 'arq', label: 'ARQ ARS' },
+  { key: 'mercadopago', label: 'MercadoPago' },
+  { key: 'banco_ciudad', label: 'Banco Ciudad' },
 ];
 
 const MONTH_LABELS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-const MONTH_LABELS_FULL = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
 function ymKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
 function ImportStatusPanel() {
-  const { data } = useQuery({
-    queryKey: ['import-status-external-ids'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('transactions')
-        .select('external_id, date')
-        .not('external_id', 'is', null);
-      if (error) throw error;
-      return data || [];
-    },
-  });
+  const { data } = useImportLog();
 
   const { months, statusBySource, pending } = useMemo(() => {
     const today = new Date();
@@ -684,11 +795,8 @@ function ImportStatusPanel() {
     const pending: { source: string; monthLabel: string }[] = [];
 
     for (const src of SOURCES) {
-      const matching = (data || []).filter((t: any) => t.external_id?.startsWith(src.prefix));
-      const monthsWithData = new Set<string>(
-        matching.map((t: any) => (t.date as string).slice(0, 7)),
-      );
-      // earliest month any data exists
+      const matching = (data || []).filter((t) => t.source === src.key);
+      const monthsWithData = new Set<string>(matching.map((t) => t.month));
       let earliest: string | null = null;
       for (const m of monthsWithData) if (!earliest || m < earliest) earliest = m;
       const hasHistory = monthsWithData.size > 0;
@@ -715,7 +823,6 @@ function ImportStatusPanel() {
     return { months, statusBySource, pending };
   }, [data]);
 
-  // group pending message
   const pendingMsg = useMemo(() => {
     if (pending.length === 0) return null;
     const byMonth = new Map<string, string[]>();

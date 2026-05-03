@@ -219,6 +219,33 @@ export type Database = {
         }
         Relationships: []
       }
+      import_log: {
+        Row: {
+          id: string
+          imported_at: string
+          month: string
+          source: string
+          transaction_count: number
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          imported_at?: string
+          month: string
+          source: string
+          transaction_count?: number
+          user_id: string
+        }
+        Update: {
+          id?: string
+          imported_at?: string
+          month?: string
+          source?: string
+          transaction_count?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       import_logs: {
         Row: {
           account_id: string | null
