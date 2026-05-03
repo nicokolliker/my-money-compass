@@ -5,13 +5,16 @@ import { useTransactions } from '@/hooks/useTransactions';
 import { useAccounts } from '@/hooks/useAccounts';
 import { useCategories, useSubcategories } from '@/hooks/useCategories';
 import { useCategoryTree } from '@/hooks/useCategoryTree';
+import { useBudgets } from '@/hooks/useBudgets';
 import { formatUSD } from '@/lib/constants';
 import { getCategoryHex } from '@/lib/categoryColors';
-import { getCategoryIcon, getBrandLogo, getInitialsColor } from '@/lib/brandLogos';
+import { getCategoryIcon } from '@/lib/brandLogos';
+import { MerchantLogo } from '@/components/MerchantLogo';
+import { cn } from '@/lib/utils';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { ArrowUp, ArrowDown, ChevronDown } from 'lucide-react';
 
-type Period = 'this_month' | 'last_month' | 'last_3' | 'ytd' | 'all';
+type Period = 'this_month' | 'last_month' | 'last_3' | 'ytd' | 'q1' | 'q2' | 'q3' | 'q4' | 'all';
 
 function getPeriodDates(period: Period) {
   const now = new Date();
@@ -44,16 +47,31 @@ function getPeriodDates(period: Period) {
       const prevTo = `${y - 1}-${String(m + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
       return { from, to: today, prevFrom, prevTo };
     }
+    case 'q1': {
+      return { from: `${y}-01-01`, to: `${y}-03-31`, prevFrom: `${y - 1}-01-01`, prevTo: `${y - 1}-03-31` };
+    }
+    case 'q2': {
+      return { from: `${y}-04-01`, to: `${y}-06-30`, prevFrom: `${y - 1}-04-01`, prevTo: `${y - 1}-06-30` };
+    }
+    case 'q3': {
+      return { from: `${y}-07-01`, to: `${y}-09-30`, prevFrom: `${y - 1}-07-01`, prevTo: `${y - 1}-09-30` };
+    }
+    case 'q4': {
+      return { from: `${y}-10-01`, to: `${y}-12-31`, prevFrom: `${y - 1}-10-01`, prevTo: `${y - 1}-12-31` };
+    }
     default:
       return { from: '2000-01-01', to: today, prevFrom: '1990-01-01', prevTo: '2000-01-01' };
   }
 }
+
+const CATEGORY_COLORS = ['#6366f1', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16', '#f97316'];
 
 export default function Analytics() {
   const { data: allTransactions, isLoading } = useTransactions();
   const { data: accounts } = useAccounts();
   const { data: categories } = useCategories();
   const { data: allSubcategories } = useSubcategories();
+  const { data: budgets } = useBudgets();
   const { tree: categoryTree } = useCategoryTree();
   const [period, setPeriod] = useState<Period>('this_month');
   const [accountFilter, setAccountFilter] = useState('all');
@@ -61,6 +79,7 @@ export default function Analytics() {
   const [digitalExpanded, setDigitalExpanded] = useState(false);
 
   const dates = useMemo(() => getPeriodDates(period), [period]);
+  const currentYear = new Date().getFullYear();
 
   const filterTx = (txs: any[], from: string, to: string) =>
     txs.filter(t => {
@@ -77,20 +96,17 @@ export default function Analytics() {
   const incomes = useMemo(() => transactions.filter(t => t.type === 'income'), [transactions]);
   const prevExpenses = useMemo(() => prevTransactions.filter(t => t.type === 'expense'), [prevTransactions]);
 
-  // Map subcategory_id -> parent category_id
   const subcatToParent = useMemo(() => {
     const m: Record<string, string> = {};
     (allSubcategories || []).forEach(s => { m[s.id] = s.category_id; });
     return m;
   }, [allSubcategories]);
 
-  // Sum per category from tree, attributing subcategory transactions to parent
   const byCategory = useMemo(() => {
     const totals: Record<string, number> = {};
     expenses.forEach(t => {
       const cid = t.category_id as string | null;
       if (!cid) return;
-      // If category_id is actually a subcategory, roll up
       const parent = subcatToParent[cid] || cid;
       totals[parent] = (totals[parent] || 0) + Math.abs(Number(t.amount_usd));
     });
@@ -107,7 +123,6 @@ export default function Analytics() {
     expenses.forEach(t => {
       const cid = t.category_id as string | null;
       if (!cid) return;
-      // direct subcategory hit
       if (subcatToParent[cid] === digital.id) {
         totals[cid] = (totals[cid] || 0) + Math.abs(Number(t.amount_usd));
       }
@@ -155,6 +170,71 @@ export default function Analytics() {
     }));
   }, [allTransactions, accountFilter, categoryFilter]);
 
+  const categoryMonthly = useMemo(() => {
+    if (!allTransactions || categoryTree.length === 0) return [];
+    const now = new Date();
+    const months: string[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+    }
+    const catTotals: Record<string, Record<string, number>> = {};
+    allTransactions
+      .filter(t => t.type === 'expense' && (!accountFilter || accountFilter === 'all' || t.account_id === accountFilter))
+      .forEach(t => {
+        const month = t.date.substring(0, 7);
+        if (!months.includes(month)) return;
+        const cid = t.category_id as string | null;
+        if (!cid) return;
+        const parent = subcatToParent[cid] || cid;
+        if (!catTotals[parent]) catTotals[parent] = {};
+        catTotals[parent][month] = (catTotals[parent][month] || 0) + Math.abs(Number(t.amount_usd));
+      });
+    return months.map(month => {
+      const entry: Record<string, any> = {
+        month,
+        label: new Date(month + '-01').toLocaleString('es', { month: 'short' }),
+      };
+      categoryTree.forEach(cat => {
+        entry[cat.id] = catTotals[cat.id]?.[month] || 0;
+      });
+      return entry;
+    });
+  }, [allTransactions, categoryTree, subcatToParent, accountFilter]);
+
+  const visibleCategoriesForChart = useMemo(
+    () => categoryTree.filter(cat => categoryMonthly.some(m => (m[cat.id] || 0) > 0)),
+    [categoryTree, categoryMonthly]
+  );
+
+  const budgetVsActual = useMemo(() => {
+    if (!allTransactions) return [];
+    const now = new Date();
+    const months: string[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+    }
+    return months.map(month => {
+      const actual = allTransactions
+        .filter(t => t.type === 'expense' && t.date.startsWith(month))
+        .reduce((s, t) => s + Math.abs(Number(t.amount_usd)), 0);
+      const budgeted = (budgets || [])
+        .filter(b => String(b.month).startsWith(month))
+        .reduce((s, b) => s + Number(b.amount || 0), 0);
+      const deviation = actual - budgeted;
+      const pct = budgeted > 0 ? Math.round((deviation / budgeted) * 100) : 0;
+      return {
+        month,
+        label: new Date(month + '-01').toLocaleString('es', { month: 'short' }),
+        actual: Math.round(actual),
+        budgeted: Math.round(budgeted),
+        deviation: Math.round(deviation),
+        pct,
+      };
+    });
+  }, [allTransactions, budgets]);
+
   const topMerchants = useMemo(() => {
     const map: Record<string, number> = {};
     expenses.forEach(t => {
@@ -166,7 +246,7 @@ export default function Analytics() {
 
   const maxMerchant = topMerchants[0]?.total || 1;
 
-  if (isLoading) return <div className="flex items-center justify-center h-64 text-muted-foreground">Loading...</div>;
+  if (isLoading) return <div className="flex items-center justify-center h-64 text-muted-foreground">Cargando...</div>;
 
   return (
     <div className="space-y-5">
@@ -175,26 +255,30 @@ export default function Analytics() {
       {/* Filters */}
       <div className="flex gap-2 flex-wrap">
         <Select value={period} onValueChange={v => setPeriod(v as Period)}>
-          <SelectTrigger className="w-[140px] h-9 rounded-xl text-xs"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="w-[160px] h-9 rounded-xl text-xs"><SelectValue /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="this_month">This Month</SelectItem>
-            <SelectItem value="last_month">Last Month</SelectItem>
-            <SelectItem value="last_3">Last 3 Months</SelectItem>
-            <SelectItem value="ytd">Year to Date</SelectItem>
-            <SelectItem value="all">All Time</SelectItem>
+            <SelectItem value="this_month">Este mes</SelectItem>
+            <SelectItem value="last_month">Mes anterior</SelectItem>
+            <SelectItem value="last_3">Últimos 3 meses</SelectItem>
+            <SelectItem value="ytd">Este año</SelectItem>
+            <SelectItem value="q1">Q1 {currentYear}</SelectItem>
+            <SelectItem value="q2">Q2 {currentYear}</SelectItem>
+            <SelectItem value="q3">Q3 {currentYear}</SelectItem>
+            <SelectItem value="q4">Q4 {currentYear}</SelectItem>
+            <SelectItem value="all">Todo</SelectItem>
           </SelectContent>
         </Select>
         <Select value={accountFilter} onValueChange={setAccountFilter}>
-          <SelectTrigger className="w-[140px] h-9 rounded-xl text-xs"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="w-[160px] h-9 rounded-xl text-xs"><SelectValue /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Accounts</SelectItem>
+            <SelectItem value="all">Todas las cuentas</SelectItem>
             {accounts?.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-          <SelectTrigger className="w-[140px] h-9 rounded-xl text-xs"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="w-[160px] h-9 rounded-xl text-xs"><SelectValue /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Categories</SelectItem>
+            <SelectItem value="all">Todas las categorías</SelectItem>
             {categories?.map(c => (
               <SelectItem key={c.id} value={c.id}>
                 <span className="flex items-center gap-1.5">
@@ -211,25 +295,25 @@ export default function Analytics() {
       <div className="grid grid-cols-3 gap-3">
         <Card className="border-success/20">
           <CardContent className="pt-4 pb-4">
-            <p className="text-[10px] text-muted-foreground font-medium">Income</p>
+            <p className="text-[10px] text-muted-foreground font-medium">Ingresos</p>
             <p className="text-lg font-bold text-success tabular-nums">{formatUSD(incomeTotal)}</p>
           </CardContent>
         </Card>
         <Card className="border-destructive/20">
           <CardContent className="pt-4 pb-4">
-            <p className="text-[10px] text-muted-foreground font-medium">Expenses</p>
+            <p className="text-[10px] text-muted-foreground font-medium">Gastos</p>
             <p className="text-lg font-bold text-destructive tabular-nums">{formatUSD(totalExpenses)}</p>
             {momChange !== 0 && (
               <p className={`text-[9px] flex items-center gap-0.5 mt-0.5 font-medium ${momChange > 0 ? 'text-destructive' : 'text-success'}`}>
                 {momChange > 0 ? <ArrowUp className="h-2.5 w-2.5" /> : <ArrowDown className="h-2.5 w-2.5" />}
-                {Math.abs(momChange).toFixed(0)}% vs prev
+                {Math.abs(momChange).toFixed(0)}% vs mes anterior
               </p>
             )}
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4 pb-4">
-            <p className="text-[10px] text-muted-foreground font-medium">Savings Rate</p>
+            <p className="text-[10px] text-muted-foreground font-medium">Tasa de ahorro</p>
             <p className={`text-lg font-bold tabular-nums ${savingsRate >= 0 ? 'text-success' : 'text-destructive'}`}>{savingsRate.toFixed(0)}%</p>
           </CardContent>
         </Card>
@@ -237,10 +321,10 @@ export default function Analytics() {
 
       {/* Fixed vs Variable */}
       <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Fixed vs Variable</CardTitle></CardHeader>
+        <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Fijos vs Variables</CardTitle></CardHeader>
         <CardContent>
           <div className="flex justify-between text-xs mb-1">
-            <span className="text-muted-foreground">Subscriptions (Fixed)</span>
+            <span className="text-muted-foreground">Gastos fijos (Recurring)</span>
             <span className="font-bold">{fixedPct.toFixed(0)}%</span>
           </div>
           <div className="w-full h-3 bg-muted rounded-full overflow-hidden">
@@ -255,12 +339,12 @@ export default function Analytics() {
 
       {/* Monthly Overview */}
       <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Monthly Overview</CardTitle></CardHeader>
+        <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Evolución mensual</CardTitle></CardHeader>
         <CardContent>
           <div className="h-52">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={monthly}>
-                <XAxis dataKey="month" tick={{ fontSize: 10 }} tickFormatter={m => { const [yy, mo] = m.split('-'); return new Date(+yy, +mo - 1).toLocaleString('en', { month: 'short' }); }} />
+                <XAxis dataKey="month" tick={{ fontSize: 10 }} tickFormatter={m => { const [yy, mo] = m.split('-'); return new Date(+yy, +mo - 1).toLocaleString('es', { month: 'short' }); }} />
                 <YAxis tick={{ fontSize: 10 }} tickFormatter={v => `$${v}`} />
                 <Tooltip formatter={(v: number) => formatUSD(v)} />
                 <Bar dataKey="income" fill="hsl(var(--success))" radius={[4, 4, 0, 0]} />
@@ -269,15 +353,102 @@ export default function Analytics() {
             </ResponsiveContainer>
           </div>
           <div className="flex gap-4 justify-center mt-2">
-            <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground"><span className="w-2.5 h-2.5 rounded-sm bg-success" /> Income</span>
-            <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground"><span className="w-2.5 h-2.5 rounded-sm bg-destructive" /> Expenses</span>
+            <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground"><span className="w-2.5 h-2.5 rounded-sm bg-success" /> Ingresos</span>
+            <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground"><span className="w-2.5 h-2.5 rounded-sm bg-destructive" /> Gastos</span>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Gasto por categoría (mes a mes) */}
+      <Card>
+        <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Gasto por categoría (últimos 6 meses)</CardTitle></CardHeader>
+        <CardContent>
+          {categoryMonthly.length > 0 && visibleCategoriesForChart.length > 0 ? (
+            <>
+              <div className="h-60">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={categoryMonthly}>
+                    <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+                    <YAxis tick={{ fontSize: 10 }} tickFormatter={v => `$${Math.round(v)}`} />
+                    <Tooltip
+                      formatter={(v: number, name: string) => {
+                        const cat = categoryTree.find(c => c.id === name);
+                        return [formatUSD(v), cat?.name || name];
+                      }}
+                    />
+                    {visibleCategoriesForChart.map((cat, idx) => (
+                      <Bar
+                        key={cat.id}
+                        dataKey={cat.id}
+                        stackId="a"
+                        fill={getCategoryHex(cat.name, cat.color) || CATEGORY_COLORS[idx % CATEGORY_COLORS.length]}
+                      />
+                    ))}
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="flex flex-wrap gap-2 mt-3">
+                {visibleCategoriesForChart.map((cat, idx) => (
+                  <span key={cat.id} className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                    <span
+                      className="w-2.5 h-2.5 rounded-sm"
+                      style={{ backgroundColor: getCategoryHex(cat.name, cat.color) || CATEGORY_COLORS[idx % CATEGORY_COLORS.length] }}
+                    />
+                    {cat.icon} {cat.name}
+                  </span>
+                ))}
+              </div>
+            </>
+          ) : (
+            <p className="text-xs text-muted-foreground py-8 text-center">Sin datos suficientes</p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Presupuesto vs Real */}
+      <Card>
+        <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Presupuesto vs Real</CardTitle></CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {budgetVsActual.map(m => {
+              const isOver = m.deviation > 0 && m.budgeted > 0;
+              const pctUsed = m.budgeted > 0 ? Math.min((m.actual / m.budgeted) * 100, 100) : 0;
+              return (
+                <div key={m.month}>
+                  <div className="flex items-center justify-between text-xs mb-1">
+                    <span className="text-foreground font-medium">{m.label}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground tabular-nums">{formatUSD(m.actual)} / {formatUSD(m.budgeted)}</span>
+                      {m.budgeted > 0 && (
+                        <span className={cn('tabular-nums font-medium', isOver ? 'text-destructive' : 'text-success')}>
+                          {isOver ? '+' : ''}{m.pct}%
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {m.budgeted > 0 ? (
+                    <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className={cn(
+                          'h-full rounded-full transition-all duration-500',
+                          isOver ? 'bg-destructive' : pctUsed > 80 ? 'bg-amber-500' : 'bg-emerald-500'
+                        )}
+                        style={{ width: `${pctUsed}%` }}
+                      />
+                    </div>
+                  ) : (
+                    <p className="text-[10px] text-muted-foreground italic">Sin presupuesto definido</p>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </CardContent>
       </Card>
 
       {/* By Category */}
       <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">By Category</CardTitle></CardHeader>
+        <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Por categoría</CardTitle></CardHeader>
         <CardContent>
           {pieData.length > 0 && (
             <div className="h-56">
@@ -334,7 +505,7 @@ export default function Analytics() {
                         );
                       })}
                       {digitalBreakdown.every(s => s.total === 0) && (
-                        <p className="text-xs text-muted-foreground px-2 py-1">No subcategory breakdown</p>
+                        <p className="text-xs text-muted-foreground px-2 py-1">Sin desglose por subcategoría</p>
                       )}
                     </div>
                   )}
@@ -347,32 +518,22 @@ export default function Analytics() {
 
       {/* Top Merchants */}
       <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Top Merchants</CardTitle></CardHeader>
+        <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Top merchants</CardTitle></CardHeader>
         <CardContent className="space-y-3">
-          {topMerchants.map(m => {
-            const brand = getBrandLogo(m.name);
-            const initials = getInitialsColor(m.name);
-            return (
-              <div key={m.name} className="flex items-center gap-3">
-                {brand ? (
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm ${brand.bg}`}>{brand.icon}</div>
-                ) : (
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${initials.bg} ${initials.text}`}>
-                    {m.name[0]?.toUpperCase()}
-                  </div>
-                )}
-                <div className="flex-1 min-w-0">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-foreground font-medium truncate">{m.name}</span>
-                    <span className="font-bold text-foreground tabular-nums shrink-0">{formatUSD(m.total)}</span>
-                  </div>
-                  <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden mt-1">
-                    <div className="h-full rounded-full bg-primary transition-all duration-500" style={{ width: `${(m.total / maxMerchant) * 100}%` }} />
-                  </div>
+          {topMerchants.map(m => (
+            <div key={m.name} className="flex items-center gap-3">
+              <MerchantLogo name={m.name} size={32} />
+              <div className="flex-1 min-w-0">
+                <div className="flex justify-between text-sm">
+                  <span className="text-foreground font-medium truncate">{m.name}</span>
+                  <span className="font-bold text-foreground tabular-nums shrink-0">{formatUSD(m.total)}</span>
+                </div>
+                <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden mt-1">
+                  <div className="h-full rounded-full bg-primary transition-all duration-500" style={{ width: `${(m.total / maxMerchant) * 100}%` }} />
                 </div>
               </div>
-            );
-          })}
+            </div>
+          ))}
         </CardContent>
       </Card>
     </div>
