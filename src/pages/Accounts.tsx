@@ -20,8 +20,8 @@ import { toast } from 'sonner';
 import { DemoDataBanner } from '@/components/DemoDataBanner';
 import { useDemoData } from '@/hooks/useDemoData';
 import { Badge } from '@/components/ui/badge';
-import { FundFlowDiagram } from '@/components/accounts/FundFlowDiagram';
 import { useQueryClient } from '@tanstack/react-query';
+import { useImportLog } from '@/hooks/useImportLog';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
@@ -173,8 +173,6 @@ export default function Accounts() {
           <p className="text-3xl font-extrabold mt-1 tracking-tight">{formatUSD(totalNetWorth)}</p>
         </CardContent>
       </Card>
-
-      <FundFlowDiagram />
 
 
 

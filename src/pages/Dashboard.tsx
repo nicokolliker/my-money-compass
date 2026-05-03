@@ -19,6 +19,7 @@ import { DemoDataBanner } from '@/components/DemoDataBanner';
 import { useDemoData } from '@/hooks/useDemoData';
 import { useHomeAlerts } from '@/hooks/useHomeAlerts';
 import { cn } from '@/lib/utils';
+import { FundFlowDiagram } from '@/components/accounts/FundFlowDiagram';
 
 function greeting() {
   const h = new Date().getHours();
@@ -99,6 +100,8 @@ export default function Dashboard() {
           </div>
         </CardContent>
       </Card>
+
+      <FundFlowDiagram />
 
       {/* Este mes */}
       <div>
