@@ -488,10 +488,24 @@ export default function ImportPage() {
       });
       const { error } = await supabase.from('transactions').insert(payload);
       if (error) throw error;
+      if (bcMonth) {
+        await supabase.from('import_log').upsert(
+          {
+            user_id: user.id,
+            source: 'banco_ciudad',
+            month: bcMonth,
+            transaction_count: toImport.length,
+            imported_at: new Date().toISOString(),
+          },
+          { onConflict: 'user_id,source,month' },
+        );
+        qc.invalidateQueries({ queryKey: ['import-log'] });
+      }
       const dups = bcRows.filter((r) => r.duplicate).length;
       setBcResultMsg(`${toImport.length} consumos importados, ${dups} duplicados ignorados`);
       toast.success('Importación completa');
       setBcRows([]);
+      setBcMonth('');
       setBcIebraFile(null);
       setBcKollikerFile(null);
     } catch (e: any) {
