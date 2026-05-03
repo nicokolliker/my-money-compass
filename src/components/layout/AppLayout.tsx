@@ -38,7 +38,7 @@ const NAV: NavEntry[] = [
       { path: '/rules/fx', label: 'FX Rates', icon: DollarSign },
     ],
   },
-  { path: '/import', label: 'Import', icon: Upload },
+  { path: '/import', label: 'Extractos', icon: Upload },
   { path: '/integrations', label: 'Integrations', icon: Plug },
 ];
 

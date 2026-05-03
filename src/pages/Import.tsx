@@ -12,13 +12,10 @@ import { useAccounts } from '@/hooks/useAccounts';
 import { useLatestFxRate } from '@/hooks/useFxRates';
 import { parseArqStatements, type ParsedTransaction } from '@/lib/importers/arqParser';
 import { parseMercadoPago } from '@/lib/importers/mercadoPagoParser';
-import { parseSplitwise, type SplitwiseRow } from '@/lib/importers/splitwiseParser';
 import { useImportLog } from '@/hooks/useImportLog';
 import { MerchantLogo } from '@/components/MerchantLogo';
 import { AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useCategories } from '@/hooks/useCategories';
-import { inferCategoryName } from '@/hooks/useRuleSuggestions';
 
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
@@ -405,159 +402,7 @@ export default function ImportPage() {
   const mpSelectedCount = mpRows.filter((r) => r.selected && !r.duplicate).length;
   const mpDupCount = mpRows.filter((r) => r.duplicate).length;
 
-  // ---- Splitwise state ----
-  const [swFile, setSwFile] = useState<File | null>(null);
-  const [swProcessing, setSwProcessing] = useState(false);
-  const [swRows, setSwRows] = useState<(SplitwiseRow & { selected: boolean; duplicate: boolean })[]>([]);
-  const [swImporting, setSwImporting] = useState(false);
-  const [swResultMsg, setSwResultMsg] = useState<string | null>(null);
-  const [swMonth, setSwMonth] = useState<string>('');
-  const [swCutoff, setSwCutoff] = useState<string>('2026-05-01');
-  const { data: categories } = useCategories();
 
-  const cashUsdAccount = useMemo(
-    () =>
-      accounts?.find((a) => a.currency === 'USD' && /cash|efectivo/i.test(a.name)) ||
-      accounts?.find((a) => a.type === 'cash' && a.currency === 'USD') ||
-      null,
-    [accounts],
-  );
-
-  async function handleSwProcess() {
-    if (!swFile) return;
-    setSwProcessing(true);
-    setSwResultMsg(null);
-    try {
-      const text = await swFile.text();
-      const parsed = parseSplitwise(text, 'nicolaskolliker', arsToUsd || 0, swCutoff);
-      if (parsed.length === 0) {
-        toast.error('No se encontraron gastos desde Mayo 2026');
-        setSwRows([]);
-        return;
-      }
-      const ids = parsed.map((p) => p.external_id);
-      const { data: existing } = await supabase
-        .from('transactions')
-        .select('external_id')
-        .in('external_id', ids);
-      const dupSet = new Set((existing || []).map((r: any) => r.external_id));
-      setSwRows(
-        parsed.map((p) => ({
-          ...p,
-          duplicate: dupSet.has(p.external_id),
-          selected: p.swType === 'expense' && !dupSet.has(p.external_id),
-        })),
-      );
-      setSwMonth(detectPredominantMonth(parsed));
-      toast.success(`${parsed.length} filas detectadas`);
-    } catch (e: any) {
-      toast.error(e.message || 'Error al procesar CSV');
-    } finally {
-      setSwProcessing(false);
-    }
-  }
-
-  function inferredCategoryId(name: string): string | null {
-    const catName = inferCategoryName(name);
-    if (!catName) return null;
-    return categories?.find((c) => c.name === catName)?.id || null;
-  }
-
-  async function handleSwImport() {
-    if (!cashUsdAccount) {
-      toast.error('No se encontró cuenta Cash USD');
-      return;
-    }
-    const expenses = swRows.filter((r) => r.selected && !r.duplicate && r.swType === 'expense');
-    const receivables = swRows.filter((r) => r.selected && !r.duplicate && r.swType === 'receivable');
-    if (expenses.length === 0 && receivables.length === 0) return;
-    setSwImporting(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
-
-      const splitwiseAcc = accounts?.find((a) => /splitwise/i.test(a.name));
-      const payload: any[] = [];
-
-      for (const r of expenses) {
-        payload.push({
-          user_id: user.id,
-          account_id: cashUsdAccount.id,
-          date: r.date,
-          description: r.description,
-          merchant: r.description,
-          amount: -r.amountUSD,
-          currency: 'USD',
-          fx_rate: 1,
-          amount_usd: -r.amountUSD,
-          type: 'expense' as const,
-          category_id: inferredCategoryId(r.description),
-          external_id: r.external_id,
-          raw_imported_description: r.description,
-        });
-      }
-
-      for (const r of receivables) {
-        if (!splitwiseAcc) continue;
-        payload.push({
-          user_id: user.id,
-          account_id: splitwiseAcc.id,
-          date: r.date,
-          description: r.description,
-          merchant: r.description,
-          amount: -r.amountUSD,
-          currency: 'USD',
-          fx_rate: 1,
-          amount_usd: -r.amountUSD,
-          type: 'expense' as const,
-          category_id: inferredCategoryId(r.description),
-          external_id: r.external_id,
-          raw_imported_description: r.description,
-        });
-      }
-
-      if (payload.length > 0) {
-        const { error } = await supabase.from('transactions').insert(payload);
-        if (error) throw error;
-      }
-
-      if (swMonth && expenses.length > 0) {
-        await supabase.from('import_log').upsert(
-          {
-            user_id: user.id,
-            source: 'splitwise',
-            month: swMonth,
-            transaction_count: expenses.length,
-            imported_at: new Date().toISOString(),
-          },
-          { onConflict: 'user_id,source,month' },
-        );
-        qc.invalidateQueries({ queryKey: ['import-log'] });
-      }
-
-      const owedTotal = receivables.reduce((s, r) => s + r.amountUSD, 0);
-      const parts = [`${expenses.length} gastos importados`];
-      if (receivables.length > 0) {
-        if (splitwiseAcc) parts.push(`${receivables.length} deudas registradas en Splitwise`);
-        else parts.push(`Te deben un total de $${owedTotal.toFixed(2)} USD`);
-      }
-      setSwResultMsg(parts.join(' · '));
-      toast.success('Importación completa');
-      setSwRows([]);
-      setSwMonth('');
-      setSwFile(null);
-    } catch (e: any) {
-      toast.error(e.message || 'Error al importar');
-    } finally {
-      setSwImporting(false);
-    }
-  }
-
-
-  const swSelectedCount = swRows.filter((r) => r.selected && !r.duplicate).length;
-  const swOwedTotal = swRows
-    .filter((r) => r.selected && !r.duplicate && r.swType === 'receivable')
-    .reduce((s, r) => s + r.amountUSD, 0);
 
   // ---- Wise CSV state ----
   const wiseSectionRef = useRef<HTMLDivElement>(null);
@@ -738,8 +583,8 @@ export default function ImportPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Import</h1>
-        <p className="text-sm text-muted-foreground">Importá estados de cuenta de tus integraciones</p>
+        <h1 className="text-2xl font-bold text-foreground">Extractos</h1>
+        <p className="text-sm text-muted-foreground">Importá extractos de tus cuentas para registrar el detalle de gastos</p>
       </div>
 
       <ImportStatusPanel />
@@ -860,120 +705,6 @@ export default function ImportPage() {
 
 
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base flex items-center gap-2">
-            <MerchantLogo name="Splitwise" domain="splitwise.com" size={28} />
-            Splitwise
-          </CardTitle>
-          <p className="text-xs text-muted-foreground pt-1">
-            Solo se importan gastos desde Mayo 2026. Exportá el CSV desde splitwise.com → Tu grupo → Exportar
-          </p>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <FileDropzone
-              label="Splitwise export (.csv)"
-              file={swFile}
-              onFile={setSwFile}
-              accept=".csv,text/csv"
-              acceptLabel="CSV"
-            />
-          </div>
-          <div className="flex items-center gap-2 text-xs">
-            <label className="text-muted-foreground">Fecha de corte:</label>
-            <input
-              type="date"
-              value={swCutoff}
-              onChange={(e) => setSwCutoff(e.target.value)}
-              className="rounded border border-border bg-background px-2 py-1 text-xs"
-            />
-            <span className="text-muted-foreground">solo se importan gastos desde esta fecha</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <Button onClick={handleSwProcess} disabled={!swFile || swProcessing}>
-              <Upload className="h-4 w-4 mr-2" />
-              {swProcessing ? 'Procesando...' : 'Procesar'}
-            </Button>
-            {!cashUsdAccount && (
-              <Badge variant="outline" className="text-amber-600">No se encontró cuenta Cash USD</Badge>
-            )}
-          </div>
-
-          {swResultMsg && (
-            <div className="flex items-center gap-2 text-sm text-success">
-              <CheckCircle2 className="h-4 w-4" /> {swResultMsg}
-            </div>
-          )}
-
-          {swRows.length > 0 && (
-            <div className="space-y-3">
-              <MonthConfirm month={swMonth} onChange={setSwMonth} count={swRows.length} />
-              <div className="flex gap-2 flex-wrap">
-                <Badge>{swSelectedCount} seleccionadas</Badge>
-                {swOwedTotal > 0 && (
-                  <Badge variant="secondary">Te deben ${swOwedTotal.toFixed(2)} USD</Badge>
-                )}
-              </div>
-              <div className="border rounded-lg max-h-[420px] overflow-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-8"></TableHead>
-                      <TableHead className="text-xs">Fecha</TableHead>
-                      <TableHead className="text-xs">Descripción</TableHead>
-                      <TableHead className="text-xs">Categoría</TableHead>
-                      <TableHead className="text-xs text-right">Monto USD</TableHead>
-                      <TableHead className="text-xs">Tipo</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {swRows.map((r, i) => (
-                      <TableRow
-                        key={r.external_id}
-                        className={`${r.duplicate ? 'opacity-50' : ''} ${r.swType === 'receivable' ? 'text-muted-foreground' : ''}`}
-                      >
-                        <TableCell>
-                          <Checkbox
-                            checked={r.selected}
-                            disabled={r.duplicate}
-                            onCheckedChange={() =>
-                              setSwRows((rs) => rs.map((x, idx) => (idx === i ? { ...x, selected: !x.selected } : x)))
-                            }
-                          />
-                        </TableCell>
-                        <TableCell className="text-xs">{r.date}</TableCell>
-                        <TableCell className="text-xs max-w-[260px] truncate">{r.description}</TableCell>
-                        <TableCell className="text-xs">{r.category_hint || '—'}</TableCell>
-                        <TableCell className="text-xs text-right font-mono tabular-nums">
-                          {r.amountUSD.toFixed(2)}
-                        </TableCell>
-                        <TableCell>
-                          {r.duplicate ? (
-                            <Badge variant="outline" className="text-[10px] h-4 px-1.5">Ya importado</Badge>
-                          ) : r.swType === 'expense' ? (
-                            <Badge className="text-[10px] h-4 px-1.5 bg-green-600 hover:bg-green-600/90">Pagaste</Badge>
-                          ) : (
-                            <Badge className="text-[10px] h-4 px-1.5 bg-blue-600 hover:bg-blue-600/90">Te deben</Badge>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-              <Button
-                onClick={handleSwImport}
-                disabled={swImporting || swSelectedCount === 0 || !cashUsdAccount || !swMonth}
-                className="w-full"
-              >
-                {swImporting ? 'Importando...' : `Importar ${swSelectedCount} seleccionadas`}
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
       {/* Wise CSV (manual) */}
       <div ref={wiseSectionRef}>
         <Card>
@@ -1039,10 +770,10 @@ export default function ImportPage() {
   );
 }
 
-const SOURCES: { key: 'arq' | 'mercadopago' | 'splitwise'; label: string }[] = [
+const SOURCES: { key: 'arq' | 'mercadopago' | 'wise'; label: string }[] = [
   { key: 'arq', label: 'ARQ ARS' },
   { key: 'mercadopago', label: 'MercadoPago' },
-  { key: 'splitwise', label: 'Splitwise' },
+  { key: 'wise', label: 'Wise (manual)' },
 ];
 
 const MONTH_LABELS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
