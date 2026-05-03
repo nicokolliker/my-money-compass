@@ -13,6 +13,7 @@ import { useLatestFxRate } from '@/hooks/useFxRates';
 import { parseArqStatements, type ParsedTransaction } from '@/lib/importers/arqParser';
 import { parseMercadoPago } from '@/lib/importers/mercadoPagoParser';
 import { parseBancoCiudad, parseBancoCiudadObSoc } from '@/lib/importers/bancoCiudadParser';
+import { parseSplitwise, type SplitwiseRow } from '@/lib/importers/splitwiseParser';
 import { useImportLog } from '@/hooks/useImportLog';
 import { MerchantLogo } from '@/components/MerchantLogo';
 import { AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react';
