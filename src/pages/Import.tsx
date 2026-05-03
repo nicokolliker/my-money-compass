@@ -33,7 +33,19 @@ interface PreviewRow extends ParsedTransaction {
   duplicate: boolean;
 }
 
-function PdfDropzone({ label, file, onFile }: { label: string; file: File | null; onFile: (f: File | null) => void }) {
+function FileDropzone({
+  label,
+  file,
+  onFile,
+  accept = 'application/pdf',
+  acceptLabel = 'PDF',
+}: {
+  label: string;
+  file: File | null;
+  onFile: (f: File | null) => void;
+  accept?: string;
+  acceptLabel?: string;
+}) {
   const inputRef = useRef<HTMLInputElement>(null);
   return (
     <div
@@ -43,7 +55,7 @@ function PdfDropzone({ label, file, onFile }: { label: string; file: File | null
       onDrop={(e) => {
         e.preventDefault();
         const f = e.dataTransfer.files?.[0];
-        if (f && f.type === 'application/pdf') onFile(f);
+        if (f) onFile(f);
       }}
     >
       <FileSpreadsheet className="h-7 w-7 text-muted-foreground" />
@@ -56,18 +68,22 @@ function PdfDropzone({ label, file, onFile }: { label: string; file: File | null
           </button>
         </div>
       ) : (
-        <p className="text-[11px] text-muted-foreground">Arrastrá o hacé click para seleccionar</p>
+        <p className="text-[11px] text-muted-foreground">Arrastrá o hacé click ({acceptLabel})</p>
       )}
       <input
         ref={inputRef}
         type="file"
-        accept="application/pdf"
+        accept={accept}
         className="hidden"
         onChange={(e) => onFile(e.target.files?.[0] || null)}
       />
     </div>
   );
 }
+
+const PdfDropzone = (props: { label: string; file: File | null; onFile: (f: File | null) => void }) => (
+  <FileDropzone {...props} accept="application/pdf" acceptLabel="PDF" />
+);
 
 export default function ImportPage() {
   const { data: accounts } = useAccounts();
