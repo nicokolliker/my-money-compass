@@ -577,15 +577,16 @@ export default function ImportPage() {
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Banco Ciudad — Tarjeta viejo</CardTitle>
           <p className="text-xs text-muted-foreground pt-1">
-            Solo se importan consumos de la tarjeta 1689 (N. Kolliker)
+            Tarjeta 1689 (titular IEBRA) y solo cargos OB SOC / PODER JUD de tarjeta 8157 (titular KOLLIKER ALFREDO)
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <PdfDropzone label="Resumen (.pdf)" file={bcFile} onFile={setBcFile} />
+            <PdfDropzone label="Resumen titular IEBRA (.pdf)" file={bcIebraFile} onFile={setBcIebraFile} />
+            <PdfDropzone label="Resumen titular KOLLIKER ALFREDO (.pdf)" file={bcKollikerFile} onFile={setBcKollikerFile} />
           </div>
           <div className="flex items-center gap-3">
-            <Button onClick={handleBcProcess} disabled={!bcFile || bcProcessing}>
+            <Button onClick={handleBcProcess} disabled={(!bcIebraFile && !bcKollikerFile) || bcProcessing}>
               <Upload className="h-4 w-4 mr-2" />
               {bcProcessing ? 'Procesando...' : 'Procesar'}
             </Button>
