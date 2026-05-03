@@ -1,5 +1,8 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { format, subMonths } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -10,15 +13,136 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { useAccountBalances, useCreateAccount, useUpdateAccount } from '@/hooks/useAccounts';
 import { useAccountGroups, useCreateAccountGroup, useUpdateAccountGroup, useDeleteAccountGroup } from '@/hooks/useAccountGroups';
 import { useNetWorth } from '@/hooks/useNetWorth';
+import { useImportLog } from '@/hooks/useImportLog';
+import { supabase } from '@/integrations/supabase/client';
 import { ACCOUNT_TYPE_LABELS, CURRENCIES, formatCurrency, formatUSD } from '@/lib/constants';
 import { MerchantLogo } from '@/components/MerchantLogo';
 import { getAccountStyle } from '@/lib/accountIcons';
-import { Plus, ChevronDown, FolderPlus, Pencil, Trash2, FileUp, PenLine, Wifi, Clock } from 'lucide-react';
+import { Plus, ChevronDown, FolderPlus, Pencil, Trash2, FileUp, PenLine, Wifi, Clock, ArrowLeftRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { DemoDataBanner } from '@/components/DemoDataBanner';
 import { useDemoData } from '@/hooks/useDemoData';
 import { Badge } from '@/components/ui/badge';
 import { FundFlowDiagram } from '@/components/accounts/FundFlowDiagram';
+
+const HUB_ACCOUNTS = ['wise', 'arq', 'dolarapp'];
+const isHub = (name: string) => HUB_ACCOUNTS.some(h => name.toLowerCase().includes(h));
+
+const REQUIRES_IMPORT: Record<string, string> = {
+  'arq':          'arq',
+  'dolarapp':     'arq',
+  'mercado pago': 'mercadopago',
+  'mercadopago':  'mercadopago',
+  'galicia':      'galicia',
+};
+const requiresImport = (name: string): string | null => {
+  const lower = name.toLowerCase();
+  for (const [key, source] of Object.entries(REQUIRES_IMPORT)) {
+    if (lower.includes(key)) return source;
+  }
+  return null;
+};
+
+function ReconciliationPanel({ account, transfers, importLog, allAccounts }: {
+  account: any;
+  transfers: any[];
+  importLog: any[];
+  allAccounts: any[];
+}) {
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+
+  const myTransfers = transfers.filter(t => t.account_id === account.id);
+  if (myTransfers.length === 0) return null;
+
+  const grouped = myTransfers.map(t => {
+    const month = t.date.slice(0, 7);
+    const counterpart = transfers.find(ct =>
+      ct.linked_transfer_id === t.id || t.linked_transfer_id === ct.id
+    );
+    const destAccount = allAccounts.find(a => a.id === counterpart?.account_id);
+    const destName = destAccount?.name || t.description || '—';
+    const importSource = requiresImport(destName);
+    const isImported = importSource
+      ? importLog?.some(l => l.source === importSource && l.month === month)
+      : null;
+
+    return {
+      date: t.date,
+      month,
+      destName,
+      amountUSD: Math.abs(Number(t.amount_usd)),
+      amountLocal: Math.abs(Number(t.amount)),
+      currency: t.currency,
+      importSource,
+      isImported,
+    };
+  });
+
+  const pendingCount = grouped.filter(g => g.isImported === false).length;
+
+  return (
+    <div className="mt-2 pt-2 border-t border-border" onClick={(e) => e.stopPropagation()}>
+      <button
+        onClick={(e) => { e.stopPropagation(); setOpen(o => !o); }}
+        className="flex items-center justify-between w-full text-xs text-muted-foreground hover:text-foreground transition-colors"
+      >
+        <div className="flex items-center gap-1.5">
+          <ArrowLeftRight className="h-3 w-3" />
+          <span>Transferencias salientes</span>
+          {pendingCount > 0 && (
+            <span className="text-[9px] bg-amber-100 text-amber-700 rounded px-1.5 py-0.5">
+              {pendingCount} sin conciliar
+            </span>
+          )}
+        </div>
+        <ChevronDown className={`h-3 w-3 transition-transform ${open ? '' : '-rotate-90'}`} />
+      </button>
+
+      {open && (
+        <div className="mt-2 space-y-1.5">
+          {grouped.map((g, i) => (
+            <div key={i} className="flex items-center justify-between text-xs gap-2">
+              <div className="flex-1 min-w-0 truncate">
+                <span className="text-muted-foreground">
+                  {format(new Date(g.date + 'T12:00:00'), 'd MMM', { locale: es })}
+                </span>
+                <span className="ml-1 text-foreground">→ {g.destName}</span>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <span className="tabular-nums text-foreground">
+                  {g.currency !== 'USD'
+                    ? `${g.currency} ${g.amountLocal.toLocaleString('es-AR', { maximumFractionDigits: 0 })}`
+                    : `$${g.amountUSD.toFixed(0)}`}
+                </span>
+                {g.isImported === true && (
+                  <span className="text-[9px] text-emerald-600">✓ conciliado</span>
+                )}
+                {g.isImported === false && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); navigate('/import'); }}
+                    className="text-[9px] bg-amber-100 text-amber-700 rounded px-1 py-0.5 hover:bg-amber-200 transition-colors"
+                  >
+                    ⚠ importar extracto
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+
+          {grouped.some(g => g.isImported === false) && (
+            <button
+              onClick={(e) => { e.stopPropagation(); navigate('/import'); }}
+              className="text-[10px] text-primary hover:underline mt-1"
+            >
+              Ir a Extractos →
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 
 function AccountLogo({ name, institution }: { name: string; institution?: string | null }) {
@@ -47,7 +171,23 @@ export default function Accounts() {
   const [editGroupId, setEditGroupId] = useState<string | null>(null);
   const [showAddChoice, setShowAddChoice] = useState(false);
   const [showPostCreate, setShowPostCreate] = useState(false);
-  
+
+  const { data: recentTransfers } = useQuery({
+    queryKey: ['reconciliation-transfers'],
+    queryFn: async () => {
+      const twoMonthsAgo = format(subMonths(new Date(), 2), 'yyyy-MM-01');
+      const { data } = await supabase
+        .from('transactions')
+        .select('id, date, amount, amount_usd, currency, account_id, description, linked_transfer_id')
+        .eq('type', 'transfer')
+        .lt('amount', 0)
+        .gte('date', twoMonthsAgo)
+        .order('date', { ascending: false });
+      return data || [];
+    },
+  });
+  const { data: importLog } = useImportLog();
+
 
   const sections = useMemo(() => {
     if (!accounts) return [];
@@ -185,26 +325,36 @@ export default function Accounts() {
                     const balUsd = a.computed_balance_usd;
                     const pct = totalNetWorth !== 0 ? (balUsd / totalNetWorth * 100) : 0;
                     return (
-                      <button key={a.id} onClick={() => openEdit(a)} className="flex items-center gap-3 w-full py-3 text-left hover:bg-accent/50 active:bg-accent rounded-lg px-2 -mx-2 transition-colors">
-                        <AccountLogo name={a.name} institution={(a as any).institution} />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <p className="text-sm font-semibold text-foreground truncate">{a.name}</p>
-                            {(a as any).source === 'csv' && <Badge variant="outline" className="text-[9px] h-4 px-1.5 shrink-0"><FileUp className="h-2.5 w-2.5 mr-0.5" />CSV</Badge>}
-                            {(a as any).source === 'manual' && <Badge variant="outline" className="text-[9px] h-4 px-1.5 shrink-0 text-muted-foreground"><PenLine className="h-2.5 w-2.5 mr-0.5" />Manual</Badge>}
+                      <div key={a.id}>
+                        <button onClick={() => openEdit(a)} className="flex items-center gap-3 w-full py-3 text-left hover:bg-accent/50 active:bg-accent rounded-lg px-2 -mx-2 transition-colors">
+                          <AccountLogo name={a.name} institution={(a as any).institution} />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <p className="text-sm font-semibold text-foreground truncate">{a.name}</p>
+                              {(a as any).source === 'csv' && <Badge variant="outline" className="text-[9px] h-4 px-1.5 shrink-0"><FileUp className="h-2.5 w-2.5 mr-0.5" />CSV</Badge>}
+                              {(a as any).source === 'manual' && <Badge variant="outline" className="text-[9px] h-4 px-1.5 shrink-0 text-muted-foreground"><PenLine className="h-2.5 w-2.5 mr-0.5" />Manual</Badge>}
+                            </div>
+                            {a.institution && <p className="text-xs text-muted-foreground">{a.institution}</p>}
                           </div>
-                          {a.institution && <p className="text-xs text-muted-foreground">{a.institution}</p>}
-                        </div>
-                        <div className="text-right shrink-0">
-                          <p className={`text-sm font-bold tabular-nums ${a.computed_balance < 0 ? 'text-destructive' : 'text-foreground'}`}>
-                            {formatCurrency(a.computed_balance, a.currency)}
-                          </p>
-                          <div className="flex items-center gap-1.5 justify-end">
-                            {a.currency !== 'USD' && <span className="text-[11px] text-muted-foreground tabular-nums">≈ {formatUSD(a.computed_balance_usd)}</span>}
-                            <span className="text-[10px] text-muted-foreground tabular-nums">{pct.toFixed(1)}%</span>
+                          <div className="text-right shrink-0">
+                            <p className={`text-sm font-bold tabular-nums ${a.computed_balance < 0 ? 'text-destructive' : 'text-foreground'}`}>
+                              {formatCurrency(a.computed_balance, a.currency)}
+                            </p>
+                            <div className="flex items-center gap-1.5 justify-end">
+                              {a.currency !== 'USD' && <span className="text-[11px] text-muted-foreground tabular-nums">≈ {formatUSD(a.computed_balance_usd)}</span>}
+                              <span className="text-[10px] text-muted-foreground tabular-nums">{pct.toFixed(1)}%</span>
+                            </div>
                           </div>
-                        </div>
-                      </button>
+                        </button>
+                        {isHub(a.name) && (
+                          <ReconciliationPanel
+                            account={a}
+                            transfers={recentTransfers || []}
+                            importLog={importLog || []}
+                            allAccounts={accounts || []}
+                          />
+                        )}
+                      </div>
                     );
                   })}
                 </CardContent>
