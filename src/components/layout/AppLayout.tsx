@@ -23,7 +23,6 @@ const NAV: NavEntry[] = [
   { path: '/transactions', label: 'Activity', icon: ArrowLeftRight },
   {
     label: 'Planning', icon: Target, children: [
-      { path: '/planning', label: 'Overview', icon: LayoutGrid },
       { path: '/planning/recurring', label: 'Recurring', icon: Repeat },
       { path: '/planning/calendar', label: 'Calendar', icon: CalendarDays },
       { path: '/planning/budget', label: 'Budget', icon: Target },
@@ -48,7 +47,7 @@ const MOBILE_TOP = [
   { path: '/transactions', label: 'Activity', icon: ArrowLeftRight },
 ];
 const MOBILE_BOTTOM = [
-  { path: '/planning', label: 'Planning', icon: Target },
+  { path: '/planning/recurring', label: 'Planning', icon: Target },
   { path: '/analytics', label: 'Analytics', icon: BarChart3 },
 ];
 
