@@ -1378,14 +1378,27 @@ export default function ImportPage() {
           </CardContent>
         </Card>
       </div>
+
+      <SettlementDialog
+        open={showSettlement}
+        onClose={() => setShowSettlement(false)}
+        bcTotalARS={bcRows.filter((r) => r.selected && !r.duplicate).reduce((s, r) => s + r.amountARS, 0)}
+        santTotalARS={santImportedTotal}
+        arsToUsd={arsToUsd || 0}
+        defaultBlueRate={blueRate?.rate || (arsToUsd ? 1 / arsToUsd : 1390)}
+        accounts={accounts || []}
+        categories={categories || []}
+        qc={qc}
+      />
     </div>
   );
 }
 
-const SOURCES: { key: 'arq' | 'mercadopago' | 'banco_ciudad' | 'splitwise'; label: string }[] = [
+const SOURCES: { key: 'arq' | 'mercadopago' | 'banco_ciudad' | 'santander' | 'splitwise'; label: string }[] = [
   { key: 'arq', label: 'ARQ ARS' },
   { key: 'mercadopago', label: 'MercadoPago' },
   { key: 'banco_ciudad', label: 'Banco Ciudad' },
+  { key: 'santander', label: 'Santander' },
   { key: 'splitwise', label: 'Splitwise' },
 ];
 
