@@ -299,7 +299,8 @@ export default function ImportPage() {
   const mpDupCount = mpRows.filter((r) => r.duplicate).length;
 
   // ---- Banco Ciudad state ----
-  const [bcFile, setBcFile] = useState<File | null>(null);
+  const [bcIebraFile, setBcIebraFile] = useState<File | null>(null);
+  const [bcKollikerFile, setBcKollikerFile] = useState<File | null>(null);
   const [bcProcessing, setBcProcessing] = useState(false);
   const [bcRows, setBcRows] = useState<PreviewRow[]>([]);
   const [bcImporting, setBcImporting] = useState(false);
@@ -314,14 +315,20 @@ export default function ImportPage() {
   );
 
   async function handleBcProcess() {
-    if (!bcFile) return;
+    if (!bcIebraFile && !bcKollikerFile) return;
     setBcProcessing(true);
     setBcResultMsg(null);
     try {
-      const text = await extractPdfText(bcFile);
-      const parsed = parseBancoCiudad(text, arsToUsd || 0);
+      const [iebraText, kollikerText] = await Promise.all([
+        bcIebraFile ? extractPdfText(bcIebraFile) : Promise.resolve(''),
+        bcKollikerFile ? extractPdfText(bcKollikerFile) : Promise.resolve(''),
+      ]);
+      const fx = arsToUsd || 0;
+      const a = iebraText ? parseBancoCiudad(iebraText, fx) : [];
+      const b = kollikerText ? parseBancoCiudadObSoc(kollikerText, fx) : [];
+      const parsed = [...a, ...b].sort((x, y) => x.date.localeCompare(y.date));
       if (parsed.length === 0) {
-        toast.error('No se encontraron consumos de la tarjeta 1689');
+        toast.error('No se encontraron consumos');
         setBcRows([]);
         return;
       }
