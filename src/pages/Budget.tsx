@@ -472,16 +472,17 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                       0
                     );
                     const result = income - recurringMonthlyTotal - variable;
+                    const noIncome = !isPast(i) && !isCurrent(i) && income === 0;
                     return (
                       <td
                         key={i}
                         className={cn(
                           'px-2 py-2 text-center tabular-nums font-bold',
-                          result >= 0 ? 'text-emerald-600' : 'text-destructive',
+                          noIncome ? 'text-muted-foreground' : result >= 0 ? 'text-emerald-600' : 'text-destructive',
                           isCurrent(i) && 'bg-primary/10'
                         )}
                       >
-                        {result >= 0 ? '+' : ''}{Math.round(result).toLocaleString('en-US')}
+                        {noIncome ? '—' : `${result >= 0 ? '+' : ''}${Math.round(result).toLocaleString('en-US')}`}
                       </td>
                     );
                   })}
@@ -489,6 +490,7 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                     {(() => {
                       const yearResult = MONTHS.reduce((s, _, i) => {
                         const income = isPast(i) ? getActualIncome(i) : getBudgetAmount(incomeCategoryId, i);
+                        if (!isPast(i) && !isCurrent(i) && income === 0) return s;
                         const variable = variableCategories.reduce(
                           (a, cat) => a + (isPast(i) ? getActualSpending(cat.id, i) : getBudgetAmount(cat.id, i)),
                           0
