@@ -12,7 +12,9 @@ import { useAccounts } from '@/hooks/useAccounts';
 import { useLatestFxRate } from '@/hooks/useFxRates';
 import { parseArqStatements, type ParsedTransaction } from '@/lib/importers/arqParser';
 import { parseMercadoPago } from '@/lib/importers/mercadoPagoParser';
-import { parseBancoCiudad } from '@/lib/importers/bancoCiudadParser';
+import { parseBancoCiudad, parseBancoCiudadObSoc } from '@/lib/importers/bancoCiudadParser';
+import { useQuery } from '@tanstack/react-query';
+import { AlertTriangle } from 'lucide-react';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
@@ -297,7 +299,8 @@ export default function ImportPage() {
   const mpDupCount = mpRows.filter((r) => r.duplicate).length;
 
   // ---- Banco Ciudad state ----
-  const [bcFile, setBcFile] = useState<File | null>(null);
+  const [bcIebraFile, setBcIebraFile] = useState<File | null>(null);
+  const [bcKollikerFile, setBcKollikerFile] = useState<File | null>(null);
   const [bcProcessing, setBcProcessing] = useState(false);
   const [bcRows, setBcRows] = useState<PreviewRow[]>([]);
   const [bcImporting, setBcImporting] = useState(false);
@@ -312,14 +315,20 @@ export default function ImportPage() {
   );
 
   async function handleBcProcess() {
-    if (!bcFile) return;
+    if (!bcIebraFile && !bcKollikerFile) return;
     setBcProcessing(true);
     setBcResultMsg(null);
     try {
-      const text = await extractPdfText(bcFile);
-      const parsed = parseBancoCiudad(text, arsToUsd || 0);
+      const [iebraText, kollikerText] = await Promise.all([
+        bcIebraFile ? extractPdfText(bcIebraFile) : Promise.resolve(''),
+        bcKollikerFile ? extractPdfText(bcKollikerFile) : Promise.resolve(''),
+      ]);
+      const fx = arsToUsd || 0;
+      const a = iebraText ? parseBancoCiudad(iebraText, fx) : [];
+      const b = kollikerText ? parseBancoCiudadObSoc(kollikerText, fx) : [];
+      const parsed = [...a, ...b].sort((x, y) => x.date.localeCompare(y.date));
       if (parsed.length === 0) {
-        toast.error('No se encontraron consumos de la tarjeta 1689');
+        toast.error('No se encontraron consumos');
         setBcRows([]);
         return;
       }
@@ -378,7 +387,8 @@ export default function ImportPage() {
       setBcResultMsg(`${toImport.length} consumos importados, ${dups} duplicados ignorados`);
       toast.success('Importación completa');
       setBcRows([]);
-      setBcFile(null);
+      setBcIebraFile(null);
+      setBcKollikerFile(null);
     } catch (e: any) {
       toast.error(e.message || 'Error al importar');
     } finally {
@@ -455,6 +465,8 @@ export default function ImportPage() {
         <h1 className="text-2xl font-bold text-foreground">Import</h1>
         <p className="text-sm text-muted-foreground">Importá estados de cuenta de tus integraciones</p>
       </div>
+
+      <ImportStatusPanel />
 
       {/* ARQ */}
       <Card>
@@ -567,15 +579,16 @@ export default function ImportPage() {
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Banco Ciudad — Tarjeta viejo</CardTitle>
           <p className="text-xs text-muted-foreground pt-1">
-            Solo se importan consumos de la tarjeta 1689 (N. Kolliker)
+            Tarjeta 1689 (titular IEBRA) y solo cargos OB SOC / PODER JUD de tarjeta 8157 (titular KOLLIKER ALFREDO)
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <PdfDropzone label="Resumen (.pdf)" file={bcFile} onFile={setBcFile} />
+            <PdfDropzone label="Resumen titular IEBRA (.pdf)" file={bcIebraFile} onFile={setBcIebraFile} />
+            <PdfDropzone label="Resumen titular KOLLIKER ALFREDO (.pdf)" file={bcKollikerFile} onFile={setBcKollikerFile} />
           </div>
           <div className="flex items-center gap-3">
-            <Button onClick={handleBcProcess} disabled={!bcFile || bcProcessing}>
+            <Button onClick={handleBcProcess} disabled={(!bcIebraFile && !bcKollikerFile) || bcProcessing}>
               <Upload className="h-4 w-4 mr-2" />
               {bcProcessing ? 'Procesando...' : 'Procesar'}
             </Button>
@@ -623,5 +636,165 @@ export default function ImportPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+const SOURCES: { key: string; label: string; prefix: string }[] = [
+  { key: 'arq', label: 'ARQ ARS', prefix: 'arq-' },
+  { key: 'mp', label: 'MercadoPago', prefix: 'mp-' },
+  { key: 'bc', label: 'Banco Ciudad', prefix: 'bc1689-' },
+];
+
+const MONTH_LABELS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+const MONTH_LABELS_FULL = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+
+function ymKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function ImportStatusPanel() {
+  const { data } = useQuery({
+    queryKey: ['import-status-external-ids'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('external_id, date')
+        .not('external_id', 'is', null);
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  const { months, statusBySource, pending } = useMemo(() => {
+    const today = new Date();
+    const months: { key: string; label: string; year: number; month: number }[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+      months.push({
+        key: ymKey(d),
+        label: MONTH_LABELS[d.getMonth()],
+        year: d.getFullYear(),
+        month: d.getMonth(),
+      });
+    }
+    const currentKey = ymKey(today);
+    const prevKey = ymKey(new Date(today.getFullYear(), today.getMonth() - 1, 1));
+
+    const statusBySource: Record<string, Record<string, 'has' | 'empty' | 'warn'>> = {};
+    const pending: { source: string; monthLabel: string }[] = [];
+
+    for (const src of SOURCES) {
+      const matching = (data || []).filter((t: any) => t.external_id?.startsWith(src.prefix));
+      const monthsWithData = new Set<string>(
+        matching.map((t: any) => (t.date as string).slice(0, 7)),
+      );
+      // earliest month any data exists
+      let earliest: string | null = null;
+      for (const m of monthsWithData) if (!earliest || m < earliest) earliest = m;
+      const hasHistory = monthsWithData.size > 0;
+
+      const row: Record<string, 'has' | 'empty' | 'warn'> = {};
+      for (const m of months) {
+        if (monthsWithData.has(m.key)) {
+          row[m.key] = 'has';
+        } else if (
+          hasHistory &&
+          earliest &&
+          m.key >= earliest &&
+          (m.key === currentKey || m.key === prevKey)
+        ) {
+          row[m.key] = 'warn';
+          const lbl = `${MONTH_LABELS_FULL[m.month]} ${m.year}`;
+          pending.push({ source: src.label, monthLabel: lbl });
+        } else {
+          row[m.key] = 'empty';
+        }
+      }
+      statusBySource[src.key] = row;
+    }
+    return { months, statusBySource, pending };
+  }, [data]);
+
+  // group pending message
+  const pendingMsg = useMemo(() => {
+    if (pending.length === 0) return null;
+    const byMonth = new Map<string, string[]>();
+    for (const p of pending) {
+      if (!byMonth.has(p.monthLabel)) byMonth.set(p.monthLabel, []);
+      byMonth.get(p.monthLabel)!.push(p.source);
+    }
+    const parts = Array.from(byMonth.entries()).map(([month, sources]) => {
+      const list =
+        sources.length === 1
+          ? sources[0]
+          : sources.length === 2
+          ? `${sources[0]} y ${sources[1]}`
+          : `${sources.slice(0, -1).join(', ')} y ${sources[sources.length - 1]}`;
+      return `${list} — ${month}`;
+    });
+    return `Tenés resúmenes pendientes de cargar: ${parts.join('; ')}`;
+  }, [pending]);
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base">Estado de importaciones</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-muted-foreground">
+                <th className="text-left font-medium pb-2 pr-3"></th>
+                {months.map((m) => (
+                  <th key={m.key} className="text-center font-medium pb-2 px-2 min-w-[44px]">
+                    {m.label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {SOURCES.map((src) => (
+                <tr key={src.key} className="border-t border-border">
+                  <td className="py-2 pr-3 font-medium text-foreground">{src.label}</td>
+                  {months.map((m) => {
+                    const s = statusBySource[src.key]?.[m.key];
+                    return (
+                      <td key={m.key} className="text-center py-2 px-2">
+                        {s === 'has' && (
+                          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-500/15 text-green-600 dark:text-green-400 text-sm">
+                            ✓
+                          </span>
+                        )}
+                        {s === 'warn' && (
+                          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 text-sm">
+                            ⚠
+                          </span>
+                        )}
+                        {s === 'empty' && (
+                          <span className="inline-block text-muted-foreground/50">—</span>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {pendingMsg ? (
+          <div className="flex items-start gap-2 rounded-lg border border-amber-300/40 bg-amber-50/60 dark:bg-amber-950/20 p-3">
+            <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+            <p className="text-xs text-amber-700 dark:text-amber-300">{pendingMsg}</p>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 rounded-lg border border-green-300/40 bg-green-50/60 dark:bg-green-950/20 p-3">
+            <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+            <p className="text-xs text-green-700 dark:text-green-300">Todo al día ✓</p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
