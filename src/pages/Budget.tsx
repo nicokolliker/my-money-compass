@@ -244,8 +244,24 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
       {/* Section 2: Annual planning table */}
       <div className="relative left-1/2 w-screen -translate-x-1/2 px-4 lg:w-[calc(100vw-16rem)] lg:px-6">
         <div className="rounded-xl border border-border bg-card overflow-hidden">
-          <div className="px-4 py-3 border-b border-border">
+          <div className="px-4 py-3 border-b border-border flex items-center justify-between gap-3">
             <h3 className="text-sm font-semibold">Planificación anual {selectedYear}</h3>
+            <div className="flex items-center gap-1 bg-muted rounded-lg p-0.5">
+              <button
+                onClick={() => setTableView('split')}
+                className={cn('text-xs px-3 py-1 rounded-md transition-colors',
+                  tableView === 'split' ? 'bg-background shadow-sm font-medium' : 'text-muted-foreground')}
+              >
+                Fijos + Variables
+              </button>
+              <button
+                onClick={() => setTableView('consolidated')}
+                className={cn('text-xs px-3 py-1 rounded-md transition-colors',
+                  tableView === 'consolidated' ? 'bg-background shadow-sm font-medium' : 'text-muted-foreground')}
+              >
+                Por categoría
+              </button>
+            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="text-xs border-collapse" style={{ minWidth: '960px', width: '100%' }}>
