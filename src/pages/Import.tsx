@@ -19,14 +19,8 @@ import { useImportLog } from '@/hooks/useImportLog';
 import { MerchantLogo } from '@/components/MerchantLogo';
 import { AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useCategories } from '@/hooks/useCategories';
-import { useBlueDollarRate } from '@/hooks/useBlueDollar';
 import { inferCategoryName } from '@/hooks/useRuleSuggestions';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
+
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
@@ -519,7 +513,7 @@ export default function ImportPage() {
       setBcMonth('');
       setBcIebraFile(null);
       setBcKollikerFile(null);
-      setShowSettlement(true);
+
     } catch (e: any) {
       toast.error(e.message || 'Error al importar');
     } finally {
@@ -537,7 +531,7 @@ export default function ImportPage() {
   const [santImporting, setSantImporting] = useState(false);
   const [santResultMsg, setSantResultMsg] = useState<string | null>(null);
   const [santMonth, setSantMonth] = useState<string>('');
-  const [santImportedTotal, setSantImportedTotal] = useState<number>(0);
+  
 
   const santAccount = useMemo(
     () => accounts?.find((a) => /santander/i.test(a.name)) || null,
@@ -617,15 +611,12 @@ export default function ImportPage() {
         );
         qc.invalidateQueries({ queryKey: ['import-log'] });
       }
-      const totalARS = toImport.reduce((s, r) => s + r.amountARS, 0);
-      setSantImportedTotal(totalARS);
       const dups = santRows.filter((r) => r.duplicate).length;
       setSantResultMsg(`${toImport.length} consumos importados, ${dups} duplicados ignorados`);
       toast.success('Importación completa');
       setSantRows([]);
       setSantMonth('');
       setSantFile(null);
-      setShowSettlement(true);
     } catch (e: any) {
       toast.error(e.message || 'Error al importar');
     } finally {
@@ -636,10 +627,7 @@ export default function ImportPage() {
   const santSelectedCount = santRows.filter((r) => r.selected && !r.duplicate).length;
   const santDupCount = santRows.filter((r) => r.duplicate).length;
 
-  // ---- Settlement panel state ----
-  const [showSettlement, setShowSettlement] = useState(false);
-  const { data: categories } = useCategories();
-  const { data: blueRate } = useBlueDollarRate();
+
 
 
   // ---- Splitwise state ----
@@ -1379,17 +1367,8 @@ export default function ImportPage() {
         </Card>
       </div>
 
-      <SettlementDialog
-        open={showSettlement}
-        onClose={() => setShowSettlement(false)}
-        bcTotalARS={bcRows.filter((r) => r.selected && !r.duplicate).reduce((s, r) => s + r.amountARS, 0)}
-        santTotalARS={santImportedTotal}
-        arsToUsd={arsToUsd || 0}
-        defaultBlueRate={blueRate?.rate || (arsToUsd ? 1 / arsToUsd : 1390)}
-        accounts={accounts || []}
-        categories={categories || []}
-        qc={qc}
-      />
+
+
     </div>
   );
 }
