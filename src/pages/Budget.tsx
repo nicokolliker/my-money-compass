@@ -306,13 +306,14 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                           <span className="text-emerald-600 font-medium">{actual > 0 ? fmt(actual) : '—'}</span>
                         ) : (
                           <Input
+                            key={`income-${selectedYear}-${i}-${getBudgetAmount(incomeCategoryId, i)}`}
                             type="number"
                             defaultValue={budgeted || ''}
                             placeholder="0"
                             className="h-7 text-xs text-center px-1 tabular-nums"
                             onBlur={(e) => {
                               const val = parseFloat(e.target.value);
-                              if (!isNaN(val) && incomeCategoryId && val !== budgeted) {
+                              if (!isNaN(val) && incomeCategoryId) {
                                 saveBudget(incomeCategoryId, i, val);
                               }
                             }}
@@ -390,25 +391,27 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                                   {actual > 0 ? fmt(actual) : '—'}
                                 </div>
                                 <Input
+                                  key={`${cat.id}-current-${selectedYear}-${i}-${getBudgetAmount(cat.id, i)}`}
                                   type="number"
                                   defaultValue={budgeted || ''}
                                   placeholder="0"
                                   className="h-6 text-[11px] text-center px-1 tabular-nums"
                                   onBlur={(e) => {
                                     const val = parseFloat(e.target.value);
-                                    if (!isNaN(val) && val !== budgeted) saveBudget(cat.id, i, val);
+                                    if (!isNaN(val)) saveBudget(cat.id, i, val);
                                   }}
                                 />
                               </div>
                             ) : (
                               <Input
+                                key={`${cat.id}-future-${selectedYear}-${i}-${getBudgetAmount(cat.id, i)}`}
                                 type="number"
                                 defaultValue={budgeted || ''}
                                 placeholder="0"
                                 className="h-7 text-xs text-center px-1 tabular-nums"
                                 onBlur={(e) => {
                                   const val = parseFloat(e.target.value);
-                                  if (!isNaN(val) && val !== budgeted) saveBudget(cat.id, i, val);
+                                  if (!isNaN(val)) saveBudget(cat.id, i, val);
                                 }}
                               />
                             )}
