@@ -25,7 +25,7 @@ const SECTION_META: Record<PlanningTab, { label: string; description: string }> 
   overview: { label: 'Overview', description: 'Snapshot of recurring, calendar and budget' },
   recurring: { label: 'Recurring', description: 'Library of recurring items and tracking of expected vs actual' },
   calendar: { label: 'Calendar', description: 'Expected payments by day across the month' },
-  budget: { label: 'Budget', description: 'Monthly limits per category and spending progress' },
+  budget: { label: 'Budget', description: 'Planificación mensual y anual' },
 };
 
 export default function Planning({ initialTab }: { initialTab?: PlanningTab } = {}) {
@@ -44,9 +44,11 @@ export default function Planning({ initialTab }: { initialTab?: PlanningTab } = 
     navigate(map[t], { replace: true });
   };
 
+  const fullWidth = tab === 'budget';
+
   return (
-    <div className="space-y-4 max-w-5xl">
-      <div>
+    <div className={fullWidth ? 'space-y-4' : 'space-y-4 max-w-5xl'}>
+      <div className={fullWidth ? 'relative left-1/2 w-screen -translate-x-1/2 px-4 lg:w-[calc(100vw-16rem)] lg:px-6' : ''}>
         <h1 className="text-2xl font-bold text-foreground">{meta.label}</h1>
         <p className="text-sm text-muted-foreground">{meta.description}</p>
       </div>
