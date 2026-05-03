@@ -171,7 +171,23 @@ export default function Accounts() {
   const [editGroupId, setEditGroupId] = useState<string | null>(null);
   const [showAddChoice, setShowAddChoice] = useState(false);
   const [showPostCreate, setShowPostCreate] = useState(false);
-  
+
+  const { data: recentTransfers } = useQuery({
+    queryKey: ['reconciliation-transfers'],
+    queryFn: async () => {
+      const twoMonthsAgo = format(subMonths(new Date(), 2), 'yyyy-MM-01');
+      const { data } = await supabase
+        .from('transactions')
+        .select('id, date, amount, amount_usd, currency, account_id, description, linked_transfer_id')
+        .eq('type', 'transfer')
+        .lt('amount', 0)
+        .gte('date', twoMonthsAgo)
+        .order('date', { ascending: false });
+      return data || [];
+    },
+  });
+  const { data: importLog } = useImportLog();
+
 
   const sections = useMemo(() => {
     if (!accounts) return [];
