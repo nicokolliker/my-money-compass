@@ -900,6 +900,33 @@ export type Database = {
           },
         ]
       }
+      user_settings: {
+        Row: {
+          created_at: string
+          updated_at: string
+          user_id: string
+          wise_last_sync: string | null
+          wise_profile_id: string | null
+          wise_token: string | null
+        }
+        Insert: {
+          created_at?: string
+          updated_at?: string
+          user_id: string
+          wise_last_sync?: string | null
+          wise_profile_id?: string | null
+          wise_token?: string | null
+        }
+        Update: {
+          created_at?: string
+          updated_at?: string
+          user_id?: string
+          wise_last_sync?: string | null
+          wise_profile_id?: string | null
+          wise_token?: string | null
+        }
+        Relationships: []
+      }
       wise_sync_log: {
         Row: {
           account_id: string | null
