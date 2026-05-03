@@ -62,6 +62,20 @@ export default function Accounts() {
 
   const qc = useQueryClient();
 
+  const IMPORTABLE = ['arq', 'dolarapp', 'mercado', 'galicia'];
+  function getLastImport(accountName: string): string | null {
+    const lower = (accountName || '').toLowerCase();
+    let source = '';
+    if (lower.includes('arq') || lower.includes('dolarapp')) source = 'arq';
+    else if (lower.includes('mercado')) source = 'mercadopago';
+    else if (lower.includes('galicia')) source = 'galicia';
+    else return null;
+    const entries = (importLog || [])
+      .filter(l => l.source === source)
+      .sort((a, b) => b.month.localeCompare(a.month));
+    return entries[0]?.month || null;
+  }
+
   const sections = useMemo(() => {
     if (!accounts) return [];
     const visibleAccounts = accounts.filter(a =>
