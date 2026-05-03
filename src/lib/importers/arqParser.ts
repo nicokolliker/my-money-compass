@@ -9,7 +9,7 @@ export interface ParsedTransaction {
   description: string;
   amountUSD: number;        // always positive
   amountARS: number;        // always positive
-  type: 'expense' | 'transfer' | 'fee';
+  type: 'expense' | 'transfer' | 'fee' | 'income';
   transferTarget?: string;
   external_id: string;      // "arq-ARS-{date}-{amountARSraw}"
   matched: boolean;         // true if a USD twin row was found
