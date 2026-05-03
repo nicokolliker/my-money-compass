@@ -106,27 +106,8 @@ export default function DebtsPage() {
   );
 }
 
-function StepRow({ n, label, done, note }: { n: number; label: string; done: boolean; note: string }) {
-  return (
-    <div className="flex items-start gap-3">
-      <div className={cn(
-        'shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold',
-        done ? 'bg-success/20 text-success' : 'bg-muted text-muted-foreground'
-      )}>
-        {done ? '✓' : n}
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className={cn('text-sm', done ? 'text-foreground' : 'text-muted-foreground')}>{label}</p>
-        <p className="text-xs text-muted-foreground">{note}</p>
-      </div>
-    </div>
-  );
-}
-
 function ViejoDebtCard({ account, importLog, onOpen }: {
-  account: any;
-  importLog: any[];
-  onOpen: () => void;
+  account: any; importLog: any[]; onOpen: () => void;
 }) {
   const currentMonth = format(new Date(), 'yyyy-MM');
   const balance = Number(account.computed_balance_usd || 0);
@@ -149,7 +130,33 @@ function ViejoDebtCard({ account, importLog, onOpen }: {
   });
 
   const yaLiquidado = (liquidacionTxs || []).length > 0;
-  const liquidadoUSD = yaLiquidado ? Math.abs(Number(liquidacionTxs?.[0]?.amount_usd || 0)) : 0;
+  const liquidadoUSD = yaLiquidado
+    ? Math.abs(Number(liquidacionTxs?.[0]?.amount_usd || 0))
+    : 0;
+
+  const steps = [
+    {
+      n: 1,
+      label: 'Cargar resúmenes',
+      sublabel: 'Banco Ciudad + Santander',
+      done: bcImportado,
+      status: bcImportado ? 'Importado este mes' : 'Pendiente',
+    },
+    {
+      n: 2,
+      label: 'Completar gastos manuales',
+      sublabel: 'Expensas, Obra Social, Préstamo, Cochera...',
+      done: bcImportado && yaLiquidado,
+      status: yaLiquidado ? 'Completado' : bcImportado ? 'Listo para completar' : 'Esperando paso 1',
+    },
+    {
+      n: 3,
+      label: 'Pagar en Cash USD',
+      sublabel: 'Vuelto ARS pendiente en Mercado Pago',
+      done: yaLiquidado,
+      status: yaLiquidado ? `Liquidado: ${formatUSD(liquidadoUSD)}` : 'Pendiente',
+    },
+  ];
 
   const ctaLabel = yaLiquidado
     ? 'Ver liquidación del mes'
@@ -178,10 +185,26 @@ function ViejoDebtCard({ account, importLog, onOpen }: {
           </div>
         </div>
 
-        <div className="space-y-2 border-t pt-3">
-          <StepRow n={1} label="Importar PDFs (BC + Santander)" done={bcImportado} note={bcImportado ? 'Importado' : 'Pendiente'} />
-          <StepRow n={2} label="Completar ítems manuales" done={yaLiquidado} note="Préstamo, expensas, patente..." />
-          <StepRow n={3} label="Liquidar con el viejo" done={yaLiquidado} note={yaLiquidado ? `Pagado ${formatUSD(liquidadoUSD)}` : 'Pendiente'} />
+        <div className="divide-y divide-border border-y">
+          {steps.map(step => (
+            <div key={step.n} className="flex items-center gap-3 py-3">
+              <div className={cn(
+                'shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold',
+                step.done ? 'bg-success/20 text-success' : 'bg-muted text-muted-foreground'
+              )}>
+                {step.done ? '✓' : step.n}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className={cn('text-sm font-medium', step.done ? 'text-foreground' : 'text-foreground')}>
+                  {step.label}
+                </p>
+                <p className="text-xs text-muted-foreground">{step.sublabel}</p>
+              </div>
+              <Badge variant={step.done ? 'secondary' : 'outline'} className="text-[10px] shrink-0">
+                {step.status}
+              </Badge>
+            </div>
+          ))}
         </div>
 
         <Button onClick={onOpen} className="w-full">{ctaLabel}</Button>
@@ -191,20 +214,50 @@ function ViejoDebtCard({ account, importLog, onOpen }: {
 }
 
 function SplitwiseDebtCard({ account, importLog, onOpen }: {
-  account: any;
-  importLog: any[];
-  onOpen: () => void;
+  account: any; importLog: any[]; onOpen: () => void;
 }) {
   const currentMonth = format(new Date(), 'yyyy-MM');
   const balance = Number(account.computed_balance_usd || 0);
   const teDebenAVos = balance > 0.5;
   const vosDebes = balance < -0.5;
 
-  const swImports = importLog
+  const swImports = (importLog || [])
     .filter(l => l.source === 'splitwise')
     .sort((a, b) => b.month.localeCompare(a.month));
   const lastImport = swImports[0];
   const importadoEsteMes = lastImport?.month === currentMonth;
+
+  const steps = [
+    {
+      n: 1,
+      label: 'Cargar CSV del mes',
+      sublabel: 'splitwise.com → Tu grupo → Exportar',
+      done: importadoEsteMes,
+      status: importadoEsteMes
+        ? 'Importado este mes'
+        : lastImport
+          ? `Último: ${lastImport.month}`
+          : 'Sin datos aún',
+    },
+    {
+      n: 2,
+      label: 'Revisar gastos y categorías',
+      sublabel: 'Confirmá en qué se gastó y quién pagó',
+      done: importadoEsteMes,
+      status: importadoEsteMes ? 'Revisado' : 'Pendiente',
+    },
+    {
+      n: 3,
+      label: 'Saldar deuda',
+      sublabel: 'Transferencia desde tu cuenta ARS',
+      done: !vosDebes,
+      status: vosDebes
+        ? `Debés ${formatUSD(Math.abs(balance))}`
+        : teDebenAVos
+          ? `Te deben ${formatUSD(balance)}`
+          : 'Al día ✓',
+    },
+  ];
 
   return (
     <Card>
@@ -215,7 +268,9 @@ function SplitwiseDebtCard({ account, importLog, onOpen }: {
             <div className="min-w-0">
               <p className="font-semibold text-base">Splitwise</p>
               <p className="text-xs text-muted-foreground">
-                {lastImport ? `Última actualización: ${lastImport.month}` : 'Sin datos aún'}
+                {lastImport
+                  ? `Última actualización: ${lastImport.month}`
+                  : 'Sin datos aún'}
               </p>
             </div>
           </div>
@@ -238,11 +293,27 @@ function SplitwiseDebtCard({ account, importLog, onOpen }: {
           </div>
         </div>
 
-        <p className="text-xs text-muted-foreground border-t pt-3">
-          Cargá el CSV mensual para actualizar el saldo y ver en qué gastaste con el grupo.
-        </p>
+        <div className="divide-y divide-border border-y">
+          {steps.map(step => (
+            <div key={step.n} className="flex items-center gap-3 py-3">
+              <div className={cn(
+                'shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold',
+                step.done ? 'bg-success/20 text-success' : 'bg-muted text-muted-foreground'
+              )}>
+                {step.done ? '✓' : step.n}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground">{step.label}</p>
+                <p className="text-xs text-muted-foreground">{step.sublabel}</p>
+              </div>
+              <Badge variant={step.done ? 'secondary' : 'outline'} className="text-[10px] shrink-0">
+                {step.status}
+              </Badge>
+            </div>
+          ))}
+        </div>
 
-        <Button onClick={onOpen} className="w-full" variant={importadoEsteMes ? 'default' : 'default'}>
+        <Button onClick={onOpen} className="w-full">
           {importadoEsteMes ? 'Actualizar / saldar →' : 'Cargar CSV de este mes →'}
         </Button>
       </CardContent>
