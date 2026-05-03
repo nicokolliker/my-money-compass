@@ -527,6 +527,7 @@ export default function ImportPage() {
   const [swImporting, setSwImporting] = useState(false);
   const [swResultMsg, setSwResultMsg] = useState<string | null>(null);
   const [swMonth, setSwMonth] = useState<string>('');
+  const [swCutoff, setSwCutoff] = useState<string>('2026-05-01');
 
   const cashUsdAccount = useMemo(
     () =>
@@ -542,7 +543,7 @@ export default function ImportPage() {
     setSwResultMsg(null);
     try {
       const text = await swFile.text();
-      const parsed = parseSplitwise(text, 'nicolaskolliker', arsToUsd || 0);
+      const parsed = parseSplitwise(text, 'nicolaskolliker', arsToUsd || 0, swCutoff);
       if (parsed.length === 0) {
         toast.error('No se encontraron gastos desde Mayo 2026');
         setSwRows([]);
@@ -1011,6 +1012,16 @@ export default function ImportPage() {
               accept=".csv,text/csv"
               acceptLabel="CSV"
             />
+          </div>
+          <div className="flex items-center gap-2 text-xs">
+            <label className="text-muted-foreground">Fecha de corte:</label>
+            <input
+              type="date"
+              value={swCutoff}
+              onChange={(e) => setSwCutoff(e.target.value)}
+              className="rounded border border-border bg-background px-2 py-1 text-xs"
+            />
+            <span className="text-muted-foreground">solo se importan gastos desde esta fecha</span>
           </div>
           <div className="flex items-center gap-3">
             <Button onClick={handleSwProcess} disabled={!swFile || swProcessing}>
