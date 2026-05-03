@@ -519,6 +519,7 @@ export default function ImportPage() {
       setBcMonth('');
       setBcIebraFile(null);
       setBcKollikerFile(null);
+      setShowSettlement(true);
     } catch (e: any) {
       toast.error(e.message || 'Error al importar');
     } finally {
