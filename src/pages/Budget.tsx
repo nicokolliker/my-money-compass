@@ -37,7 +37,7 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
   const { data: transactions } = useTransactions();
   const { data: budgets } = useBudgets();
   const { data: categories } = useCategories();
-  const { tree } = useCategoryTree();
+  const { tree, totalRecurringMonthly } = useCategoryTree();
   const upsertBudget = useUpsertBudget();
 
   const incomeCategoryId = useMemo(
