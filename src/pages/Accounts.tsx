@@ -21,6 +21,11 @@ import { DemoDataBanner } from '@/components/DemoDataBanner';
 import { useDemoData } from '@/hooks/useDemoData';
 import { Badge } from '@/components/ui/badge';
 import { FundFlowDiagram } from '@/components/accounts/FundFlowDiagram';
+import { useQueryClient } from '@tanstack/react-query';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 
 
@@ -54,27 +59,46 @@ export default function Accounts() {
 
 
 
+  const qc = useQueryClient();
+
   const sections = useMemo(() => {
     if (!accounts) return [];
+    const visibleAccounts = accounts.filter(a =>
+      !/deel/i.test(a.name) &&
+      !/deel/i.test((a as any).institution || '') &&
+      !['debt', 'credit_card'].includes(a.type)
+    );
     const result: { key: string; label: string; icon: string; isCustomGroup: boolean; accounts: typeof accounts }[] = [];
     const assignedIds = new Set<string>();
 
     if (groups && groups.length > 0) {
       for (const g of groups) {
-        const groupAccounts = accounts.filter(a => a.group_id === g.id);
+        const groupAccounts = visibleAccounts.filter(a => a.group_id === g.id);
         result.push({ key: g.id, label: g.name, icon: g.icon || '📁', isCustomGroup: true, accounts: groupAccounts });
         groupAccounts.forEach(a => assignedIds.add(a.id));
       }
-      const ungrouped = accounts.filter(a => !assignedIds.has(a.id));
+      const ungrouped = visibleAccounts.filter(a => !assignedIds.has(a.id));
       if (ungrouped.length > 0) {
         result.push({ key: 'ungrouped', label: 'Ungrouped', icon: '📦', isCustomGroup: false, accounts: ungrouped });
       }
     } else {
-      result.push({ key: 'all', label: 'All Accounts', icon: '🏦', isCustomGroup: false, accounts });
+      result.push({ key: 'all', label: 'All Accounts', icon: '🏦', isCustomGroup: false, accounts: visibleAccounts });
     }
 
     return result;
   }, [accounts, groups]);
+
+  async function handleDeleteAccount(id: string) {
+    try {
+      const { error } = await supabase.from('accounts').update({ is_active: false }).eq('id', id);
+      if (error) throw error;
+      toast.success('Cuenta eliminada');
+      qc.invalidateQueries({ queryKey: ['accounts'] });
+      qc.invalidateQueries({ queryKey: ['account-balances'] });
+    } catch (e: any) {
+      toast.error(e.message || 'Error al eliminar');
+    }
+  }
 
   const handleSave = async () => {
     try {
@@ -190,8 +214,8 @@ export default function Accounts() {
                     const balUsd = a.computed_balance_usd;
                     const pct = totalNetWorth !== 0 ? (balUsd / totalNetWorth * 100) : 0;
                     return (
-                      <div key={a.id}>
-                        <button onClick={() => openEdit(a)} className="flex items-center gap-3 w-full py-3 text-left hover:bg-accent/50 active:bg-accent rounded-lg px-2 -mx-2 transition-colors">
+                      <div key={a.id} className="flex items-center gap-1">
+                        <button onClick={() => openEdit(a)} className="flex items-center gap-3 flex-1 min-w-0 py-3 text-left hover:bg-accent/50 active:bg-accent rounded-lg px-2 -mx-2 transition-colors">
                           <AccountLogo name={a.name} institution={(a as any).institution} />
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5">
@@ -211,6 +235,30 @@ export default function Accounts() {
                             </div>
                           </div>
                         </button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive">
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>¿Eliminar cuenta?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Esta acción no se puede deshacer. Se eliminará la cuenta "{a.name}" y todas sus transacciones asociadas.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                onClick={() => handleDeleteAccount(a.id)}
+                              >
+                                Eliminar
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
                     );
                   })}
