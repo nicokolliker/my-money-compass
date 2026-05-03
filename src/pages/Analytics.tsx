@@ -309,19 +309,19 @@ export default function Analytics() {
       <div className="grid grid-cols-3 gap-3">
         <Card>
           <CardContent className="pt-4 pb-4">
-            <p className="text-[10px] text-muted-foreground font-medium">Ingresos</p>
+            <p className="text-xs text-muted-foreground font-medium">Ingresos</p>
             <p className="text-lg font-bold text-emerald-600 tabular-nums">{formatUSD(incomeTotal)}</p>
-            <p className="text-[9px] text-muted-foreground mt-0.5">
+            <p className="text-xs text-muted-foreground mt-0.5">
               {period === 'this_month' || period === 'last_month' ? 'este período' : ''}
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4 pb-4">
-            <p className="text-[10px] text-muted-foreground font-medium">Gastos</p>
+            <p className="text-xs text-muted-foreground font-medium">Gastos</p>
             <p className="text-lg font-bold text-destructive tabular-nums">{formatUSD(totalExpenses)}</p>
             {momChange !== 0 && (
-              <p className={cn('text-[9px] flex items-center gap-0.5 mt-0.5 font-medium', momChange > 0 ? 'text-destructive' : 'text-emerald-600')}>
+              <p className={cn('text-xs flex items-center gap-0.5 mt-0.5 font-medium', momChange > 0 ? 'text-destructive' : 'text-emerald-600')}>
                 {momChange > 0 ? <ArrowUp className="h-2.5 w-2.5" /> : <ArrowDown className="h-2.5 w-2.5" />}
                 {Math.abs(momChange).toFixed(0)}% vs anterior
               </p>
@@ -330,12 +330,12 @@ export default function Analytics() {
         </Card>
         <Card>
           <CardContent className="pt-4 pb-4">
-            <p className="text-[10px] text-muted-foreground font-medium">Ahorro</p>
+            <p className="text-xs text-muted-foreground font-medium">Ahorro</p>
             <p className={cn('text-lg font-bold tabular-nums', savingsRate >= 0 ? 'text-emerald-600' : 'text-destructive')}>
               {savingsRate.toFixed(0)}%
             </p>
             {incomeTotal > 0 && (
-              <p className="text-[9px] text-muted-foreground mt-0.5">
+              <p className="text-xs text-muted-foreground mt-0.5">
                 {formatUSD(Math.max(0, incomeTotal - totalExpenses))} guardado
               </p>
             )}
