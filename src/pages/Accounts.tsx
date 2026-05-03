@@ -19,6 +19,7 @@ import { DemoDataBanner } from '@/components/DemoDataBanner';
 import { useDemoData } from '@/hooks/useDemoData';
 import { Badge } from '@/components/ui/badge';
 import { FundFlowDiagram } from '@/components/accounts/FundFlowDiagram';
+import { MonthlySettlementWizard } from '@/components/accounts/MonthlySettlementWizard';
 
 function AccountLogo({ name, institution }: { name: string; institution?: string | null }) {
   // Try institution name first (e.g. "Wise", "Banco Galicia"), then fall back to account name
@@ -46,6 +47,7 @@ export default function Accounts() {
   const [editGroupId, setEditGroupId] = useState<string | null>(null);
   const [showAddChoice, setShowAddChoice] = useState(false);
   const [showPostCreate, setShowPostCreate] = useState(false);
+  const [showSettlement, setShowSettlement] = useState(false);
 
   const sections = useMemo(() => {
     if (!accounts) return [];
@@ -144,6 +146,13 @@ export default function Accounts() {
       </Card>
 
       <FundFlowDiagram />
+
+      <div className="flex justify-end">
+        <Button variant="outline" size="sm" onClick={() => setShowSettlement(true)}>
+          💸 Liquidar con el viejo
+        </Button>
+      </div>
+      <MonthlySettlementWizard open={showSettlement} onOpenChange={setShowSettlement} />
 
       {sections.map(section => {
         const sectionTotal = section.accounts.reduce((s, a) => s + a.computed_balance_usd, 0);
