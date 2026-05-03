@@ -79,7 +79,7 @@ export function useRecurringInstances(filters?: { from?: string; to?: string }) 
       const recurringIds = [...new Set(instances.map((i: any) => i.recurring_id as string))] as string[];
       const { data: recurringExpenses } = await supabase
         .from('recurring_expenses')
-        .select('id, name, type, frequency, category_id, categories(name, icon, color), accounts(name, currency, type)')
+        .select('id, name, type, frequency, category_id, categories!category_id(name, icon, color), accounts(name, currency, type)')
         .in('id', recurringIds);
 
       const expenseMap = Object.fromEntries((recurringExpenses || []).map((r: any) => [r.id, r]));
