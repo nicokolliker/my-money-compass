@@ -693,6 +693,12 @@ export default function ImportPage() {
     }
   }
 
+  function inferredCategoryId(name: string): string | null {
+    const catName = inferCategoryName(name);
+    if (!catName) return null;
+    return categories?.find((c) => c.name === catName)?.id || null;
+  }
+
   async function handleSwImport() {
     if (!cashUsdAccount) {
       toast.error('No se encontró cuenta Cash USD');
@@ -706,8 +712,11 @@ export default function ImportPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      if (expenses.length > 0) {
-        const payload = expenses.map((r) => ({
+      const splitwiseAcc = accounts?.find((a) => /splitwise/i.test(a.name));
+      const payload: any[] = [];
+
+      for (const r of expenses) {
+        payload.push({
           user_id: user.id,
           account_id: cashUsdAccount.id,
           date: r.date,
@@ -718,9 +727,32 @@ export default function ImportPage() {
           fx_rate: 1,
           amount_usd: -r.amountUSD,
           type: 'expense' as const,
+          category_id: inferredCategoryId(r.description),
           external_id: r.external_id,
           raw_imported_description: r.description,
-        }));
+        });
+      }
+
+      for (const r of receivables) {
+        if (!splitwiseAcc) continue;
+        payload.push({
+          user_id: user.id,
+          account_id: splitwiseAcc.id,
+          date: r.date,
+          description: r.description,
+          merchant: r.description,
+          amount: -r.amountUSD,
+          currency: 'USD',
+          fx_rate: 1,
+          amount_usd: -r.amountUSD,
+          type: 'expense' as const,
+          category_id: inferredCategoryId(r.description),
+          external_id: r.external_id,
+          raw_imported_description: r.description,
+        });
+      }
+
+      if (payload.length > 0) {
         const { error } = await supabase.from('transactions').insert(payload);
         if (error) throw error;
       }
@@ -741,7 +773,10 @@ export default function ImportPage() {
 
       const owedTotal = receivables.reduce((s, r) => s + r.amountUSD, 0);
       const parts = [`${expenses.length} gastos importados`];
-      if (receivables.length > 0) parts.push(`Te deben un total de $${owedTotal.toFixed(2)} USD`);
+      if (receivables.length > 0) {
+        if (splitwiseAcc) parts.push(`${receivables.length} deudas registradas en Splitwise`);
+        else parts.push(`Te deben un total de $${owedTotal.toFixed(2)} USD`);
+      }
       setSwResultMsg(parts.join(' · '));
       toast.success('Importación completa');
       setSwRows([]);
@@ -753,6 +788,7 @@ export default function ImportPage() {
       setSwImporting(false);
     }
   }
+
 
   const swSelectedCount = swRows.filter((r) => r.selected && !r.duplicate).length;
   const swOwedTotal = swRows
