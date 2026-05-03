@@ -277,7 +277,7 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                     <th
                       key={m}
                       className={cn(
-                        'px-2 py-2 text-center font-semibold text-foreground min-w-[80px]',
+                        'px-2 py-2 text-center font-semibold text-foreground min-w-[72px]',
                         isCurrent(i) && 'bg-primary/10 text-primary'
                       )}
                     >
