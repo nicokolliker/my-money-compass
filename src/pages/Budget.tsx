@@ -25,9 +25,9 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
   const [selectedChartMonth, setSelectedChartMonth] = useState(today.getMonth());
   const [digitalExpanded, setDigitalExpanded] = useState(false);
   const toggleDigital = () => setDigitalExpanded(v => !v);
-  const [trackingExpanded, setTrackingExpanded] = useState(true);
-  const [fixedExpanded, setFixedExpanded] = useState(true);
-  const [variableExpanded, setVariableExpanded] = useState(true);
+  const [trackingExpanded, setTrackingExpanded] = useState(false);
+  const [fixedExpanded, setFixedExpanded] = useState(false);
+  const [variableExpanded, setVariableExpanded] = useState(false);
   const [tableView, setTableView] = useState<'split' | 'consolidated'>('split');
 
   const noSpinClass = '[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none';
