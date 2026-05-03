@@ -8,7 +8,7 @@ import { useSubcategories } from '@/hooks/useCategories';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Check, ChevronsUpDown } from 'lucide-react';
 import { useAccounts } from '@/hooks/useAccounts';
-import { useCategories } from '@/hooks/useCategories';
+import { useCategories, useSubcategories } from '@/hooks/useCategories';
 import { useMerchants } from '@/hooks/useMerchants';
 import { useCreateTransaction, useCreateTransfer, useUpdateTransaction } from '@/hooks/useTransactions';
 import { useFxRates } from '@/hooks/useFxRates';
