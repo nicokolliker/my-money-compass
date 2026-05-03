@@ -237,6 +237,15 @@ export default function Accounts() {
                               {(a as any).source === 'manual' && <Badge variant="outline" className="text-[9px] h-4 px-1.5 shrink-0 text-muted-foreground"><PenLine className="h-2.5 w-2.5 mr-0.5" />Manual</Badge>}
                             </div>
                             {a.institution && <p className="text-xs text-muted-foreground">{a.institution}</p>}
+                            {IMPORTABLE.some(k => a.name.toLowerCase().includes(k)) && (
+                              <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
+                                <Clock className="h-2.5 w-2.5" />
+                                {getLastImport(a.name)
+                                  ? <>Últ. extracto: <span className="font-medium">{getLastImport(a.name)}</span></>
+                                  : <span className="italic">Sin extracto importado</span>
+                                }
+                              </p>
+                            )}
                           </div>
                           <div className="text-right shrink-0">
                             <p className={`text-sm font-bold tabular-nums ${a.computed_balance < 0 ? 'text-destructive' : 'text-foreground'}`}>
