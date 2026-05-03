@@ -529,6 +529,118 @@ export default function ImportPage() {
   const bcSelectedCount = bcRows.filter((r) => r.selected && !r.duplicate).length;
   const bcDupCount = bcRows.filter((r) => r.duplicate).length;
 
+  // ---- Santander state ----
+  const [santFile, setSantFile] = useState<File | null>(null);
+  const [santProcessing, setSantProcessing] = useState(false);
+  const [santRows, setSantRows] = useState<PreviewRow[]>([]);
+  const [santImporting, setSantImporting] = useState(false);
+  const [santResultMsg, setSantResultMsg] = useState<string | null>(null);
+  const [santMonth, setSantMonth] = useState<string>('');
+  const [santImportedTotal, setSantImportedTotal] = useState<number>(0);
+
+  const santAccount = useMemo(
+    () => accounts?.find((a) => /santander/i.test(a.name)) || null,
+    [accounts],
+  );
+
+  async function handleSantProcess() {
+    if (!santFile) return;
+    setSantProcessing(true);
+    setSantResultMsg(null);
+    try {
+      const text = await extractPdfText(santFile);
+      const parsed = parseSantander(text, arsToUsd || 0);
+      if (parsed.length === 0) {
+        toast.error('No se encontraron consumos en tarjeta 5829');
+        setSantRows([]);
+        return;
+      }
+      const ids = parsed.map((p) => p.external_id);
+      const { data: existing } = await supabase
+        .from('transactions')
+        .select('external_id')
+        .in('external_id', ids);
+      const dupSet = new Set((existing || []).map((r: any) => r.external_id));
+      setSantRows(
+        parsed.map((p) => ({ ...p, duplicate: dupSet.has(p.external_id), selected: !dupSet.has(p.external_id) })),
+      );
+      setSantMonth(detectPredominantMonth(parsed));
+      toast.success(`${parsed.length} consumos detectados`);
+    } catch (e: any) {
+      toast.error(e.message || 'Error al procesar PDF');
+    } finally {
+      setSantProcessing(false);
+    }
+  }
+
+  async function handleSantImport() {
+    if (!santAccount) {
+      toast.error('Creá una cuenta Santander en Accounts primero');
+      return;
+    }
+    const toImport = santRows.filter((r) => r.selected && !r.duplicate);
+    if (toImport.length === 0) return;
+    setSantImporting(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+      const payload = toImport.map((r) => {
+        const fxRate = r.amountARS > 0 && r.amountUSD > 0 ? r.amountUSD / r.amountARS : (arsToUsd || 0);
+        return {
+          user_id: user.id,
+          account_id: santAccount.id,
+          date: r.date,
+          description: r.description,
+          merchant: r.description,
+          amount: -r.amountARS,
+          currency: 'ARS',
+          fx_rate: fxRate,
+          amount_usd: -r.amountUSD,
+          type: 'expense' as const,
+          external_id: r.external_id,
+          raw_imported_description: r.description,
+        };
+      });
+      const { error } = await supabase.from('transactions').insert(payload);
+      if (error) throw error;
+      if (santMonth) {
+        await supabase.from('import_log').upsert(
+          {
+            user_id: user.id,
+            source: 'santander',
+            month: santMonth,
+            transaction_count: toImport.length,
+            imported_at: new Date().toISOString(),
+          },
+          { onConflict: 'user_id,source,month' },
+        );
+        qc.invalidateQueries({ queryKey: ['import-log'] });
+      }
+      const totalARS = toImport.reduce((s, r) => s + r.amountARS, 0);
+      setSantImportedTotal(totalARS);
+      const dups = santRows.filter((r) => r.duplicate).length;
+      setSantResultMsg(`${toImport.length} consumos importados, ${dups} duplicados ignorados`);
+      toast.success('Importación completa');
+      setSantRows([]);
+      setSantMonth('');
+      setSantFile(null);
+      setShowSettlement(true);
+    } catch (e: any) {
+      toast.error(e.message || 'Error al importar');
+    } finally {
+      setSantImporting(false);
+    }
+  }
+
+  const santSelectedCount = santRows.filter((r) => r.selected && !r.duplicate).length;
+  const santDupCount = santRows.filter((r) => r.duplicate).length;
+
+  // ---- Settlement panel state ----
+  const [showSettlement, setShowSettlement] = useState(false);
+  const { data: categories } = useCategories();
+  const { data: blueRate } = useBlueDollarRate();
+
+
   // ---- Splitwise state ----
   const [swFile, setSwFile] = useState<File | null>(null);
   const [swProcessing, setSwProcessing] = useState(false);
