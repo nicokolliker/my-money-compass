@@ -52,7 +52,6 @@ function normalizeDate(s: string): string | null {
 }
 
 export function parseSplitwise(
-export function parseSplitwise(
   csvText: string,
   userColumn: string = 'nicolaskolliker',
   arsToUsd: number = 0,
