@@ -408,7 +408,7 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                           </tr>
                         );
                       })}
-                    </>
+                    </React.Fragment>
                   );
                 })}
 
