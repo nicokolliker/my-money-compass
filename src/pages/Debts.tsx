@@ -25,6 +25,7 @@ import { parseBancoCiudad, parseBancoCiudadObSoc } from '@/lib/importers/bancoCi
 import { parseSantander } from '@/lib/importers/santanderParser';
 import { parseSplitwise, type SplitwiseRow } from '@/lib/importers/splitwiseParser';
 import { inferCategoryName } from '@/hooks/useRuleSuggestions';
+import { useImportLog } from '@/hooks/useImportLog';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
