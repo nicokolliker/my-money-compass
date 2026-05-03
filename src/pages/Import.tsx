@@ -518,6 +518,122 @@ export default function ImportPage() {
   const bcSelectedCount = bcRows.filter((r) => r.selected && !r.duplicate).length;
   const bcDupCount = bcRows.filter((r) => r.duplicate).length;
 
+  // ---- Wise CSV state ----
+  const wiseSectionRef = useRef<HTMLDivElement>(null);
+  const [wiseFile, setWiseFile] = useState<File | null>(null);
+  const [wiseProcessing, setWiseProcessing] = useState(false);
+  const [wiseRows, setWiseRows] = useState<(PreviewRow & { _currency?: string; _amount?: number })[]>([]);
+  const [wiseImporting, setWiseImporting] = useState(false);
+  const [wiseResultMsg, setWiseResultMsg] = useState<string | null>(null);
+  const [wiseMonth, setWiseMonth] = useState<string>('');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.search.includes('section=wise')) {
+      setTimeout(() => wiseSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
+    }
+  }, []);
+
+  async function handleWiseProcess() {
+    if (!wiseFile) return;
+    setWiseProcessing(true);
+    setWiseResultMsg(null);
+    try {
+      const text = await wiseFile.text();
+      const { parseWiseCsv } = await import('@/lib/importers/wiseCsvParser');
+      const parsed = parseWiseCsv(text) as any[];
+      if (parsed.length === 0) {
+        toast.error('No se encontraron transacciones');
+        setWiseRows([]);
+        return;
+      }
+      const ids = parsed.map((p) => p.external_id);
+      const { data: existing } = await supabase
+        .from('transactions')
+        .select('external_id')
+        .in('external_id', ids);
+      const dupSet = new Set((existing || []).map((r: any) => r.external_id));
+      setWiseRows(
+        parsed.map((p) => ({
+          ...p,
+          duplicate: dupSet.has(p.external_id),
+          selected: !dupSet.has(p.external_id),
+        })),
+      );
+      setWiseMonth(detectPredominantMonth(parsed));
+      toast.success(`${parsed.length} transacciones detectadas`);
+    } catch (e: any) {
+      toast.error(e.message || 'Error al procesar CSV');
+    } finally {
+      setWiseProcessing(false);
+    }
+  }
+
+  async function handleWiseImport() {
+    const toImport = wiseRows.filter((r) => r.selected && !r.duplicate);
+    if (toImport.length === 0) return;
+    setWiseImporting(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const payload: any[] = [];
+      for (const r of toImport) {
+        const cur = (r._currency || 'USD').toUpperCase();
+        const amt = r._amount ?? r.amountUSD;
+        const acct = accounts?.find(a => /wise/i.test(a.name) && a.currency === cur);
+        if (!acct) continue;
+        const isIncome = r.type === 'income';
+        const sign = isIncome ? 1 : -1;
+        payload.push({
+          user_id: user.id,
+          account_id: acct.id,
+          date: r.date,
+          description: r.description,
+          merchant: r.description,
+          amount: sign * amt,
+          currency: cur,
+          fx_rate: cur === 'USD' ? 1 : 0,
+          amount_usd: cur === 'USD' ? sign * amt : 0,
+          type: (isIncome ? 'income' : 'expense') as any,
+          external_id: r.external_id,
+          raw_imported_description: r.description,
+        });
+      }
+      if (payload.length === 0) {
+        toast.error('No se encontraron cuentas Wise correspondientes');
+        return;
+      }
+      const { error } = await supabase.from('transactions').insert(payload);
+      if (error) throw error;
+      if (wiseMonth) {
+        await supabase.from('import_log').upsert(
+          {
+            user_id: user.id,
+            source: 'wise',
+            month: wiseMonth,
+            transaction_count: payload.length,
+            imported_at: new Date().toISOString(),
+          },
+          { onConflict: 'user_id,source,month' },
+        );
+        qc.invalidateQueries({ queryKey: ['import-log'] });
+      }
+      const dups = wiseRows.filter((r) => r.duplicate).length;
+      setWiseResultMsg(`${payload.length} transacciones importadas, ${dups} duplicados ignorados`);
+      toast.success('Importación completa');
+      setWiseRows([]);
+      setWiseMonth('');
+      setWiseFile(null);
+    } catch (e: any) {
+      toast.error(e.message || 'Error al importar');
+    } finally {
+      setWiseImporting(false);
+    }
+  }
+
+  const wiseSelectedCount = wiseRows.filter((r) => r.selected && !r.duplicate).length;
+  const wiseDupCount = wiseRows.filter((r) => r.duplicate).length;
+
   function renderPreviewTable(
     items: PreviewRow[],
     onToggle: (i: number) => void,
