@@ -520,6 +520,122 @@ export default function ImportPage() {
   const bcSelectedCount = bcRows.filter((r) => r.selected && !r.duplicate).length;
   const bcDupCount = bcRows.filter((r) => r.duplicate).length;
 
+  // ---- Splitwise state ----
+  const [swFile, setSwFile] = useState<File | null>(null);
+  const [swProcessing, setSwProcessing] = useState(false);
+  const [swRows, setSwRows] = useState<(SplitwiseRow & { selected: boolean; duplicate: boolean })[]>([]);
+  const [swImporting, setSwImporting] = useState(false);
+  const [swResultMsg, setSwResultMsg] = useState<string | null>(null);
+  const [swMonth, setSwMonth] = useState<string>('');
+
+  const cashUsdAccount = useMemo(
+    () =>
+      accounts?.find((a) => a.currency === 'USD' && /cash|efectivo/i.test(a.name)) ||
+      accounts?.find((a) => a.type === 'cash' && a.currency === 'USD') ||
+      null,
+    [accounts],
+  );
+
+  async function handleSwProcess() {
+    if (!swFile) return;
+    setSwProcessing(true);
+    setSwResultMsg(null);
+    try {
+      const text = await swFile.text();
+      const parsed = parseSplitwise(text, 'nicolaskolliker', arsToUsd || 0);
+      if (parsed.length === 0) {
+        toast.error('No se encontraron gastos desde Mayo 2026');
+        setSwRows([]);
+        return;
+      }
+      const ids = parsed.map((p) => p.external_id);
+      const { data: existing } = await supabase
+        .from('transactions')
+        .select('external_id')
+        .in('external_id', ids);
+      const dupSet = new Set((existing || []).map((r: any) => r.external_id));
+      setSwRows(
+        parsed.map((p) => ({
+          ...p,
+          duplicate: dupSet.has(p.external_id),
+          selected: p.swType === 'expense' && !dupSet.has(p.external_id),
+        })),
+      );
+      setSwMonth(detectPredominantMonth(parsed));
+      toast.success(`${parsed.length} filas detectadas`);
+    } catch (e: any) {
+      toast.error(e.message || 'Error al procesar CSV');
+    } finally {
+      setSwProcessing(false);
+    }
+  }
+
+  async function handleSwImport() {
+    if (!cashUsdAccount) {
+      toast.error('No se encontró cuenta Cash USD');
+      return;
+    }
+    const expenses = swRows.filter((r) => r.selected && !r.duplicate && r.swType === 'expense');
+    const receivables = swRows.filter((r) => r.selected && !r.duplicate && r.swType === 'receivable');
+    if (expenses.length === 0 && receivables.length === 0) return;
+    setSwImporting(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      if (expenses.length > 0) {
+        const payload = expenses.map((r) => ({
+          user_id: user.id,
+          account_id: cashUsdAccount.id,
+          date: r.date,
+          description: r.description,
+          merchant: r.description,
+          amount: -r.amountUSD,
+          currency: 'USD',
+          fx_rate: 1,
+          amount_usd: -r.amountUSD,
+          type: 'expense' as const,
+          external_id: r.external_id,
+          raw_imported_description: r.description,
+        }));
+        const { error } = await supabase.from('transactions').insert(payload);
+        if (error) throw error;
+      }
+
+      if (swMonth && expenses.length > 0) {
+        await supabase.from('import_log').upsert(
+          {
+            user_id: user.id,
+            source: 'splitwise',
+            month: swMonth,
+            transaction_count: expenses.length,
+            imported_at: new Date().toISOString(),
+          },
+          { onConflict: 'user_id,source,month' },
+        );
+        qc.invalidateQueries({ queryKey: ['import-log'] });
+      }
+
+      const owedTotal = receivables.reduce((s, r) => s + r.amountUSD, 0);
+      const parts = [`${expenses.length} gastos importados`];
+      if (receivables.length > 0) parts.push(`Te deben un total de $${owedTotal.toFixed(2)} USD`);
+      setSwResultMsg(parts.join(' · '));
+      toast.success('Importación completa');
+      setSwRows([]);
+      setSwMonth('');
+      setSwFile(null);
+    } catch (e: any) {
+      toast.error(e.message || 'Error al importar');
+    } finally {
+      setSwImporting(false);
+    }
+  }
+
+  const swSelectedCount = swRows.filter((r) => r.selected && !r.duplicate).length;
+  const swOwedTotal = swRows
+    .filter((r) => r.selected && !r.duplicate && r.swType === 'receivable')
+    .reduce((s, r) => s + r.amountUSD, 0);
+
   // ---- Wise CSV state ----
   const wiseSectionRef = useRef<HTMLDivElement>(null);
   const [wiseFile, setWiseFile] = useState<File | null>(null);
