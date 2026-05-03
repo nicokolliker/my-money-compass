@@ -279,21 +279,21 @@ export default function Analytics() {
       <Card>
         <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">By Category</CardTitle></CardHeader>
         <CardContent>
-          {byCategory.length > 0 && (
+          {pieData.length > 0 && (
             <div className="h-56">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={byCategory}
+                    data={pieData}
                     dataKey="total"
                     nameKey="name"
                     cx="50%" cy="50%"
                     innerRadius={50} outerRadius={85}
                     paddingAngle={2}
-                    label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`}
+                    label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
                     labelLine={false}
                   >
-                    {byCategory.map(c => <Cell key={c.name} fill={getCategoryHex(c.name, c.color)} />)}
+                    {pieData.map((c: any) => <Cell key={c.id || c.name} fill={getCategoryHex(c.name, c.color)} />)}
                   </Pie>
                   <Tooltip formatter={(v: number) => formatUSD(v)} />
                 </PieChart>
@@ -304,13 +304,40 @@ export default function Analytics() {
             {byCategory.map(c => {
               const pct = totalExpenses > 0 ? (c.total / totalExpenses * 100) : 0;
               return (
-                <div key={c.name} className="flex items-center justify-between text-sm py-1 px-2 rounded-lg hover:bg-accent/50 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <span className="text-base">{getCategoryIcon(c.name, c.icon)}</span>
-                    <span className="text-foreground font-medium">{c.name}</span>
-                    <span className="text-xs text-muted-foreground">{pct.toFixed(0)}%</span>
+                <div key={c.id}>
+                  <div
+                    className={`flex items-center justify-between text-sm py-1 px-2 rounded-lg transition-colors ${c.isDigital ? 'cursor-pointer hover:bg-accent' : 'hover:bg-accent/50'}`}
+                    onClick={() => c.isDigital && setDigitalExpanded(v => !v)}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">{getCategoryIcon(c.name, c.icon)}</span>
+                      <span className="text-foreground font-medium">{c.name}</span>
+                      <span className="text-xs text-muted-foreground">{pct.toFixed(0)}%</span>
+                      {c.isDigital && (
+                        <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${digitalExpanded ? 'rotate-180' : ''}`} />
+                      )}
+                    </div>
+                    <span className="font-bold text-foreground tabular-nums">{formatUSD(c.total)}</span>
                   </div>
-                  <span className="font-bold text-foreground tabular-nums">{formatUSD(c.total)}</span>
+                  {c.isDigital && digitalExpanded && (
+                    <div className="ml-6 mt-1 space-y-1">
+                      {digitalBreakdown.filter(s => s.total > 0).map(s => {
+                        const sPct = totalExpenses > 0 ? (s.total / totalExpenses * 100) : 0;
+                        return (
+                          <div key={s.id} className="flex items-center justify-between text-xs py-1 px-2 rounded-lg text-muted-foreground">
+                            <div className="flex items-center gap-2">
+                              <span>{s.name}</span>
+                              <span>{sPct.toFixed(0)}%</span>
+                            </div>
+                            <span className="tabular-nums">{formatUSD(s.total)}</span>
+                          </div>
+                        );
+                      })}
+                      {digitalBreakdown.every(s => s.total === 0) && (
+                        <p className="text-xs text-muted-foreground px-2 py-1">No subcategory breakdown</p>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}
