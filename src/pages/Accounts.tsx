@@ -47,6 +47,7 @@ export default function Accounts() {
   const [editGroupId, setEditGroupId] = useState<string | null>(null);
   const [showAddChoice, setShowAddChoice] = useState(false);
   const [showPostCreate, setShowPostCreate] = useState(false);
+  const [showSettlement, setShowSettlement] = useState(false);
 
   const sections = useMemo(() => {
     if (!accounts) return [];
