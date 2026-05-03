@@ -136,10 +136,19 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
     <div className={embedded ? 'space-y-4' : 'space-y-5'}>
       {/* Header */}
       {!embedded && (
-        <div className="flex items-start justify-between gap-3">
-          <div className="text-left">
+        <div className="flex items-center justify-between">
+          <div>
             <h1 className="text-2xl font-bold text-foreground">Budget</h1>
             <p className="text-sm text-muted-foreground">Planificación mensual y anual por categoría</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setSelectedYear(y => y - 1)}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-base font-semibold tabular-nums w-14 text-center">{selectedYear}</span>
+            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setSelectedYear(y => y + 1)}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
           </div>
         </div>
       )}
