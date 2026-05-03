@@ -520,7 +520,7 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
                           <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${digitalSubExpanded ? 'rotate-180' : ''}`} />
                         </div>
                         {digitalSubExpanded && (
-                          <div className="px-3 py-2 rounded-lg bg-muted/10 border border-border/50 grid grid-cols-2 gap-y-1 sm:grid-cols-4">
+                          <div className="px-4 py-3 rounded-lg bg-muted/10 border border-border/50 space-y-1.5">
                             {Object.entries(DIGITAL_SUBTYPES).map(([subKey, sub]) => {
                               const subItems = group.items.filter((i: any) =>
                                 i.is_active && getDigitalSubtype(i.name) === subKey
@@ -529,12 +529,15 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
                                 const amountUsd = toUSD(Math.abs(Number(i.amount)), i.currency || 'USD', fxList);
                                 return s + toMonthlyAmount(amountUsd, i.frequency);
                               }, 0);
-                              if (subItems.length === 0) return null;
+                              if (subTotal === 0 && subItems.length === 0) return null;
                               return (
-                                <div key={subKey} className="text-xs flex items-center gap-1">
-                                  <span>{sub.icon}</span>
-                                  <span className="text-muted-foreground">{sub.label}</span>
-                                  <span className="font-medium ml-auto tabular-nums">{formatUSD(subTotal)}</span>
+                                <div key={subKey} className="flex items-center justify-between text-xs">
+                                  <div className="flex items-center gap-1.5 text-muted-foreground">
+                                    <span>{sub.icon}</span>
+                                    <span>{sub.label}</span>
+                                    <span className="text-muted-foreground/60">· {subItems.length} item{subItems.length !== 1 ? 's' : ''}</span>
+                                  </div>
+                                  <span className="font-medium text-foreground tabular-nums">{formatUSD(subTotal)}/mo</span>
                                 </div>
                               );
                             })}
