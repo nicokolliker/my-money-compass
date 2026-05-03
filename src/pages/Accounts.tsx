@@ -20,8 +20,8 @@ import { toast } from 'sonner';
 import { DemoDataBanner } from '@/components/DemoDataBanner';
 import { useDemoData } from '@/hooks/useDemoData';
 import { Badge } from '@/components/ui/badge';
-import { FundFlowDiagram } from '@/components/accounts/FundFlowDiagram';
 import { useQueryClient } from '@tanstack/react-query';
+import { useImportLog } from '@/hooks/useImportLog';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
@@ -39,6 +39,7 @@ function AccountLogo({ name, institution }: { name: string; institution?: string
 export default function Accounts() {
   const navigate = useNavigate();
   const { data: accounts, isLoading } = useAccountBalances();
+  const { data: importLog } = useImportLog();
   const { data: groups } = useAccountGroups();
   const createAccount = useCreateAccount();
   const updateAccount = useUpdateAccount();
@@ -60,6 +61,20 @@ export default function Accounts() {
 
 
   const qc = useQueryClient();
+
+  const IMPORTABLE = ['arq', 'dolarapp', 'mercado', 'galicia'];
+  function getLastImport(accountName: string): string | null {
+    const lower = (accountName || '').toLowerCase();
+    let source = '';
+    if (lower.includes('arq') || lower.includes('dolarapp')) source = 'arq';
+    else if (lower.includes('mercado')) source = 'mercadopago';
+    else if (lower.includes('galicia')) source = 'galicia';
+    else return null;
+    const entries = (importLog || [])
+      .filter(l => l.source === source)
+      .sort((a, b) => b.month.localeCompare(a.month));
+    return entries[0]?.month || null;
+  }
 
   const sections = useMemo(() => {
     if (!accounts) return [];
@@ -174,8 +189,6 @@ export default function Accounts() {
         </CardContent>
       </Card>
 
-      <FundFlowDiagram />
-
 
 
       {sections.map(section => {
@@ -224,6 +237,15 @@ export default function Accounts() {
                               {(a as any).source === 'manual' && <Badge variant="outline" className="text-[9px] h-4 px-1.5 shrink-0 text-muted-foreground"><PenLine className="h-2.5 w-2.5 mr-0.5" />Manual</Badge>}
                             </div>
                             {a.institution && <p className="text-xs text-muted-foreground">{a.institution}</p>}
+                            {IMPORTABLE.some(k => a.name.toLowerCase().includes(k)) && (
+                              <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
+                                <Clock className="h-2.5 w-2.5" />
+                                {getLastImport(a.name)
+                                  ? <>Últ. extracto: <span className="font-medium">{getLastImport(a.name)}</span></>
+                                  : <span className="italic">Sin extracto importado</span>
+                                }
+                              </p>
+                            )}
                           </div>
                           <div className="text-right shrink-0">
                             <p className={`text-sm font-bold tabular-nums ${a.computed_balance < 0 ? 'text-destructive' : 'text-foreground'}`}>
