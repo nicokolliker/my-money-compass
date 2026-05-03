@@ -20,7 +20,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { TransactionForm } from '@/components/transactions/TransactionForm';
 
 function formatDateGroupLabel(dateStr: string): string {
@@ -296,16 +296,19 @@ export default function Transactions() {
         </div>
       )}
 
-      <Sheet open={!!editTx} onOpenChange={(open) => { if (!open) setEditTx(null); }}>
-        <SheetContent side="bottom" className="h-[85vh] rounded-t-2xl overflow-y-auto">
+      <Dialog open={!!editTx} onOpenChange={(open) => { if (!open) setEditTx(null); }}>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Editar transacción</DialogTitle>
+          </DialogHeader>
           {editTx && (
             <TransactionForm
               editData={editTx}
               onSuccess={() => setEditTx(null)}
             />
           )}
-        </SheetContent>
-      </Sheet>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

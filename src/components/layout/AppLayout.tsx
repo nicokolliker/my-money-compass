@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { TransactionForm } from '@/components/transactions/TransactionForm';
 import { DebugPanel } from '@/components/DebugPanel';
 import { useAuth } from '@/hooks/useAuth';
@@ -195,12 +195,15 @@ export function AppLayout({ children }: { children: ReactNode }) {
         </div>
       </nav>
 
-      {/* Quick Add Sheet */}
-      <Sheet open={showQuickAdd} onOpenChange={setShowQuickAdd}>
-        <SheetContent side="bottom" className="h-[85vh] rounded-t-2xl overflow-y-auto">
+      {/* Quick Add Dialog */}
+      <Dialog open={showQuickAdd} onOpenChange={setShowQuickAdd}>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Nueva transacción</DialogTitle>
+          </DialogHeader>
           <TransactionForm onSuccess={() => setShowQuickAdd(false)} />
-        </SheetContent>
-      </Sheet>
+        </DialogContent>
+      </Dialog>
       <DebugPanel />
     </div>
   );
