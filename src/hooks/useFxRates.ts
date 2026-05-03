@@ -21,11 +21,18 @@ export function useFxRates() {
   });
 }
 
+const FALLBACK_TO_USD: Record<string, number> = {
+  ARS: 1 / 1390,
+  EUR: 1.08,
+  GBP: 1.27,
+};
+
 export function useLatestFxRate(fromCurrency: string, toCurrency = 'USD') {
   const { data: rates } = useFxRates();
-  if (!rates || fromCurrency === toCurrency) return 1;
+  if (fromCurrency === toCurrency) return 1;
+  if (!rates) return FALLBACK_TO_USD[fromCurrency] ?? 1;
   const rate = rates.find(r => r.from_currency === fromCurrency && r.to_currency === toCurrency);
-  return rate?.rate || 1;
+  return rate?.rate ?? FALLBACK_TO_USD[fromCurrency] ?? 1;
 }
 
 export function useCreateFxRate() {

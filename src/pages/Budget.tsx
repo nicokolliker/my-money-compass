@@ -58,7 +58,7 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
       const prefix = monthPrefix(selectedYear, monthIndex);
       return Math.abs(
         (transactions || [])
-          .filter(t => (t.category_id === categoryId || (t as any).subcategory_id === categoryId) && t.type === 'expense' && t.date.startsWith(prefix))
+          .filter(t => (t.category_id === categoryId || t.subcategory_id === categoryId) && t.type === 'expense' && t.date.startsWith(prefix))
           .reduce((s, t) => s + Number(t.amount_usd || 0), 0)
       );
     },
