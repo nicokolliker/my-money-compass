@@ -82,6 +82,10 @@ function MerchantCombobox({ merchants, value, onChange }: { merchants: any[]; va
 export function TransactionForm({ onSuccess, editData }: Props) {
   const { data: accounts } = useAccounts();
   const { data: categories } = useCategories();
+  const { data: allSubcategories } = useSubcategories();
+  const { tree: categoryTree } = useCategoryTree();
+  const digitalCategory = categoryTree.find(c => c.isDigital);
+  const digitalSubcategories = (allSubcategories || []).filter(s => digitalCategory && s.category_id === digitalCategory.id);
   const { data: merchants } = useMerchants();
   const { data: fxRates } = useFxRates();
   const createTx = useCreateTransaction();
