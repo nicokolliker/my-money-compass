@@ -137,19 +137,21 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
 
       {/* ─── PAGE HEADER ─── */}
       {!embedded && (
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Budget</h1>
-            <p className="text-sm text-muted-foreground">Planificación mensual y anual</p>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setSelectedYear(y => y - 1)}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span className="text-sm font-semibold tabular-nums w-14 text-center">{selectedYear}</span>
-            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setSelectedYear(y => y + 1)}>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
+        <div className="relative left-1/2 w-screen -translate-x-1/2 px-4 lg:w-[calc(100vw-16rem)] lg:px-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-foreground">Budget</h1>
+              <p className="text-sm text-muted-foreground">Planificación mensual y anual</p>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setSelectedYear(y => y - 1)}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="text-sm font-semibold tabular-nums w-14 text-center">{selectedYear}</span>
+              <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setSelectedYear(y => y + 1)}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </div>
       )}
