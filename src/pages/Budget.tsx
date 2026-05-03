@@ -28,6 +28,7 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
   const [trackingExpanded, setTrackingExpanded] = useState(true);
   const [fixedExpanded, setFixedExpanded] = useState(true);
   const [variableExpanded, setVariableExpanded] = useState(true);
+  const [tableView, setTableView] = useState<'split' | 'consolidated'>('split');
 
   const noSpinClass = '[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none';
 
@@ -135,10 +136,19 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
     <div className={embedded ? 'space-y-4' : 'space-y-5'}>
       {/* Header */}
       {!embedded && (
-        <div className="flex items-start justify-between gap-3">
-          <div className="text-left">
+        <div className="flex items-center justify-between">
+          <div>
             <h1 className="text-2xl font-bold text-foreground">Budget</h1>
             <p className="text-sm text-muted-foreground">Planificación mensual y anual por categoría</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setSelectedYear(y => y - 1)}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-base font-semibold tabular-nums w-14 text-center">{selectedYear}</span>
+            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setSelectedYear(y => y + 1)}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
           </div>
         </div>
       )}
@@ -147,82 +157,85 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
       <div className="relative left-1/2 w-screen -translate-x-1/2 px-4 lg:w-[calc(100vw-16rem)] lg:px-6">
         <Card>
           <div
-            className="flex items-center justify-between px-6 py-4 cursor-pointer border-b border-border gap-3"
+            className="flex items-center justify-between px-5 py-3 cursor-pointer"
             onClick={() => setTrackingExpanded(v => !v)}
           >
-            <div className="min-w-0">
-              <h3 className="text-sm font-semibold capitalize">
-                {monthLabel} — Seguimiento del mes
-              </h3>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {fmt(chartData.reduce((s, d) => s + d.spent, 0))} gastado de {fmt(chartData.reduce((s, d) => s + d.budgeted, 0))} presupuestado
-              </p>
-            </div>
-            <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-              <select
-                value={selectedChartMonth}
-                onChange={e => setSelectedChartMonth(Number(e.target.value))}
-                className="text-xs border border-border rounded-lg px-2 py-1 bg-background"
-              >
-                {MONTHS.map((m, i) => (
-                  <option key={m} value={i}>{m}</option>
-                ))}
-              </select>
-              <div className="flex items-center gap-1">
-                <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setSelectedYear(y => y - 1)}>
-                  <ChevronLeft className="h-3.5 w-3.5" />
-                </Button>
-                <span className="text-xs font-semibold tabular-nums w-12 text-center">{selectedYear}</span>
-                <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setSelectedYear(y => y + 1)}>
-                  <ChevronRight className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-              <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', trackingExpanded && 'rotate-180')} />
-            </div>
-          </div>
-          {trackingExpanded && (
-            <CardContent>
-              {chartData.length === 0 ? (
-                <div className="py-6 text-center space-y-1">
-                  <p className="text-sm text-muted-foreground">No hay presupuestos definidos para este mes.</p>
-                  <p className="text-xs text-muted-foreground">Usá la tabla de abajo para definir tu presupuesto mensual.</p>
+            <div className="flex items-center gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={selectedChartMonth}
+                    onChange={e => setSelectedChartMonth(Number(e.target.value))}
+                    className="text-sm font-semibold border-0 bg-transparent focus:outline-none cursor-pointer capitalize"
+                    onClick={e => e.stopPropagation()}
+                  >
+                    {MONTHS.map((m, i) => <option key={m} value={i}>{m}</option>)}
+                  </select>
+                  <span className="text-sm font-semibold text-foreground">{selectedYear}</span>
+                  <span className="text-sm text-muted-foreground">— Seguimiento</span>
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  {chartData.map(item => {
-                    const pctUsed = item.budgeted > 0 ? Math.min((item.spent / item.budgeted) * 100, 100) : 0;
-                    const isOver = item.spent > item.budgeted && item.budgeted > 0;
-                    const remaining = item.budgeted - item.spent;
-                    const barColor = isOver ? 'bg-destructive' : pctUsed > 80 ? 'bg-amber-500' : 'bg-emerald-500';
-                    return (
-                      <div key={item.id}>
-                        <div className="flex items-center justify-between mb-1.5">
-                          <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-                            <span>{item.icon}</span>
-                            <span>{item.name}</span>
-                          </div>
-                          <div className="text-xs tabular-nums">
-                            <span className={cn('font-semibold', isOver ? 'text-destructive' : 'text-foreground')}>
-                              {fmt(item.spent)}
-                            </span>
-                            <span className="text-muted-foreground"> / {fmt(item.budgeted)}</span>
-                          </div>
+                {chartData.length > 0 && (
+                  <div className="flex items-center gap-3 mt-0.5">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                      <span className="text-xs text-muted-foreground">
+                        Gastado: <span className="font-medium text-foreground tabular-nums">{fmt(chartData.reduce((s,d) => s+d.spent, 0))}</span>
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-2 h-2 rounded-full bg-primary/30" />
+                      <span className="text-xs text-muted-foreground">
+                        Budget: <span className="font-medium text-foreground tabular-nums">{fmt(chartData.reduce((s,d) => s+d.budgeted, 0))}</span>
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+            <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform shrink-0', trackingExpanded && 'rotate-180')} />
+          </div>
+
+          {trackingExpanded && chartData.length > 0 && (
+            <CardContent className="pt-0 pb-4">
+              <div className="divide-y divide-border">
+                {chartData.map(item => {
+                  const pctUsed = item.budgeted > 0 ? Math.min((item.spent / item.budgeted) * 100, 100) : 0;
+                  const isOver = item.spent > item.budgeted && item.budgeted > 0;
+                  const remaining = item.budgeted - item.spent;
+                  const barColor = isOver ? 'bg-destructive' : pctUsed > 80 ? 'bg-amber-500' : 'bg-emerald-500';
+                  return (
+                    <div key={item.id} className="py-3">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center gap-1.5 text-sm">
+                          <span>{item.icon}</span>
+                          <span className="font-medium">{item.name}</span>
                         </div>
-                        <div className="relative h-2 bg-muted rounded-full overflow-hidden">
-                          <div className={cn('h-full rounded-full transition-all', barColor)} style={{ width: `${pctUsed}%` }} />
-                          {isOver && <div className="absolute inset-0 rounded-full ring-1 ring-destructive/40 pointer-events-none" />}
-                        </div>
-                        <div className="flex items-center justify-between mt-1 text-[10px] text-muted-foreground">
-                          <span>{Math.round(pctUsed)}% usado</span>
-                          <span className={cn(isOver && 'text-destructive font-semibold')}>
-                            {isOver ? `+${fmt(Math.abs(remaining))} sobre presupuesto` : `${fmt(remaining)} restante`}
-                          </span>
+                        <div className="text-xs tabular-nums text-right">
+                          <span className={cn('font-semibold', isOver ? 'text-destructive' : 'text-foreground')}>{fmt(item.spent)}</span>
+                          <span className="text-muted-foreground"> / {fmt(item.budgeted)}</span>
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              )}
+                      <div className="relative h-1.5 bg-muted rounded-full overflow-hidden">
+                        <div className={cn('h-full rounded-full transition-all', barColor)} style={{ width: `${pctUsed}%` }} />
+                      </div>
+                      <div className="flex justify-between mt-1 text-[10px] text-muted-foreground">
+                        <span>{Math.round(pctUsed)}% usado</span>
+                        <span className={cn(isOver && 'text-destructive font-medium')}>
+                          {isOver ? `+${fmt(Math.abs(remaining))} sobre presupuesto` : `${fmt(remaining)} restante`}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          )}
+
+          {trackingExpanded && chartData.length === 0 && (
+            <CardContent>
+              <p className="text-sm text-muted-foreground text-center py-4">
+                No hay presupuestos definidos. Completá la tabla de abajo.
+              </p>
             </CardContent>
           )}
         </Card>
@@ -231,8 +244,24 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
       {/* Section 2: Annual planning table */}
       <div className="relative left-1/2 w-screen -translate-x-1/2 px-4 lg:w-[calc(100vw-16rem)] lg:px-6">
         <div className="rounded-xl border border-border bg-card overflow-hidden">
-          <div className="px-4 py-3 border-b border-border">
+          <div className="px-4 py-3 border-b border-border flex items-center justify-between gap-3">
             <h3 className="text-sm font-semibold">Planificación anual {selectedYear}</h3>
+            <div className="flex items-center gap-1 bg-muted rounded-lg p-0.5">
+              <button
+                onClick={() => setTableView('split')}
+                className={cn('text-xs px-3 py-1 rounded-md transition-colors',
+                  tableView === 'split' ? 'bg-background shadow-sm font-medium' : 'text-muted-foreground')}
+              >
+                Fijos + Variables
+              </button>
+              <button
+                onClick={() => setTableView('consolidated')}
+                className={cn('text-xs px-3 py-1 rounded-md transition-colors',
+                  tableView === 'consolidated' ? 'bg-background shadow-sm font-medium' : 'text-muted-foreground')}
+              >
+                Por categoría
+              </button>
+            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="text-xs border-collapse" style={{ minWidth: '960px', width: '100%' }}>
@@ -248,7 +277,7 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                     <th
                       key={m}
                       className={cn(
-                        'px-2 py-2 text-center font-semibold text-foreground min-w-[80px]',
+                        'px-2 py-2 text-center font-semibold text-foreground min-w-[72px]',
                         isCurrent(i) && 'bg-primary/10 text-primary'
                       )}
                     >
@@ -300,26 +329,28 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                 </tr>
 
                 {/* Fixed section header */}
-                <tr className="bg-primary/5 cursor-pointer" onClick={() => setFixedExpanded(v => !v)}>
-                  <td
-                    className="px-3 py-2 sticky left-0 z-10 font-semibold text-primary text-xs"
-                    style={{ background: 'hsl(var(--card))', boxShadow: '2px 0 4px -2px rgba(0,0,0,0.08)' }}
-                  >
-                    <div className="flex items-center gap-1">
-                      <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', fixedExpanded && 'rotate-180')} />
-                      <span>🔒 Gastos fijos</span>
-                    </div>
-                  </td>
-                  {MONTHS.map((_, i) => (
-                    <td key={i} className={cn('px-2 py-2 text-center tabular-nums text-primary text-xs font-medium', isCurrent(i) && 'bg-primary/10')}>
-                      {fmt(totalRecurringMonthly)}
+                {tableView === 'split' && (
+                  <tr className="bg-primary/5 cursor-pointer" onClick={() => setFixedExpanded(v => !v)}>
+                    <td
+                      className="px-3 py-2 sticky left-0 z-10 font-semibold text-primary text-xs"
+                      style={{ background: 'hsl(var(--card))', boxShadow: '2px 0 4px -2px rgba(0,0,0,0.08)' }}
+                    >
+                      <div className="flex items-center gap-1">
+                        <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', fixedExpanded && 'rotate-180')} />
+                        <span>🔒 Gastos fijos</span>
+                      </div>
                     </td>
-                  ))}
-                  <td className="px-3 py-2 text-right text-xs font-semibold text-primary tabular-nums">{fmt(totalRecurringMonthly * 12)}</td>
-                </tr>
+                    {MONTHS.map((_, i) => (
+                      <td key={i} className={cn('px-2 py-2 text-center tabular-nums text-primary text-xs font-medium', isCurrent(i) && 'bg-primary/10')}>
+                        {fmt(totalRecurringMonthly)}
+                      </td>
+                    ))}
+                    <td className="px-3 py-2 text-right text-xs font-semibold text-primary tabular-nums">{fmt(totalRecurringMonthly * 12)}</td>
+                  </tr>
+                )}
 
                 {/* Fixed detail rows */}
-                {fixedExpanded && tree.filter(cat => cat.recurringMonthly > 0).map(cat => (
+                {tableView === 'split' && fixedExpanded && tree.filter(cat => cat.recurringMonthly > 0).map(cat => (
                   <tr key={`fixed-${cat.id}`} className="border-b border-border/50">
                     <td
                       className="px-3 py-1.5 pl-8 sticky left-0 z-10 text-xs text-muted-foreground"
@@ -337,31 +368,33 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                 ))}
 
                 {/* Variable section header */}
-                <tr className="bg-muted/40 cursor-pointer border-t-2 border-border" onClick={() => setVariableExpanded(v => !v)}>
-                  <td
-                    className="px-3 py-2 sticky left-0 z-10 font-semibold text-foreground text-xs"
-                    style={{ background: 'hsl(var(--muted))', boxShadow: '2px 0 4px -2px rgba(0,0,0,0.08)' }}
-                  >
-                    <div className="flex items-center gap-1">
-                      <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', variableExpanded && 'rotate-180')} />
-                      <span>📊 Gastos variables</span>
-                    </div>
-                  </td>
-                  {MONTHS.map((_, i) => {
-                    const varTotal = tree.reduce((s, cat) => s + (isPast(i) ? getActualSpending(cat.id, i) : getBudgetAmount(cat.id, i)), 0);
-                    return (
-                      <td key={i} className={cn('px-2 py-2 text-center tabular-nums text-xs font-medium', isCurrent(i) && 'bg-primary/5')}>
-                        {fmt(varTotal)}
-                      </td>
-                    );
-                  })}
-                  <td className="px-3 py-2 text-right text-xs font-semibold tabular-nums">
-                    {fmt(MONTHS.reduce((s, _, i) => s + tree.reduce((a, cat) => a + (isPast(i) ? getActualSpending(cat.id, i) : getBudgetAmount(cat.id, i)), 0), 0))}
-                  </td>
-                </tr>
+                {tableView === 'split' && (
+                  <tr className="bg-muted/40 cursor-pointer border-t-2 border-border" onClick={() => setVariableExpanded(v => !v)}>
+                    <td
+                      className="px-3 py-2 sticky left-0 z-10 font-semibold text-foreground text-xs"
+                      style={{ background: 'hsl(var(--muted))', boxShadow: '2px 0 4px -2px rgba(0,0,0,0.08)' }}
+                    >
+                      <div className="flex items-center gap-1">
+                        <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', variableExpanded && 'rotate-180')} />
+                        <span>📊 Gastos variables</span>
+                      </div>
+                    </td>
+                    {MONTHS.map((_, i) => {
+                      const varTotal = tree.reduce((s, cat) => s + (isPast(i) ? getActualSpending(cat.id, i) : getBudgetAmount(cat.id, i)), 0);
+                      return (
+                        <td key={i} className={cn('px-2 py-2 text-center tabular-nums text-xs font-medium', isCurrent(i) && 'bg-primary/5')}>
+                          {fmt(varTotal)}
+                        </td>
+                      );
+                    })}
+                    <td className="px-3 py-2 text-right text-xs font-semibold tabular-nums">
+                      {fmt(MONTHS.reduce((s, _, i) => s + tree.reduce((a, cat) => a + (isPast(i) ? getActualSpending(cat.id, i) : getBudgetAmount(cat.id, i)), 0), 0))}
+                    </td>
+                  </tr>
+                )}
 
-                {/* Variable category rows */}
-                {variableExpanded && tree.map(cat => {
+                {/* Variable category rows (split view) */}
+                {tableView === 'split' && variableExpanded && tree.map(cat => {
                   const yearTotal = MONTHS.reduce((s, _, i) => {
                     const variable = isPast(i) ? getActualSpending(cat.id, i) : getBudgetAmount(cat.id, i);
                     return s + variable;
@@ -387,52 +420,36 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                             )}
                           </div>
                         </td>
-                        {MONTHS.map((_, i) => {
-                          const variable = getBudgetAmount(cat.id, i);
-                          const actual = getActualSpending(cat.id, i);
-                          const isOver = variable > 0 && actual > variable;
-                          return (
-                            <td
-                              key={i}
-                              className={cn('px-1 py-1 text-center tabular-nums align-middle', isCurrent(i) && 'bg-primary/5')}
-                            >
-                              {isPast(i) ? (
-                                <div className={cn('text-[11px]', actual > 0 ? 'text-foreground' : 'text-muted-foreground')}>
-                                  {actual > 0 ? fmt(actual) : '—'}
-                                </div>
-                              ) : isCurrent(i) ? (
-                                <div className="space-y-0.5">
-                                  <div className={cn('text-[10px]', isOver ? 'text-destructive font-semibold' : 'text-muted-foreground')}>
-                                    {actual > 0 ? fmt(actual) : '—'}
-                                  </div>
-                                  <Input
-                                    key={`${cat.id}-cur-${selectedYear}-${i}-${variable}`}
-                                    type="number"
-                                    defaultValue={variable || ''}
-                                    placeholder="0"
-                                    className={cn('h-6 text-[11px] text-center px-1 tabular-nums', noSpinClass)}
-                                    onBlur={(e) => {
-                                      const v = parseFloat(e.target.value);
-                                      if (!isNaN(v)) saveBudget(cat.id, i, v);
-                                    }}
-                                  />
-                                </div>
-                              ) : (
-                                <Input
-                                  key={`${cat.id}-fut-${selectedYear}-${i}-${variable}`}
-                                  type="number"
-                                  defaultValue={variable || ''}
-                                  placeholder="0"
-                                  className={cn('h-6 text-[11px] text-center px-1 tabular-nums', noSpinClass)}
-                                  onBlur={(e) => {
-                                    const v = parseFloat(e.target.value);
-                                    if (!isNaN(v)) saveBudget(cat.id, i, v);
-                                  }}
-                                />
-                              )}
-                            </td>
-                          );
-                        })}
+                        {MONTHS.map((_, i) => (
+                          <td
+                            key={i}
+                            className={cn('px-1 py-1 text-center tabular-nums align-middle', isCurrent(i) && 'bg-primary/5')}
+                          >
+                            {isCurrent(i) ? (
+                              <Input
+                                key={`${cat.id}-${selectedYear}-${i}-${getBudgetAmount(cat.id, i)}`}
+                                type="number"
+                                defaultValue={getBudgetAmount(cat.id, i) || ''}
+                                placeholder={getActualSpending(cat.id, i) > 0 ? String(Math.round(getActualSpending(cat.id, i))) : '0'}
+                                className={cn('h-7 text-xs text-center px-1 tabular-nums bg-primary/5', noSpinClass)}
+                                onBlur={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) saveBudget(cat.id, i, v); }}
+                              />
+                            ) : isPast(i) ? (
+                              <span className={cn('tabular-nums text-[11px]', getActualSpending(cat.id, i) > 0 ? 'text-foreground' : 'text-muted-foreground')}>
+                                {getActualSpending(cat.id, i) > 0 ? fmt(getActualSpending(cat.id, i)) : '—'}
+                              </span>
+                            ) : (
+                              <Input
+                                key={`${cat.id}-future-${selectedYear}-${i}-${getBudgetAmount(cat.id, i)}`}
+                                type="number"
+                                defaultValue={getBudgetAmount(cat.id, i) || ''}
+                                placeholder="0"
+                                className={cn('h-7 text-xs text-center px-1 tabular-nums', noSpinClass)}
+                                onBlur={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) saveBudget(cat.id, i, v); }}
+                              />
+                            )}
+                          </td>
+                        ))}
                         <td className="px-3 py-2 text-right tabular-nums font-semibold text-foreground">{fmt(yearTotal)}</td>
                       </tr>
 
@@ -478,6 +495,43 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                         );
                       })}
                     </React.Fragment>
+                  );
+                })}
+
+                {/* Consolidated rows */}
+                {tableView === 'consolidated' && tree.map(cat => {
+                  const yearTotal = MONTHS.reduce((s, _, i) => {
+                    const fixed = cat.recurringMonthly;
+                    const variable = isPast(i) ? getActualSpending(cat.id, i) : getBudgetAmount(cat.id, i);
+                    return s + fixed + variable;
+                  }, 0);
+                  return (
+                    <tr key={`cons-${cat.id}`} className="border-b border-border hover:bg-muted/20">
+                      <td
+                        className="px-3 py-2 sticky left-0 z-10"
+                        style={{ background: 'hsl(var(--card))', boxShadow: '2px 0 4px -2px rgba(0,0,0,0.06)' }}
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span>{cat.icon}</span>
+                          <span className="text-xs font-medium">{cat.name}</span>
+                        </div>
+                      </td>
+                      {MONTHS.map((_, i) => {
+                        const fixed = cat.recurringMonthly;
+                        const variable = isPast(i) ? getActualSpending(cat.id, i) : getBudgetAmount(cat.id, i);
+                        const total = fixed + variable;
+                        return (
+                          <td key={i} className={cn('px-2 py-2 text-center tabular-nums text-xs', isCurrent(i) && 'bg-primary/5')}>
+                            {total > 0 ? (
+                              <span className={isPast(i) ? 'text-foreground' : 'text-muted-foreground'}>
+                                {fmt(total)}
+                              </span>
+                            ) : '—'}
+                          </td>
+                        );
+                      })}
+                      <td className="px-2 py-2 text-right tabular-nums text-xs font-medium">{fmt(yearTotal)}</td>
+                    </tr>
                   );
                 })}
 
