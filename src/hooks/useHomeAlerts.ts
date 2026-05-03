@@ -32,15 +32,17 @@ function monthLabel(ym: string) {
 export function useHomeAlerts() {
   const { data: importLog } = useImportLog();
   const { data: instances } = useDerivedInstances();
-  const now = new Date();
-  const monthStart = format(now, 'yyyy-MM') + '-01';
+  const today = new Date();
+  const monthStart = format(today, 'yyyy-MM') + '-01';
   const { data: budgets } = useBudgets(monthStart);
   const { data: transactions } = useTransactions();
   const suggestions = useRuleSuggestions();
 
   return useMemo(() => {
-    const alerts: HomeAlert[] = [];
+    const now = new Date();
     const currentMonth = format(now, 'yyyy-MM');
+    const monthStart = currentMonth + '-01';
+    const alerts: HomeAlert[] = [];
     const sources = ['arq', 'mercadopago', 'banco_ciudad'];
     for (const source of sources) {
       const hasCurrent = importLog?.some(l => l.source === source && l.month === currentMonth);
