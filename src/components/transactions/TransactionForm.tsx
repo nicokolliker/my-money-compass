@@ -2,11 +2,12 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useCategoryTree } from '@/hooks/useCategoryTree';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Check, ChevronsUpDown } from 'lucide-react';
 import { useAccounts } from '@/hooks/useAccounts';
-import { useCategories } from '@/hooks/useCategories';
+import { useCategories, useSubcategories } from '@/hooks/useCategories';
 import { useMerchants } from '@/hooks/useMerchants';
 import { useCreateTransaction, useCreateTransfer, useUpdateTransaction } from '@/hooks/useTransactions';
 import { useFxRates } from '@/hooks/useFxRates';
@@ -81,6 +82,10 @@ function MerchantCombobox({ merchants, value, onChange }: { merchants: any[]; va
 export function TransactionForm({ onSuccess, editData }: Props) {
   const { data: accounts } = useAccounts();
   const { data: categories } = useCategories();
+  const { data: allSubcategories } = useSubcategories();
+  const { tree: categoryTree } = useCategoryTree();
+  const digitalCategory = categoryTree.find(c => c.isDigital);
+  const digitalSubcategories = (allSubcategories || []).filter(s => digitalCategory && s.category_id === digitalCategory.id);
   const { data: merchants } = useMerchants();
   const { data: fxRates } = useFxRates();
   const createTx = useCreateTransaction();
@@ -311,9 +316,18 @@ export function TransactionForm({ onSuccess, editData }: Props) {
           <Select value={categoryId} onValueChange={setCategoryId}>
             <SelectTrigger className="mt-1"><SelectValue placeholder="Select category" /></SelectTrigger>
             <SelectContent>
-              {categories?.map(c => (
+              {categoryTree.filter(c => !c.isDigital).map(c => (
                 <SelectItem key={c.id} value={c.id}>{c.icon} {c.name}</SelectItem>
               ))}
+              {digitalCategory && digitalSubcategories.length > 0 && (
+                <SelectGroup>
+                  <SelectLabel>{digitalCategory.icon} {digitalCategory.name}</SelectLabel>
+                  <SelectItem value={digitalCategory.id}>&nbsp;&nbsp;All Digital</SelectItem>
+                  {digitalSubcategories.map(sub => (
+                    <SelectItem key={sub.id} value={sub.id}>&nbsp;&nbsp;{sub.name}</SelectItem>
+                  ))}
+                </SelectGroup>
+              )}
             </SelectContent>
           </Select>
         </div>

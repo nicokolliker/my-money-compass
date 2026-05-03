@@ -9,9 +9,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useRecurringExpenses, useCreateRecurringExpense, useUpdateRecurringExpense, useDeleteRecurringExpense } from '@/hooks/useRecurringExpenses';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useDerivedInstances } from '@/hooks/useRecurringInstances';
-import { useCategories } from '@/hooks/useCategories';
+import { useCategories, useSubcategories } from '@/hooks/useCategories';
 import { useAccounts } from '@/hooks/useAccounts';
 import { useFxRates } from '@/hooks/useFxRates';
+import { useCategoryTree } from '@/hooks/useCategoryTree';
 import { formatUSD } from '@/lib/constants';
 import { toMonthlyAmount, isDerivedPaid, toUSD, type FxRateRow, type DerivedInstanceState } from '@/lib/money';
 import { Plus, Trash2, Pencil, Repeat, ChevronDown } from 'lucide-react';
@@ -22,27 +23,6 @@ import { MerchantLogo } from '@/components/MerchantLogo';
 import { useDemoData } from '@/hooks/useDemoData';
 import RecurringTracking from '@/components/recurring/RecurringTracking';
 
-// Recurring expense types
-const TYPE_LABELS: Record<string, { label: string; icon: string; color: string }> = {
-  casa:           { label: 'Casa',                    icon: '🏠', color: '#FAECE7' },
-  auto:           { label: 'Auto',                    icon: '🚗', color: '#E1F5EE' },
-  salud:          { label: 'Salud',                   icon: '❤️', color: '#FBEAF0' },
-  personal_care:  { label: 'Personal Care',           icon: '✨', color: '#EAF3DE' },
-  obligaciones:   { label: 'Obligaciones',            icon: '📋', color: '#F1EFE8' },
-  ocio:           { label: 'Ocio',                    icon: '🎉', color: '#FAEEDA' },
-  digital:        { label: 'Digital',                 icon: '💻', color: '#E6F1FB' },
-};
-
-const TYPE_KEYS = Object.keys(TYPE_LABELS);
-
-// Digital subcategories
-const DIGITAL_SUBTYPES: Record<string, { label: string; icon: string }> = {
-  ia:                  { label: 'IA',                          icon: '🤖' },
-  creatividad:         { label: 'Creatividad & Productividad', icon: '🎨' },
-  entretenimiento:     { label: 'Entretenimiento',             icon: '🎬' },
-  delivery_movilidad:  { label: 'Delivery & Movilidad',        icon: '🚚' },
-};
-
 // Status badge tones (Library list)
 const STATUS_STYLES: Record<DerivedInstanceState | 'none', { label: string; bg: string; color: string }> = {
   matched:      { label: 'Matched',  bg: '#EAF3DE', color: '#3B6D11' },
@@ -51,6 +31,13 @@ const STATUS_STYLES: Record<DerivedInstanceState | 'none', { label: string; bg: 
   needs_review: { label: 'Upcoming', bg: '#FAEEDA', color: '#854F0B' },
   missing:      { label: 'Missing',  bg: '#FCEBEB', color: '#A32D2D' },
   none:         { label: 'Sin instancias', bg: 'hsl(var(--muted))', color: 'hsl(var(--muted-foreground))' },
+};
+
+// Map legacy string `type` values to category names (for migration of unlinked items)
+const LEGACY_TYPE_TO_NAME: Record<string, string> = {
+  casa: 'Casa', auto: 'Auto', salud: 'Salud',
+  personal_care: 'Personal Care', obligaciones: 'Obligaciones',
+  ocio: 'Ocio', digital: 'Digital',
 };
 
 function getNextDate(current: Date, frequency: string): Date {
@@ -76,8 +63,10 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
   const { data: instances, error: instancesError } = useDerivedInstances();
   if (instancesError) console.error('Recurring instances error:', instancesError);
   const { data: categories } = useCategories();
+  const { data: allSubcategories } = useSubcategories();
   const { data: accounts } = useAccounts();
   const { data: fxRates } = useFxRates();
+  const { tree } = useCategoryTree();
   const createItem = useCreateRecurringExpense();
   const updateItem = useUpdateRecurringExpense();
   const deleteItem = useDeleteRecurringExpense();
@@ -86,17 +75,39 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
   const [topTab, setTopTab] = useState<'library' | 'tracking'>('library');
   const [digitalExpanded, setDigitalExpanded] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
-  const toggleGroup = (type: string) => setCollapsedGroups(prev => ({ ...prev, [type]: !prev[type] }));
+  const toggleGroup = (id: string) => setCollapsedGroups(prev => ({ ...prev, [id]: !prev[id] }));
   const { hasDemoData, onCleared: onDemoCleared } = useDemoData();
 
   const emptyForm = {
-    name: '', type: 'casa', subtype: '', category_id: '', account_id: '', amount: '',
+    name: '', type: '', subtype: '', account_id: '', amount: '',
     currency: 'USD', frequency: 'monthly', due_day: '1', notes: '', end_date: '', renewal_notes: '',
   };
   const [form, setForm] = useState(emptyForm);
 
   const fxList = fxRates as FxRateRow[] | undefined;
   const { start: monthStart, end: monthEnd } = monthBounds();
+
+  // Resolve a category id for any item (linked or via legacy type)
+  const itemCategoryId = useMemo(() => {
+    const map: Record<string, string | null> = {};
+    if (!items) return map;
+    items.forEach(i => {
+      let cid: string | null = (i as any).linked_category_id || null;
+      if (!cid) {
+        const legacyName = LEGACY_TYPE_TO_NAME[i.type];
+        if (legacyName) cid = tree.find(c => c.name === legacyName)?.id || null;
+      }
+      map[i.id] = cid;
+    });
+    return map;
+  }, [items, tree]);
+
+  const selectedCategory = tree.find(c => c.id === form.type);
+  const isDigitalForm = selectedCategory?.isDigital;
+  const digitalSubcats = useMemo(() => {
+    if (!selectedCategory?.isDigital) return [];
+    return (allSubcategories || []).filter(s => s.category_id === selectedCategory.id);
+  }, [selectedCategory, allSubcategories]);
 
   // ----- Top metrics -----
   const totalFijosUsd = useMemo(() => {
@@ -133,18 +144,18 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
 
   const disponibleUsd = monthIncome - totalFijosUsd;
 
-  // ----- Breakdown por tipo -----
+  // ----- Breakdown by category -----
   const breakdown = useMemo(() => {
     const map: Record<string, number> = {};
-    TYPE_KEYS.forEach(k => { map[k] = 0; });
+    tree.forEach(c => { map[c.id] = 0; });
     (items || []).filter(i => i.is_active).forEach(i => {
+      const cid = itemCategoryId[i.id];
+      if (!cid) return;
       const m = toMonthlyAmount(Math.abs(Number(i.amount)), i.frequency);
-      const usd = toUSD(m, i.currency, fxList);
-      const key = TYPE_KEYS.includes(i.type) ? i.type : 'casa';
-      map[key] = (map[key] || 0) + usd;
+      map[cid] = (map[cid] || 0) + toUSD(m, i.currency, fxList);
     });
     return map;
-  }, [items, fxList]);
+  }, [items, itemCategoryId, fxList, tree]);
 
   // ----- Timeline del mes -----
   const timeline = useMemo(() => {
@@ -153,13 +164,10 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
     items.forEach(i => { itemMap[i.id] = i; });
     return [...monthInstances]
       .sort((a, b) => (a.expected_date > b.expected_date ? 1 : -1))
-      .map(i => ({
-        instance: i,
-        item: itemMap[i.recurring_id],
-      }));
+      .map(i => ({ instance: i, item: itemMap[i.recurring_id] }));
   }, [items, monthInstances]);
 
-  // ----- Per-item state for grouped list -----
+  // ----- Per-item state -----
   const itemState = useMemo(() => {
     const map: Record<string, DerivedInstanceState | 'none'> = {};
     if (!items) return map;
@@ -178,27 +186,34 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
     return map;
   }, [items, instances]);
 
-  // ----- Grouped list -----
+  // ----- Grouped list by category id -----
   const grouped = useMemo(() => {
     const g: Record<string, { items: any[]; totalUsd: number }> = {};
-    TYPE_KEYS.forEach(k => { g[k] = { items: [], totalUsd: 0 }; });
+    tree.forEach(c => { g[c.id] = { items: [], totalUsd: 0 }; });
     (items || []).forEach(i => {
-      const key = TYPE_KEYS.includes(i.type) ? i.type : 'casa';
-      g[key].items.push(i);
+      const cid = itemCategoryId[i.id];
+      if (!cid || !g[cid]) return;
+      g[cid].items.push(i);
       if (i.is_active) {
         const m = toMonthlyAmount(Math.abs(Number(i.amount)), i.frequency);
-        g[key].totalUsd += toUSD(m, i.currency, fxList);
+        g[cid].totalUsd += toUSD(m, i.currency, fxList);
       }
     });
     return g;
-  }, [items, fxList]);
+  }, [items, itemCategoryId, fxList, tree]);
+
+  const subcatNameById = useMemo(() => {
+    const m: Record<string, string> = {};
+    (allSubcategories || []).forEach(s => { m[s.id] = s.name; });
+    return m;
+  }, [allSubcategories]);
 
   const openEdit = (item: any) => {
+    const cid = itemCategoryId[item.id] || (tree[0]?.id ?? '');
     setForm({
       name: item.name,
-      type: TYPE_KEYS.includes(item.type) ? item.type : 'casa',
+      type: cid,
       subtype: item.subtype || '',
-      category_id: item.category_id || '',
       account_id: item.account_id || '',
       amount: String(Math.abs(Number(item.amount))),
       currency: item.currency, frequency: item.frequency, due_day: String(item.due_day || 1),
@@ -209,16 +224,21 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
   };
 
   const handleSave = async () => {
-    if (!form.name || !form.amount) return;
+    if (!form.name || !form.amount || !form.type) return;
+    const cat = tree.find(c => c.id === form.type);
+    if (!cat) return;
     const nextDue = new Date();
     nextDue.setDate(parseInt(form.due_day) || 1);
     if (nextDue < new Date()) nextDue.setMonth(nextDue.getMonth() + 1);
 
     const payload: any = {
-      name: form.name, type: form.type,
-      subtype: form.type === 'digital' ? (form.subtype || null) : null,
-      category_id: form.category_id || null,
-      account_id: form.account_id || null, amount: parseFloat(form.amount),
+      name: form.name,
+      type: cat.name.toLowerCase().replace(/\s+/g, '_'),
+      subtype: cat.isDigital ? (form.subtype || null) : null,
+      category_id: cat.id,
+      linked_category_id: cat.id,
+      account_id: form.account_id || null,
+      amount: parseFloat(form.amount),
       currency: form.currency, frequency: form.frequency,
       due_day: parseInt(form.due_day) || 1, notes: form.notes || null,
       end_date: form.end_date || null, renewal_notes: form.renewal_notes || null,
@@ -247,7 +267,9 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
         {!embedded && <h1 className="text-2xl font-bold text-foreground">Recurring</h1>}
         <Dialog open={showAdd} onOpenChange={o => { setShowAdd(o); if (!o) { setEditingId(null); setForm(emptyForm); } }}>
           <DialogTrigger asChild>
-            <Button size="sm"><Plus className="h-4 w-4 mr-1" /> Add</Button>
+            <Button size="sm" onClick={() => { if (!form.type && tree[0]) setForm(f => ({ ...f, type: tree[0].id })); }}>
+              <Plus className="h-4 w-4 mr-1" /> Add
+            </Button>
           </DialogTrigger>
           <DialogContent className="max-h-[85vh] overflow-y-auto">
             <DialogHeader><DialogTitle>{editingId ? 'Edit' : 'Add'} Recurring Expense</DialogTitle></DialogHeader>
@@ -255,11 +277,11 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
               <div><Label>Name</Label><Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Netflix, Gym, Rent..." className="mt-1" /></div>
               <div className="grid grid-cols-2 gap-2">
                 <div><Label>Type</Label>
-                  <Select value={form.type} onValueChange={v => setForm(f => ({ ...f, type: v }))}>
-                    <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                  <Select value={form.type} onValueChange={v => setForm(f => ({ ...f, type: v, subtype: '' }))}>
+                    <SelectTrigger className="mt-1 rounded-xl"><SelectValue placeholder="Select" /></SelectTrigger>
                     <SelectContent>
-                      {TYPE_KEYS.map(k => (
-                        <SelectItem key={k} value={k}>{TYPE_LABELS[k].icon} {TYPE_LABELS[k].label}</SelectItem>
+                      {tree.map(c => (
+                        <SelectItem key={c.id} value={c.id}>{c.icon} {c.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -276,14 +298,14 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
                   </Select>
                 </div>
               </div>
-              {form.type === 'digital' && (
+              {isDigitalForm && digitalSubcats.length > 0 && (
                 <div>
                   <Label>Subcategoría</Label>
                   <Select value={form.subtype} onValueChange={v => setForm(f => ({ ...f, subtype: v }))}>
                     <SelectTrigger className="mt-1"><SelectValue placeholder="Seleccionar subcategoría" /></SelectTrigger>
                     <SelectContent>
-                      {Object.entries(DIGITAL_SUBTYPES).map(([key, sub]) => (
-                        <SelectItem key={key} value={key}>{sub.icon} {sub.label}</SelectItem>
+                      {digitalSubcats.map(s => (
+                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -302,19 +324,12 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
                   </Select>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div><Label>Category</Label>
-                  <Select value={form.category_id} onValueChange={v => setForm(f => ({ ...f, category_id: v }))}>
-                    <SelectTrigger className="mt-1"><SelectValue placeholder="Select" /></SelectTrigger>
-                    <SelectContent>{categories?.map(c => <SelectItem key={c.id} value={c.id}>{c.icon} {c.name}</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
-                <div><Label>Payment Method</Label>
-                  <Select value={form.account_id} onValueChange={v => setForm(f => ({ ...f, account_id: v }))}>
-                    <SelectTrigger className="mt-1"><SelectValue placeholder="Select" /></SelectTrigger>
-                    <SelectContent>{accounts?.map(a => <SelectItem key={a.id} value={a.id}>{a.name} ({a.currency})</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
+              <div>
+                <Label>Payment Method</Label>
+                <Select value={form.account_id} onValueChange={v => setForm(f => ({ ...f, account_id: v }))}>
+                  <SelectTrigger className="mt-1"><SelectValue placeholder="Select" /></SelectTrigger>
+                  <SelectContent>{accounts?.map(a => <SelectItem key={a.id} value={a.id}>{a.name} ({a.currency})</SelectItem>)}</SelectContent>
+                </Select>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div><Label>Due Day</Label><Input type="number" min="1" max="31" value={form.due_day} onChange={e => setForm(f => ({ ...f, due_day: e.target.value }))} className="mt-1" /></div>
@@ -356,22 +371,22 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
             <Card>
               <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Breakdown por tipo</CardTitle></CardHeader>
               <CardContent className="space-y-2">
-                {TYPE_KEYS.map(k => {
-                  const v = breakdown[k] || 0;
+                {tree.map(c => {
+                  const v = breakdown[c.id] || 0;
+                  if (v === 0 && grouped[c.id]?.items.length === 0) return null;
                   const pct = totalFijosUsd > 0 ? (v / totalFijosUsd) * 100 : 0;
 
-                  if (k === 'digital') {
-                    const digitalItems = (items || []).filter(i => i.is_active && i.type === 'digital');
+                  if (c.isDigital) {
+                    const digitalItems = (items || []).filter(i => i.is_active && itemCategoryId[i.id] === c.id);
                     return (
-                      <div key={k}>
+                      <div key={c.id}>
                         <div
                           className="flex items-center justify-between text-sm cursor-pointer"
                           style={{ userSelect: 'none' }}
-                          onClick={(e) => { e.stopPropagation(); setDigitalExpanded(v => !v); }}
+                          onClick={() => setDigitalExpanded(v => !v)}
                         >
                           <div className="flex items-center gap-2 min-w-0 pointer-events-none">
-                            <span className="inline-block w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: TYPE_LABELS[k].color }} />
-                            <span className="text-foreground truncate font-medium">{TYPE_LABELS[k].icon} {TYPE_LABELS[k].label}</span>
+                            <span className="text-foreground truncate font-medium">{c.icon} {c.name}</span>
                             <ChevronDown
                               className="h-3.5 w-3.5 text-muted-foreground"
                               style={{ transform: digitalExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}
@@ -384,17 +399,16 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
                         </div>
                         {digitalExpanded && (
                           <div className="mt-1 space-y-1">
-                            {Object.entries(DIGITAL_SUBTYPES).map(([subKey, sub]) => {
-                              const subItems = digitalItems.filter((i: any) => i.subtype === subKey);
+                            {c.children.map(sub => {
+                              const subItems = digitalItems.filter((i: any) => i.subtype === sub.id);
                               const subTotal = subItems.reduce((s, i: any) => {
                                 const m = toMonthlyAmount(Math.abs(Number(i.amount)), i.frequency);
                                 return s + toUSD(m, i.currency, fxList);
                               }, 0);
                               return (
-                                <div key={subKey} className="flex items-center justify-between text-sm pl-6">
+                                <div key={sub.id} className="flex items-center justify-between text-sm pl-6">
                                   <div className="flex items-center gap-2 min-w-0">
-                                    <span className="text-xs">{sub.icon}</span>
-                                    <span className="text-xs text-muted-foreground truncate">{sub.label}</span>
+                                    <span className="text-xs text-muted-foreground truncate">{sub.name}</span>
                                     {subItems.length > 0 && <span className="text-[10px] text-muted-foreground">· {subItems.length}</span>}
                                   </div>
                                   <span className="text-xs font-medium tabular-nums text-foreground shrink-0">{formatUSD(subTotal)}</span>
@@ -408,10 +422,9 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
                   }
 
                   return (
-                    <div key={k} className="flex items-center justify-between text-sm">
+                    <div key={c.id} className="flex items-center justify-between text-sm">
                       <div className="flex items-center gap-2 min-w-0">
-                        <span className="inline-block w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: TYPE_LABELS[k].color }} />
-                        <span className="text-foreground truncate">{TYPE_LABELS[k].icon} {TYPE_LABELS[k].label}</span>
+                        <span className="text-foreground truncate">{c.icon} {c.name}</span>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         <span className="text-xs text-muted-foreground tabular-nums">{pct.toFixed(0)}%</span>
@@ -450,22 +463,21 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
             </Card>
           </div>
 
-          {/* Grouped list by type */}
+          {/* Grouped list by category */}
           <div className="space-y-4">
-            {TYPE_KEYS.map(k => {
-              const group = grouped[k];
+            {tree.map(c => {
+              const group = grouped[c.id];
               if (!group || group.items.length === 0) return null;
-              const meta = TYPE_LABELS[k];
-              const collapsed = !!collapsedGroups[k];
+              const collapsed = !!collapsedGroups[c.id];
               return (
-                <div key={k} className="space-y-2">
+                <div key={c.id} className="space-y-2">
                   <div
                     className="flex items-center justify-between px-1 cursor-pointer select-none"
-                    onClick={() => toggleGroup(k)}
+                    onClick={() => toggleGroup(c.id)}
                   >
                     <div className="flex items-center gap-2">
-                      <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-base" style={{ backgroundColor: meta.color }}>{meta.icon}</span>
-                      <span className="font-semibold text-foreground text-sm">{meta.label}</span>
+                      <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-base bg-muted">{c.icon}</span>
+                      <span className="font-semibold text-foreground text-sm">{c.name}</span>
                       <span className="text-xs text-muted-foreground">· {group.items.length}</span>
                       <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${collapsed ? '' : 'rotate-180'}`} />
                     </div>
@@ -474,22 +486,21 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
                   {!collapsed && (
                   <div className="space-y-2">
                     {group.items.map((item: any) => {
-                      const cat = item.categories;
                       const acc = item.accounts;
                       const state = itemState[item.id] || 'none';
                       const badge = STATUS_STYLES[state];
+                      const subLabel = c.isDigital && item.subtype ? subcatNameById[item.subtype] : null;
                       return (
                         <Card key={item.id}>
                           <CardContent className="flex items-center gap-3 py-3">
                             <MerchantLogo name={item.name} size={36} />
-                            {void cat /* keep cat in scope */}
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-semibold text-foreground truncate">{item.name}</p>
                               <p className="text-xs text-muted-foreground truncate">
                                 {acc?.name || '—'} · <span className="capitalize">{item.frequency}</span>
-                                {item.type === 'digital' && item.subtype && DIGITAL_SUBTYPES[item.subtype] && (
+                                {subLabel && (
                                   <span className="ml-1.5 inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-foreground/70 align-middle">
-                                    {DIGITAL_SUBTYPES[item.subtype].icon} {DIGITAL_SUBTYPES[item.subtype].label}
+                                    {subLabel}
                                   </span>
                                 )}
                               </p>
@@ -548,5 +559,4 @@ function MetricCard({ label, value, hint, valueColor }: { label: string; value: 
   );
 }
 
-// Re-export helper kept for other modules that may import it
 export { getNextDate };

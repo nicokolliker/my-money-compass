@@ -3,12 +3,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useAccounts } from '@/hooks/useAccounts';
-import { useCategories } from '@/hooks/useCategories';
+import { useCategories, useSubcategories } from '@/hooks/useCategories';
+import { useCategoryTree } from '@/hooks/useCategoryTree';
 import { formatUSD } from '@/lib/constants';
 import { getCategoryHex } from '@/lib/categoryColors';
 import { getCategoryIcon, getBrandLogo, getInitialsColor } from '@/lib/brandLogos';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { ArrowUp, ArrowDown } from 'lucide-react';
+import { ArrowUp, ArrowDown, ChevronDown } from 'lucide-react';
 
 type Period = 'this_month' | 'last_month' | 'last_3' | 'ytd' | 'all';
 
@@ -52,9 +53,12 @@ export default function Analytics() {
   const { data: allTransactions, isLoading } = useTransactions();
   const { data: accounts } = useAccounts();
   const { data: categories } = useCategories();
+  const { data: allSubcategories } = useSubcategories();
+  const { tree: categoryTree } = useCategoryTree();
   const [period, setPeriod] = useState<Period>('this_month');
   const [accountFilter, setAccountFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
+  const [digitalExpanded, setDigitalExpanded] = useState(false);
 
   const dates = useMemo(() => getPeriodDates(period), [period]);
 
@@ -73,16 +77,59 @@ export default function Analytics() {
   const incomes = useMemo(() => transactions.filter(t => t.type === 'income'), [transactions]);
   const prevExpenses = useMemo(() => prevTransactions.filter(t => t.type === 'expense'), [prevTransactions]);
 
+  // Map subcategory_id -> parent category_id
+  const subcatToParent = useMemo(() => {
+    const m: Record<string, string> = {};
+    (allSubcategories || []).forEach(s => { m[s.id] = s.category_id; });
+    return m;
+  }, [allSubcategories]);
+
+  // Sum per category from tree, attributing subcategory transactions to parent
   const byCategory = useMemo(() => {
-    const map: Record<string, { name: string; total: number; icon: string | null; color: string | null }> = {};
+    const totals: Record<string, number> = {};
     expenses.forEach(t => {
-      const cat = (t as any).categories;
-      const catName = cat?.name || 'Uncategorized';
-      if (!map[catName]) map[catName] = { name: catName, total: 0, icon: cat?.icon || null, color: cat?.color || null };
-      map[catName].total += Math.abs(Number(t.amount_usd));
+      const cid = t.category_id as string | null;
+      if (!cid) return;
+      // If category_id is actually a subcategory, roll up
+      const parent = subcatToParent[cid] || cid;
+      totals[parent] = (totals[parent] || 0) + Math.abs(Number(t.amount_usd));
     });
-    return Object.values(map).sort((a, b) => b.total - a.total);
-  }, [expenses]);
+    return categoryTree
+      .map(c => ({ id: c.id, name: c.name, total: totals[c.id] || 0, icon: c.icon, color: c.color, isDigital: c.isDigital, children: c.children }))
+      .filter(c => c.total > 0)
+      .sort((a, b) => b.total - a.total);
+  }, [expenses, categoryTree, subcatToParent]);
+
+  const digitalBreakdown = useMemo(() => {
+    const digital = categoryTree.find(c => c.isDigital);
+    if (!digital) return [];
+    const totals: Record<string, number> = {};
+    expenses.forEach(t => {
+      const cid = t.category_id as string | null;
+      if (!cid) return;
+      // direct subcategory hit
+      if (subcatToParent[cid] === digital.id) {
+        totals[cid] = (totals[cid] || 0) + Math.abs(Number(t.amount_usd));
+      }
+    });
+    return digital.children.map(s => ({ id: s.id, name: s.name, total: totals[s.id] || 0 }))
+      .sort((a, b) => b.total - a.total);
+  }, [expenses, categoryTree, subcatToParent]);
+
+  const pieData = useMemo(() => {
+    if (!digitalExpanded) return byCategory;
+    const expanded: any[] = [];
+    byCategory.forEach(c => {
+      if (c.isDigital) {
+        digitalBreakdown.forEach(s => {
+          if (s.total > 0) expanded.push({ id: s.id, name: `${c.name} · ${s.name}`, total: s.total, icon: c.icon, color: c.color });
+        });
+      } else {
+        expanded.push(c);
+      }
+    });
+    return expanded;
+  }, [byCategory, digitalBreakdown, digitalExpanded]);
 
   const totalExpenses = Math.abs(expenses.reduce((s, t) => s + Number(t.amount_usd), 0));
   const prevTotalExpenses = Math.abs(prevExpenses.reduce((s, t) => s + Number(t.amount_usd), 0));
@@ -232,21 +279,21 @@ export default function Analytics() {
       <Card>
         <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">By Category</CardTitle></CardHeader>
         <CardContent>
-          {byCategory.length > 0 && (
+          {pieData.length > 0 && (
             <div className="h-56">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={byCategory}
+                    data={pieData}
                     dataKey="total"
                     nameKey="name"
                     cx="50%" cy="50%"
                     innerRadius={50} outerRadius={85}
                     paddingAngle={2}
-                    label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`}
+                    label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
                     labelLine={false}
                   >
-                    {byCategory.map(c => <Cell key={c.name} fill={getCategoryHex(c.name, c.color)} />)}
+                    {pieData.map((c: any) => <Cell key={c.id || c.name} fill={getCategoryHex(c.name, c.color)} />)}
                   </Pie>
                   <Tooltip formatter={(v: number) => formatUSD(v)} />
                 </PieChart>
@@ -257,13 +304,40 @@ export default function Analytics() {
             {byCategory.map(c => {
               const pct = totalExpenses > 0 ? (c.total / totalExpenses * 100) : 0;
               return (
-                <div key={c.name} className="flex items-center justify-between text-sm py-1 px-2 rounded-lg hover:bg-accent/50 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <span className="text-base">{getCategoryIcon(c.name, c.icon)}</span>
-                    <span className="text-foreground font-medium">{c.name}</span>
-                    <span className="text-xs text-muted-foreground">{pct.toFixed(0)}%</span>
+                <div key={c.id}>
+                  <div
+                    className={`flex items-center justify-between text-sm py-1 px-2 rounded-lg transition-colors ${c.isDigital ? 'cursor-pointer hover:bg-accent' : 'hover:bg-accent/50'}`}
+                    onClick={() => c.isDigital && setDigitalExpanded(v => !v)}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">{getCategoryIcon(c.name, c.icon)}</span>
+                      <span className="text-foreground font-medium">{c.name}</span>
+                      <span className="text-xs text-muted-foreground">{pct.toFixed(0)}%</span>
+                      {c.isDigital && (
+                        <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${digitalExpanded ? 'rotate-180' : ''}`} />
+                      )}
+                    </div>
+                    <span className="font-bold text-foreground tabular-nums">{formatUSD(c.total)}</span>
                   </div>
-                  <span className="font-bold text-foreground tabular-nums">{formatUSD(c.total)}</span>
+                  {c.isDigital && digitalExpanded && (
+                    <div className="ml-6 mt-1 space-y-1">
+                      {digitalBreakdown.filter(s => s.total > 0).map(s => {
+                        const sPct = totalExpenses > 0 ? (s.total / totalExpenses * 100) : 0;
+                        return (
+                          <div key={s.id} className="flex items-center justify-between text-xs py-1 px-2 rounded-lg text-muted-foreground">
+                            <div className="flex items-center gap-2">
+                              <span>{s.name}</span>
+                              <span>{sPct.toFixed(0)}%</span>
+                            </div>
+                            <span className="tabular-nums">{formatUSD(s.total)}</span>
+                          </div>
+                        );
+                      })}
+                      {digitalBreakdown.every(s => s.total === 0) && (
+                        <p className="text-xs text-muted-foreground px-2 py-1">No subcategory breakdown</p>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}

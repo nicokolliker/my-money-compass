@@ -412,6 +412,7 @@ export type Database = {
           is_active: boolean
           last_matched_transaction_id: string | null
           last_paid_date: string | null
+          linked_category_id: string | null
           name: string
           next_due_date: string | null
           notes: string | null
@@ -436,6 +437,7 @@ export type Database = {
           is_active?: boolean
           last_matched_transaction_id?: string | null
           last_paid_date?: string | null
+          linked_category_id?: string | null
           name: string
           next_due_date?: string | null
           notes?: string | null
@@ -460,6 +462,7 @@ export type Database = {
           is_active?: boolean
           last_matched_transaction_id?: string | null
           last_paid_date?: string | null
+          linked_category_id?: string | null
           name?: string
           next_due_date?: string | null
           notes?: string | null
@@ -491,6 +494,13 @@ export type Database = {
             columns: ["last_matched_transaction_id"]
             isOneToOne: false
             referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recurring_expenses_linked_category_id_fkey"
+            columns: ["linked_category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
             referencedColumns: ["id"]
           },
         ]
