@@ -299,6 +299,7 @@ export default function ImportPage() {
   const [mpRows, setMpRows] = useState<PreviewRow[]>([]);
   const [mpImporting, setMpImporting] = useState(false);
   const [mpResultMsg, setMpResultMsg] = useState<string | null>(null);
+  const [mpMonth, setMpMonth] = useState<string>('');
 
   const mpAccount = useMemo(
     () => accounts?.find((a) => /mercado\s*pago|mercadopago/i.test(a.name)) || null,
