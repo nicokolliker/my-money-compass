@@ -53,9 +53,12 @@ export default function Analytics() {
   const { data: allTransactions, isLoading } = useTransactions();
   const { data: accounts } = useAccounts();
   const { data: categories } = useCategories();
+  const { data: allSubcategories } = useSubcategories();
+  const { tree: categoryTree } = useCategoryTree();
   const [period, setPeriod] = useState<Period>('this_month');
   const [accountFilter, setAccountFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
+  const [digitalExpanded, setDigitalExpanded] = useState(false);
 
   const dates = useMemo(() => getPeriodDates(period), [period]);
 
