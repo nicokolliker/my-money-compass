@@ -175,6 +175,9 @@ export default function ImportPage() {
     );
   }, [accounts]);
 
+  const [arqMonth, setArqMonth] = useState<string>('');
+  const qc = useQueryClient();
+
   async function handleProcess() {
     if (!arsFile) {
       toast.error('Subí el estado ARS');
