@@ -259,6 +259,37 @@ export default function Analytics() {
 
   const maxMerchant = topMerchants[0]?.total || 1;
 
+  const topExpenses = useMemo(() => {
+    return [...displayExpenses]
+      .sort((a, b) => Math.abs(Number(b.amount_usd)) - Math.abs(Number(a.amount_usd)))
+      .slice(0, 5);
+  }, [displayExpenses]);
+
+  const prevByCategory = useMemo(() => {
+    const totals: Record<string, number> = {};
+    prevExpenses.forEach(t => {
+      const cid = t.category_id as string | null;
+      if (!cid) return;
+      const parent = subcatToParent[cid] || cid;
+      totals[parent] = (totals[parent] || 0) + Math.abs(Number(t.amount_usd));
+    });
+    return totals;
+  }, [prevExpenses, subcatToParent]);
+
+  const categoryTrends = useMemo(() => {
+    return byCategory
+      .map(c => {
+        const prev = prevByCategory[c.id] || 0;
+        if (prev === 0) return null;
+        const delta = ((c.total - prev) / prev) * 100;
+        return { ...c, delta };
+      })
+      .filter((c): c is NonNullable<typeof c> => c !== null && Math.abs(c.delta) > 10)
+      .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
+  }, [byCategory, prevByCategory]);
+
+  const monthlyLast6 = useMemo(() => monthly.slice(-6), [monthly]);
+
   if (isLoading) return <div className="flex items-center justify-center h-64 text-muted-foreground">Cargando...</div>;
 
   return (
