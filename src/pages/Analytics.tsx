@@ -213,6 +213,13 @@ export default function Analytics() {
     [categoryTree, categoryMonthly]
   );
 
+  const categoryChartData = useMemo(
+    () => categoryMonthly.filter(m =>
+      visibleCategoriesForChart.reduce((sum, cat) => sum + (m[cat.id] || 0), 0) > 0
+    ),
+    [categoryMonthly, visibleCategoriesForChart]
+  );
+
   const budgetVsActual = useMemo(() => {
     if (!allTransactions) return [];
     const now = new Date();
@@ -385,13 +392,17 @@ export default function Analytics() {
       <Card>
         <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Gasto por categoría · últimos 6 meses</CardTitle></CardHeader>
         <CardContent>
-          {visibleCategoriesForChart.length > 0 ? (
+          {categoryChartData.length < 2 ? (
+            <p className="text-xs text-muted-foreground py-8 text-center">
+              Se necesitan al menos 2 meses de datos para mostrar tendencias
+            </p>
+          ) : (
             <>
               <div className="h-60">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={categoryMonthly.filter(m => visibleCategoriesForChart.some(cat => (m[cat.id] || 0) > 0))}>
+                  <BarChart data={categoryChartData} barCategoryGap="30%" barGap={4}>
                     <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-                    <YAxis tick={{ fontSize: 10 }} tickCount={5} allowDecimals={false} tickFormatter={v => `$${v >= 1000 ? `${(v/1000).toFixed(0)}k` : v}`} />
+                    <YAxis tick={{ fontSize: 10 }} tickCount={4} allowDecimals={false} domain={[0, 'dataMax']} tickFormatter={v => `$${v >= 1000 ? `${(v/1000).toFixed(0)}k` : v}`} />
                     <Tooltip
                       formatter={(v: number, name: string) => {
                         const cat = categoryTree.find(c => c.id === name);
@@ -419,8 +430,6 @@ export default function Analytics() {
                 ))}
               </div>
             </>
-          ) : (
-            <p className="text-xs text-muted-foreground py-8 text-center">Sin datos suficientes</p>
           )}
         </CardContent>
       </Card>
