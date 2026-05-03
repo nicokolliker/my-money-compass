@@ -25,6 +25,11 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
   const [selectedChartMonth, setSelectedChartMonth] = useState(today.getMonth());
   const [digitalExpanded, setDigitalExpanded] = useState(false);
   const toggleDigital = () => setDigitalExpanded(v => !v);
+  const [trackingExpanded, setTrackingExpanded] = useState(true);
+  const [fixedExpanded, setFixedExpanded] = useState(true);
+  const [variableExpanded, setVariableExpanded] = useState(true);
+
+  const noSpinClass = '[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none';
 
   const currentMonth = today.getMonth();
   const currentYear = today.getFullYear();
