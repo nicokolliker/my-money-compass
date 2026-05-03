@@ -157,82 +157,85 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
       <div className="relative left-1/2 w-screen -translate-x-1/2 px-4 lg:w-[calc(100vw-16rem)] lg:px-6">
         <Card>
           <div
-            className="flex items-center justify-between px-6 py-4 cursor-pointer border-b border-border gap-3"
+            className="flex items-center justify-between px-5 py-3 cursor-pointer"
             onClick={() => setTrackingExpanded(v => !v)}
           >
-            <div className="min-w-0">
-              <h3 className="text-sm font-semibold capitalize">
-                {monthLabel} — Seguimiento del mes
-              </h3>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {fmt(chartData.reduce((s, d) => s + d.spent, 0))} gastado de {fmt(chartData.reduce((s, d) => s + d.budgeted, 0))} presupuestado
-              </p>
-            </div>
-            <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-              <select
-                value={selectedChartMonth}
-                onChange={e => setSelectedChartMonth(Number(e.target.value))}
-                className="text-xs border border-border rounded-lg px-2 py-1 bg-background"
-              >
-                {MONTHS.map((m, i) => (
-                  <option key={m} value={i}>{m}</option>
-                ))}
-              </select>
-              <div className="flex items-center gap-1">
-                <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setSelectedYear(y => y - 1)}>
-                  <ChevronLeft className="h-3.5 w-3.5" />
-                </Button>
-                <span className="text-xs font-semibold tabular-nums w-12 text-center">{selectedYear}</span>
-                <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setSelectedYear(y => y + 1)}>
-                  <ChevronRight className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-              <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', trackingExpanded && 'rotate-180')} />
-            </div>
-          </div>
-          {trackingExpanded && (
-            <CardContent>
-              {chartData.length === 0 ? (
-                <div className="py-6 text-center space-y-1">
-                  <p className="text-sm text-muted-foreground">No hay presupuestos definidos para este mes.</p>
-                  <p className="text-xs text-muted-foreground">Usá la tabla de abajo para definir tu presupuesto mensual.</p>
+            <div className="flex items-center gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={selectedChartMonth}
+                    onChange={e => setSelectedChartMonth(Number(e.target.value))}
+                    className="text-sm font-semibold border-0 bg-transparent focus:outline-none cursor-pointer capitalize"
+                    onClick={e => e.stopPropagation()}
+                  >
+                    {MONTHS.map((m, i) => <option key={m} value={i}>{m}</option>)}
+                  </select>
+                  <span className="text-sm font-semibold text-foreground">{selectedYear}</span>
+                  <span className="text-sm text-muted-foreground">— Seguimiento</span>
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  {chartData.map(item => {
-                    const pctUsed = item.budgeted > 0 ? Math.min((item.spent / item.budgeted) * 100, 100) : 0;
-                    const isOver = item.spent > item.budgeted && item.budgeted > 0;
-                    const remaining = item.budgeted - item.spent;
-                    const barColor = isOver ? 'bg-destructive' : pctUsed > 80 ? 'bg-amber-500' : 'bg-emerald-500';
-                    return (
-                      <div key={item.id}>
-                        <div className="flex items-center justify-between mb-1.5">
-                          <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-                            <span>{item.icon}</span>
-                            <span>{item.name}</span>
-                          </div>
-                          <div className="text-xs tabular-nums">
-                            <span className={cn('font-semibold', isOver ? 'text-destructive' : 'text-foreground')}>
-                              {fmt(item.spent)}
-                            </span>
-                            <span className="text-muted-foreground"> / {fmt(item.budgeted)}</span>
-                          </div>
+                {chartData.length > 0 && (
+                  <div className="flex items-center gap-3 mt-0.5">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                      <span className="text-xs text-muted-foreground">
+                        Gastado: <span className="font-medium text-foreground tabular-nums">{fmt(chartData.reduce((s,d) => s+d.spent, 0))}</span>
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-2 h-2 rounded-full bg-primary/30" />
+                      <span className="text-xs text-muted-foreground">
+                        Budget: <span className="font-medium text-foreground tabular-nums">{fmt(chartData.reduce((s,d) => s+d.budgeted, 0))}</span>
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+            <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform shrink-0', trackingExpanded && 'rotate-180')} />
+          </div>
+
+          {trackingExpanded && chartData.length > 0 && (
+            <CardContent className="pt-0 pb-4">
+              <div className="divide-y divide-border">
+                {chartData.map(item => {
+                  const pctUsed = item.budgeted > 0 ? Math.min((item.spent / item.budgeted) * 100, 100) : 0;
+                  const isOver = item.spent > item.budgeted && item.budgeted > 0;
+                  const remaining = item.budgeted - item.spent;
+                  const barColor = isOver ? 'bg-destructive' : pctUsed > 80 ? 'bg-amber-500' : 'bg-emerald-500';
+                  return (
+                    <div key={item.id} className="py-3">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center gap-1.5 text-sm">
+                          <span>{item.icon}</span>
+                          <span className="font-medium">{item.name}</span>
                         </div>
-                        <div className="relative h-2 bg-muted rounded-full overflow-hidden">
-                          <div className={cn('h-full rounded-full transition-all', barColor)} style={{ width: `${pctUsed}%` }} />
-                          {isOver && <div className="absolute inset-0 rounded-full ring-1 ring-destructive/40 pointer-events-none" />}
-                        </div>
-                        <div className="flex items-center justify-between mt-1 text-[10px] text-muted-foreground">
-                          <span>{Math.round(pctUsed)}% usado</span>
-                          <span className={cn(isOver && 'text-destructive font-semibold')}>
-                            {isOver ? `+${fmt(Math.abs(remaining))} sobre presupuesto` : `${fmt(remaining)} restante`}
-                          </span>
+                        <div className="text-xs tabular-nums text-right">
+                          <span className={cn('font-semibold', isOver ? 'text-destructive' : 'text-foreground')}>{fmt(item.spent)}</span>
+                          <span className="text-muted-foreground"> / {fmt(item.budgeted)}</span>
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              )}
+                      <div className="relative h-1.5 bg-muted rounded-full overflow-hidden">
+                        <div className={cn('h-full rounded-full transition-all', barColor)} style={{ width: `${pctUsed}%` }} />
+                      </div>
+                      <div className="flex justify-between mt-1 text-[10px] text-muted-foreground">
+                        <span>{Math.round(pctUsed)}% usado</span>
+                        <span className={cn(isOver && 'text-destructive font-medium')}>
+                          {isOver ? `+${fmt(Math.abs(remaining))} sobre presupuesto` : `${fmt(remaining)} restante`}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          )}
+
+          {trackingExpanded && chartData.length === 0 && (
+            <CardContent>
+              <p className="text-sm text-muted-foreground text-center py-4">
+                No hay presupuestos definidos. Completá la tabla de abajo.
+              </p>
             </CardContent>
           )}
         </Card>
