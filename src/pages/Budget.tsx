@@ -329,26 +329,28 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                 </tr>
 
                 {/* Fixed section header */}
-                <tr className="bg-primary/5 cursor-pointer" onClick={() => setFixedExpanded(v => !v)}>
-                  <td
-                    className="px-3 py-2 sticky left-0 z-10 font-semibold text-primary text-xs"
-                    style={{ background: 'hsl(var(--card))', boxShadow: '2px 0 4px -2px rgba(0,0,0,0.08)' }}
-                  >
-                    <div className="flex items-center gap-1">
-                      <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', fixedExpanded && 'rotate-180')} />
-                      <span>🔒 Gastos fijos</span>
-                    </div>
-                  </td>
-                  {MONTHS.map((_, i) => (
-                    <td key={i} className={cn('px-2 py-2 text-center tabular-nums text-primary text-xs font-medium', isCurrent(i) && 'bg-primary/10')}>
-                      {fmt(totalRecurringMonthly)}
+                {tableView === 'split' && (
+                  <tr className="bg-primary/5 cursor-pointer" onClick={() => setFixedExpanded(v => !v)}>
+                    <td
+                      className="px-3 py-2 sticky left-0 z-10 font-semibold text-primary text-xs"
+                      style={{ background: 'hsl(var(--card))', boxShadow: '2px 0 4px -2px rgba(0,0,0,0.08)' }}
+                    >
+                      <div className="flex items-center gap-1">
+                        <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', fixedExpanded && 'rotate-180')} />
+                        <span>🔒 Gastos fijos</span>
+                      </div>
                     </td>
-                  ))}
-                  <td className="px-3 py-2 text-right text-xs font-semibold text-primary tabular-nums">{fmt(totalRecurringMonthly * 12)}</td>
-                </tr>
+                    {MONTHS.map((_, i) => (
+                      <td key={i} className={cn('px-2 py-2 text-center tabular-nums text-primary text-xs font-medium', isCurrent(i) && 'bg-primary/10')}>
+                        {fmt(totalRecurringMonthly)}
+                      </td>
+                    ))}
+                    <td className="px-3 py-2 text-right text-xs font-semibold text-primary tabular-nums">{fmt(totalRecurringMonthly * 12)}</td>
+                  </tr>
+                )}
 
                 {/* Fixed detail rows */}
-                {fixedExpanded && tree.filter(cat => cat.recurringMonthly > 0).map(cat => (
+                {tableView === 'split' && fixedExpanded && tree.filter(cat => cat.recurringMonthly > 0).map(cat => (
                   <tr key={`fixed-${cat.id}`} className="border-b border-border/50">
                     <td
                       className="px-3 py-1.5 pl-8 sticky left-0 z-10 text-xs text-muted-foreground"
@@ -366,28 +368,30 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                 ))}
 
                 {/* Variable section header */}
-                <tr className="bg-muted/40 cursor-pointer border-t-2 border-border" onClick={() => setVariableExpanded(v => !v)}>
-                  <td
-                    className="px-3 py-2 sticky left-0 z-10 font-semibold text-foreground text-xs"
-                    style={{ background: 'hsl(var(--muted))', boxShadow: '2px 0 4px -2px rgba(0,0,0,0.08)' }}
-                  >
-                    <div className="flex items-center gap-1">
-                      <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', variableExpanded && 'rotate-180')} />
-                      <span>📊 Gastos variables</span>
-                    </div>
-                  </td>
-                  {MONTHS.map((_, i) => {
-                    const varTotal = tree.reduce((s, cat) => s + (isPast(i) ? getActualSpending(cat.id, i) : getBudgetAmount(cat.id, i)), 0);
-                    return (
-                      <td key={i} className={cn('px-2 py-2 text-center tabular-nums text-xs font-medium', isCurrent(i) && 'bg-primary/5')}>
-                        {fmt(varTotal)}
-                      </td>
-                    );
-                  })}
-                  <td className="px-3 py-2 text-right text-xs font-semibold tabular-nums">
-                    {fmt(MONTHS.reduce((s, _, i) => s + tree.reduce((a, cat) => a + (isPast(i) ? getActualSpending(cat.id, i) : getBudgetAmount(cat.id, i)), 0), 0))}
-                  </td>
-                </tr>
+                {tableView === 'split' && (
+                  <tr className="bg-muted/40 cursor-pointer border-t-2 border-border" onClick={() => setVariableExpanded(v => !v)}>
+                    <td
+                      className="px-3 py-2 sticky left-0 z-10 font-semibold text-foreground text-xs"
+                      style={{ background: 'hsl(var(--muted))', boxShadow: '2px 0 4px -2px rgba(0,0,0,0.08)' }}
+                    >
+                      <div className="flex items-center gap-1">
+                        <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', variableExpanded && 'rotate-180')} />
+                        <span>📊 Gastos variables</span>
+                      </div>
+                    </td>
+                    {MONTHS.map((_, i) => {
+                      const varTotal = tree.reduce((s, cat) => s + (isPast(i) ? getActualSpending(cat.id, i) : getBudgetAmount(cat.id, i)), 0);
+                      return (
+                        <td key={i} className={cn('px-2 py-2 text-center tabular-nums text-xs font-medium', isCurrent(i) && 'bg-primary/5')}>
+                          {fmt(varTotal)}
+                        </td>
+                      );
+                    })}
+                    <td className="px-3 py-2 text-right text-xs font-semibold tabular-nums">
+                      {fmt(MONTHS.reduce((s, _, i) => s + tree.reduce((a, cat) => a + (isPast(i) ? getActualSpending(cat.id, i) : getBudgetAmount(cat.id, i)), 0), 0))}
+                    </td>
+                  </tr>
+                )}
 
                 {/* Variable category rows */}
                 {variableExpanded && tree.map(cat => {
