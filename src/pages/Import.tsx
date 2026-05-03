@@ -13,8 +13,9 @@ import { useLatestFxRate } from '@/hooks/useFxRates';
 import { parseArqStatements, type ParsedTransaction } from '@/lib/importers/arqParser';
 import { parseMercadoPago } from '@/lib/importers/mercadoPagoParser';
 import { parseBancoCiudad, parseBancoCiudadObSoc } from '@/lib/importers/bancoCiudadParser';
-import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle } from 'lucide-react';
+import { useImportLog } from '@/hooks/useImportLog';
+import { AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
