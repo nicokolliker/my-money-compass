@@ -86,6 +86,7 @@ export function FundFlowDiagram() {
             <line x1={340} y1={Y2 + NODE_H} x2={340} y2={Y3} stroke="hsl(var(--muted-foreground))" strokeWidth={1.5} markerEnd="url(#arrow)" />
             {/* Wise → Cash USD */}
             <path d={`M 375 ${Y2 + NODE_H} Q 460 220 550 ${Y3}`} fill="none" stroke="hsl(var(--muted-foreground))" strokeWidth={1.5} markerEnd="url(#arrow)" />
+            <text x={460} y={215} textAnchor="middle" fontSize="11" fill="hsl(var(--muted-foreground))">vía conocido · efectivo</text>
 
             {/* ARQ → Mercado Pago (left exit) */}
             <path d={`M 320 ${Y3 + NODE_H} Q 270 330 220 ${Y4}`} fill="none" stroke="hsl(var(--muted-foreground))" strokeWidth={1.5} markerEnd="url(#arrow)" />
