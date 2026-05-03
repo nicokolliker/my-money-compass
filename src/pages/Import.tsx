@@ -707,31 +707,20 @@ export default function ImportPage() {
   );
 }
 
-const SOURCES: { key: string; label: string; prefix: string }[] = [
-  { key: 'arq', label: 'ARQ ARS', prefix: 'arq-' },
-  { key: 'mp', label: 'MercadoPago', prefix: 'mp-' },
-  { key: 'bc', label: 'Banco Ciudad', prefix: 'bc1689-' },
+const SOURCES: { key: 'arq' | 'mercadopago' | 'banco_ciudad'; label: string }[] = [
+  { key: 'arq', label: 'ARQ ARS' },
+  { key: 'mercadopago', label: 'MercadoPago' },
+  { key: 'banco_ciudad', label: 'Banco Ciudad' },
 ];
 
 const MONTH_LABELS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-const MONTH_LABELS_FULL = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
 function ymKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
 function ImportStatusPanel() {
-  const { data } = useQuery({
-    queryKey: ['import-status-external-ids'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('transactions')
-        .select('external_id, date')
-        .not('external_id', 'is', null);
-      if (error) throw error;
-      return data || [];
-    },
-  });
+  const { data } = useImportLog();
 
   const { months, statusBySource, pending } = useMemo(() => {
     const today = new Date();
@@ -752,11 +741,8 @@ function ImportStatusPanel() {
     const pending: { source: string; monthLabel: string }[] = [];
 
     for (const src of SOURCES) {
-      const matching = (data || []).filter((t: any) => t.external_id?.startsWith(src.prefix));
-      const monthsWithData = new Set<string>(
-        matching.map((t: any) => (t.date as string).slice(0, 7)),
-      );
-      // earliest month any data exists
+      const matching = (data || []).filter((t) => t.source === src.key);
+      const monthsWithData = new Set<string>(matching.map((t) => t.month));
       let earliest: string | null = null;
       for (const m of monthsWithData) if (!earliest || m < earliest) earliest = m;
       const hasHistory = monthsWithData.size > 0;
@@ -783,7 +769,6 @@ function ImportStatusPanel() {
     return { months, statusBySource, pending };
   }, [data]);
 
-  // group pending message
   const pendingMsg = useMemo(() => {
     if (pending.length === 0) return null;
     const byMonth = new Map<string, string[]>();
