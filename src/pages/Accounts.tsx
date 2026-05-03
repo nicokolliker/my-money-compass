@@ -325,26 +325,36 @@ export default function Accounts() {
                     const balUsd = a.computed_balance_usd;
                     const pct = totalNetWorth !== 0 ? (balUsd / totalNetWorth * 100) : 0;
                     return (
-                      <button key={a.id} onClick={() => openEdit(a)} className="flex items-center gap-3 w-full py-3 text-left hover:bg-accent/50 active:bg-accent rounded-lg px-2 -mx-2 transition-colors">
-                        <AccountLogo name={a.name} institution={(a as any).institution} />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <p className="text-sm font-semibold text-foreground truncate">{a.name}</p>
-                            {(a as any).source === 'csv' && <Badge variant="outline" className="text-[9px] h-4 px-1.5 shrink-0"><FileUp className="h-2.5 w-2.5 mr-0.5" />CSV</Badge>}
-                            {(a as any).source === 'manual' && <Badge variant="outline" className="text-[9px] h-4 px-1.5 shrink-0 text-muted-foreground"><PenLine className="h-2.5 w-2.5 mr-0.5" />Manual</Badge>}
+                      <div key={a.id}>
+                        <button onClick={() => openEdit(a)} className="flex items-center gap-3 w-full py-3 text-left hover:bg-accent/50 active:bg-accent rounded-lg px-2 -mx-2 transition-colors">
+                          <AccountLogo name={a.name} institution={(a as any).institution} />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <p className="text-sm font-semibold text-foreground truncate">{a.name}</p>
+                              {(a as any).source === 'csv' && <Badge variant="outline" className="text-[9px] h-4 px-1.5 shrink-0"><FileUp className="h-2.5 w-2.5 mr-0.5" />CSV</Badge>}
+                              {(a as any).source === 'manual' && <Badge variant="outline" className="text-[9px] h-4 px-1.5 shrink-0 text-muted-foreground"><PenLine className="h-2.5 w-2.5 mr-0.5" />Manual</Badge>}
+                            </div>
+                            {a.institution && <p className="text-xs text-muted-foreground">{a.institution}</p>}
                           </div>
-                          {a.institution && <p className="text-xs text-muted-foreground">{a.institution}</p>}
-                        </div>
-                        <div className="text-right shrink-0">
-                          <p className={`text-sm font-bold tabular-nums ${a.computed_balance < 0 ? 'text-destructive' : 'text-foreground'}`}>
-                            {formatCurrency(a.computed_balance, a.currency)}
-                          </p>
-                          <div className="flex items-center gap-1.5 justify-end">
-                            {a.currency !== 'USD' && <span className="text-[11px] text-muted-foreground tabular-nums">≈ {formatUSD(a.computed_balance_usd)}</span>}
-                            <span className="text-[10px] text-muted-foreground tabular-nums">{pct.toFixed(1)}%</span>
+                          <div className="text-right shrink-0">
+                            <p className={`text-sm font-bold tabular-nums ${a.computed_balance < 0 ? 'text-destructive' : 'text-foreground'}`}>
+                              {formatCurrency(a.computed_balance, a.currency)}
+                            </p>
+                            <div className="flex items-center gap-1.5 justify-end">
+                              {a.currency !== 'USD' && <span className="text-[11px] text-muted-foreground tabular-nums">≈ {formatUSD(a.computed_balance_usd)}</span>}
+                              <span className="text-[10px] text-muted-foreground tabular-nums">{pct.toFixed(1)}%</span>
+                            </div>
                           </div>
-                        </div>
-                      </button>
+                        </button>
+                        {isHub(a.name) && (
+                          <ReconciliationPanel
+                            account={a}
+                            transfers={recentTransfers || []}
+                            importLog={importLog || []}
+                            allAccounts={accounts || []}
+                          />
+                        )}
+                      </div>
                     );
                   })}
                 </CardContent>
