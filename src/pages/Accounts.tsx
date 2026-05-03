@@ -19,6 +19,7 @@ import { DemoDataBanner } from '@/components/DemoDataBanner';
 import { useDemoData } from '@/hooks/useDemoData';
 import { Badge } from '@/components/ui/badge';
 import { FundFlowDiagram } from '@/components/accounts/FundFlowDiagram';
+import { MonthlySettlementWizard } from '@/components/accounts/MonthlySettlementWizard';
 
 function AccountLogo({ name, institution }: { name: string; institution?: string | null }) {
   // Try institution name first (e.g. "Wise", "Banco Galicia"), then fall back to account name
