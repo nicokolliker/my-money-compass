@@ -39,6 +39,7 @@ function AccountLogo({ name, institution }: { name: string; institution?: string
 export default function Accounts() {
   const navigate = useNavigate();
   const { data: accounts, isLoading } = useAccountBalances();
+  const { data: importLog } = useImportLog();
   const { data: groups } = useAccountGroups();
   const createAccount = useCreateAccount();
   const updateAccount = useUpdateAccount();
