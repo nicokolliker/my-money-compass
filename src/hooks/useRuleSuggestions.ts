@@ -126,6 +126,9 @@ export function useRuleSuggestions() {
       if (hasRule) continue;
       const id = `rule-${g.key}`;
       if (ignored.has(id)) continue;
+      // Si ya hay una sugerencia de categoría para este mismo merchant, no agregar la de regla
+      const alreadyHasCategorySuggestion = suggestions.some(s => s.type === 'category' && s.merchant === g.name);
+      if (alreadyHasCategorySuggestion) continue;
       const inferred = inferCategoryName(g.name);
       const cat = inferred ? findCategory(inferred) : undefined;
       suggestions.push({

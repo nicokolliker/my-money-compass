@@ -13,7 +13,7 @@ const CATEGORY_MAP: Record<string, string> = {
   Entretenimiento: 'Ocio',
 };
 
-const CUTOFF = '2026-05-01';
+const DEFAULT_CUTOFF = '2026-05-01';
 
 function parseCsvLine(line: string): string[] {
   const out: string[] = [];
