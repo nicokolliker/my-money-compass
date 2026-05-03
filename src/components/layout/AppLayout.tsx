@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { TransactionForm } from '@/components/transactions/TransactionForm';
 import { DebugPanel } from '@/components/DebugPanel';
 import { useAuth } from '@/hooks/useAuth';
