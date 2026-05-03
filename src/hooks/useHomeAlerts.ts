@@ -1,10 +1,14 @@
 import { useMemo } from 'react';
-import { format, subMonths } from 'date-fns';
+import { format } from 'date-fns';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { useImportLog } from '@/hooks/useImportLog';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useBudgets } from '@/hooks/useBudgets';
 import { useDerivedInstances } from '@/hooks/useRecurringInstances';
 import { useRuleSuggestions } from '@/hooks/useRuleSuggestions';
+import { useAccountBalances } from '@/hooks/useAccounts';
+import { formatUSD } from '@/lib/constants';
 
 export interface HomeAlert {
   id: string;
@@ -20,6 +24,7 @@ const SOURCE_LABEL: Record<string, string> = {
   banco_ciudad: 'Banco Ciudad',
   splitwise: 'Splitwise',
   wise: 'Wise',
+  santander: 'Santander',
 };
 
 const MONTH_NAMES_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
@@ -37,6 +42,19 @@ export function useHomeAlerts() {
   const { data: budgets } = useBudgets(monthStart);
   const { data: transactions } = useTransactions();
   const suggestions = useRuleSuggestions();
+  const { data: accounts } = useAccountBalances();
+
+  const { data: liquidacionTxs } = useQuery({
+    queryKey: ['liquidacion-check', currentMonthStr],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('transactions')
+        .select('id,description,date')
+        .ilike('description', '%Liquidación%')
+        .gte('date', monthStart);
+      return data || [];
+    },
+  });
 
   return useMemo(() => {
     const currentMonth = currentMonthStr;
@@ -67,7 +85,6 @@ export function useHomeAlerts() {
       });
     }
 
-    // Budgets >= 80%
     if (budgets && transactions) {
       const monthTxs = transactions.filter((t: any) => t.type === 'expense' && t.date >= monthStart);
       for (const b of budgets) {
@@ -100,6 +117,35 @@ export function useHomeAlerts() {
       });
     }
 
+    // Liquidación viejo pendiente
+    const hasImportThisMonth = importLog?.some(l =>
+      ['banco_ciudad', 'santander'].includes(l.source) && l.month === currentMonth,
+    );
+    const hasLiquidacion = (liquidacionTxs || []).some((t: any) =>
+      t.description?.includes('Liquidación') && (t.date || '').startsWith(currentMonth),
+    );
+    if (hasImportThisMonth && !hasLiquidacion) {
+      alerts.push({
+        id: `settlement-pending-${currentMonth}`,
+        type: 'warning',
+        message: '💸 Liquidación con el viejo pendiente este mes',
+        action: '/debts',
+        actionLabel: 'Liquidar',
+      });
+    }
+
+    // Splitwise pendiente
+    const splitwiseAcc = (accounts || []).find((a: any) => /splitwise/i.test(a.name));
+    if (splitwiseAcc && Number(splitwiseAcc.computed_balance_usd) < -10) {
+      alerts.push({
+        id: 'splitwise-pending',
+        type: 'info',
+        message: `💸 Splitwise tiene ${formatUSD(Math.abs(Number(splitwiseAcc.computed_balance_usd)))} pendiente`,
+        action: '/debts',
+        actionLabel: 'Ver Deudas',
+      });
+    }
+
     return alerts;
-  }, [importLog, instances, budgets, transactions, suggestions, currentMonthStr, monthStart]);
+  }, [importLog, instances, budgets, transactions, suggestions, accounts, liquidacionTxs, currentMonthStr, monthStart]);
 }

@@ -2,7 +2,7 @@ import { ReactNode, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Wallet, ArrowLeftRight, BarChart3, Repeat, BookOpen, Plus,
-  CalendarDays, Target, LogOut, Upload, ChevronDown, ChevronRight, Tag, Store, DollarSign, Plug, LayoutGrid,
+  CalendarDays, Target, LogOut, Upload, ChevronDown, ChevronRight, Tag, Store, DollarSign, Plug, LayoutGrid, CreditCard,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -20,6 +20,7 @@ type NavEntry = NavLeaf | NavGroup;
 const NAV: NavEntry[] = [
   { path: '/', label: 'Home', icon: LayoutDashboard },
   { path: '/accounts', label: 'Accounts', icon: Wallet },
+  { path: '/debts', label: 'Deudas', icon: CreditCard },
   { path: '/transactions', label: 'Activity', icon: ArrowLeftRight },
   {
     label: 'Planning', icon: Target, children: [
