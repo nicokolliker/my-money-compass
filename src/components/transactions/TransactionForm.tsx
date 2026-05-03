@@ -316,9 +316,18 @@ export function TransactionForm({ onSuccess, editData }: Props) {
           <Select value={categoryId} onValueChange={setCategoryId}>
             <SelectTrigger className="mt-1"><SelectValue placeholder="Select category" /></SelectTrigger>
             <SelectContent>
-              {categories?.map(c => (
+              {categoryTree.filter(c => !c.isDigital).map(c => (
                 <SelectItem key={c.id} value={c.id}>{c.icon} {c.name}</SelectItem>
               ))}
+              {digitalCategory && digitalSubcategories.length > 0 && (
+                <SelectGroup>
+                  <SelectLabel>{digitalCategory.icon} {digitalCategory.name}</SelectLabel>
+                  <SelectItem value={digitalCategory.id}>&nbsp;&nbsp;All Digital</SelectItem>
+                  {digitalSubcategories.map(sub => (
+                    <SelectItem key={sub.id} value={sub.id}>&nbsp;&nbsp;{sub.name}</SelectItem>
+                  ))}
+                </SelectGroup>
+              )}
             </SelectContent>
           </Select>
         </div>
