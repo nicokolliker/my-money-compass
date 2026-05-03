@@ -141,6 +141,22 @@ Deno.serve(async (req) => {
           let type: "income" | "expense" | "transfer" = amount >= 0 ? "income" : "expense";
           if ((tx.details?.type || "").toUpperCase() === "TRANSFER") type = "transfer";
 
+          // Buscar el rate EUR/USD para convertir
+          let amountUsd = amount;
+          let fxRate = 1;
+          if (currency !== 'USD') {
+            const { data: rateRow } = await supabaseAdmin
+              .from('fx_rates')
+              .select('rate')
+              .eq('from_currency', currency)
+              .eq('to_currency', 'USD')
+              .order('date', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            fxRate = rateRow?.rate ?? (currency === 'EUR' ? 1.08 : 1);
+            amountUsd = amount * fxRate;
+          }
+
           const { error: insErr } = await supabaseAdmin
             .from("transactions")
             .upsert(
@@ -155,8 +171,8 @@ Deno.serve(async (req) => {
                   "Wise",
                 amount: amount,
                 currency,
-                fx_rate: 1,
-                amount_usd: currency === "USD" ? amount : 0,
+                fx_rate: fxRate,
+                amount_usd: amountUsd,
                 type,
                 external_id,
               },

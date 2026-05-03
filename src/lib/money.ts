@@ -18,7 +18,7 @@
  */
 const FALLBACK_TO_USD: Record<string, number> = {
   USD: 1,
-  ARS: 0.000833, // ~1200 ARS / USD
+  ARS: 0.00072, // ~1390 ARS / USD (actualizado Mayo 2026)
   EUR: 1.08,
   GBP: 1.27,
   BRL: 0.20,

@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useAccountBalances } from '@/hooks/useAccounts';
+
 import { useNetWorth } from '@/hooks/useNetWorth';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useRecurringExpenses } from '@/hooks/useRecurringExpenses';
@@ -29,7 +29,7 @@ function greeting() {
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { data: accountBalances, isLoading } = useAccountBalances();
+  const { isLoading } = useNetWorth();
   const { data: transactions } = useTransactions();
   const { data: blueDollar } = useBlueDollarRate();
   const { data: recurringItems } = useRecurringExpenses();

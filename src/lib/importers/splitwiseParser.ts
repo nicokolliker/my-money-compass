@@ -13,7 +13,7 @@ const CATEGORY_MAP: Record<string, string> = {
   Entretenimiento: 'Ocio',
 };
 
-const CUTOFF = '2026-05-01';
+const DEFAULT_CUTOFF = '2026-05-01';
 
 function parseCsvLine(line: string): string[] {
   const out: string[] = [];
@@ -55,7 +55,9 @@ export function parseSplitwise(
   csvText: string,
   userColumn: string = 'nicolaskolliker',
   arsToUsd: number = 0,
+  cutoffDate?: string,
 ): SplitwiseRow[] {
+  const CUTOFF = cutoffDate || DEFAULT_CUTOFF;
   const lines = csvText.split(/\r?\n/).filter((l) => l.trim().length > 0);
   if (lines.length < 2) return [];
   const header = parseCsvLine(lines[0]).map((h) => h.trim());
