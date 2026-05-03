@@ -408,6 +408,7 @@ export default function ImportPage() {
   const [bcRows, setBcRows] = useState<PreviewRow[]>([]);
   const [bcImporting, setBcImporting] = useState(false);
   const [bcResultMsg, setBcResultMsg] = useState<string | null>(null);
+  const [bcMonth, setBcMonth] = useState<string>('');
 
   const bcAccount = useMemo(
     () =>
