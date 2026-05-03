@@ -622,6 +622,7 @@ export default function ImportPage() {
 
           {rows.length > 0 && (
             <div className="space-y-3">
+              <MonthConfirm month={arqMonth} onChange={setArqMonth} count={rows.length} />
               <div className="flex gap-2 flex-wrap">
                 <Badge>{selectedCount} seleccionadas</Badge>
                 {dupCount > 0 && <Badge variant="secondary">{dupCount} duplicadas</Badge>}
@@ -629,7 +630,7 @@ export default function ImportPage() {
               {renderPreviewTable(rows, toggleRow)}
               <Button
                 onClick={handleImport}
-                disabled={importing || selectedCount === 0 || !arqAccount}
+                disabled={importing || selectedCount === 0 || !arqAccount || !arqMonth}
                 className="w-full"
               >
                 {importing ? 'Importando...' : `Importar ${selectedCount} seleccionadas`}
