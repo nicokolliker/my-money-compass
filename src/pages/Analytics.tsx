@@ -11,7 +11,7 @@ import { getCategoryHex } from '@/lib/categoryColors';
 import { getCategoryIcon } from '@/lib/brandLogos';
 import { MerchantLogo } from '@/components/MerchantLogo';
 import { cn } from '@/lib/utils';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area } from 'recharts';
 import { ArrowUp, ArrowDown, ChevronDown } from 'lucide-react';
 
 type Period = 'this_month' | 'last_month' | 'last_3' | 'ytd' | 'q1' | 'q2' | 'q3' | 'q4' | 'all';
@@ -309,19 +309,19 @@ export default function Analytics() {
       <div className="grid grid-cols-3 gap-3">
         <Card>
           <CardContent className="pt-4 pb-4">
-            <p className="text-[10px] text-muted-foreground font-medium">Ingresos</p>
+            <p className="text-xs text-muted-foreground font-medium">Ingresos</p>
             <p className="text-lg font-bold text-emerald-600 tabular-nums">{formatUSD(incomeTotal)}</p>
-            <p className="text-[9px] text-muted-foreground mt-0.5">
+            <p className="text-xs text-muted-foreground mt-0.5">
               {period === 'this_month' || period === 'last_month' ? 'este período' : ''}
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4 pb-4">
-            <p className="text-[10px] text-muted-foreground font-medium">Gastos</p>
+            <p className="text-xs text-muted-foreground font-medium">Gastos</p>
             <p className="text-lg font-bold text-destructive tabular-nums">{formatUSD(totalExpenses)}</p>
             {momChange !== 0 && (
-              <p className={cn('text-[9px] flex items-center gap-0.5 mt-0.5 font-medium', momChange > 0 ? 'text-destructive' : 'text-emerald-600')}>
+              <p className={cn('text-xs flex items-center gap-0.5 mt-0.5 font-medium', momChange > 0 ? 'text-destructive' : 'text-emerald-600')}>
                 {momChange > 0 ? <ArrowUp className="h-2.5 w-2.5" /> : <ArrowDown className="h-2.5 w-2.5" />}
                 {Math.abs(momChange).toFixed(0)}% vs anterior
               </p>
@@ -330,12 +330,12 @@ export default function Analytics() {
         </Card>
         <Card>
           <CardContent className="pt-4 pb-4">
-            <p className="text-[10px] text-muted-foreground font-medium">Ahorro</p>
+            <p className="text-xs text-muted-foreground font-medium">Ahorro</p>
             <p className={cn('text-lg font-bold tabular-nums', savingsRate >= 0 ? 'text-emerald-600' : 'text-destructive')}>
               {savingsRate.toFixed(0)}%
             </p>
             {incomeTotal > 0 && (
-              <p className="text-[9px] text-muted-foreground mt-0.5">
+              <p className="text-xs text-muted-foreground mt-0.5">
                 {formatUSD(Math.max(0, incomeTotal - totalExpenses))} guardado
               </p>
             )}
@@ -349,7 +349,7 @@ export default function Analytics() {
         <CardContent>
           <div className="h-52">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={monthly}>
+              <AreaChart data={monthly}>
                 <XAxis
                   dataKey="month"
                   tick={{ fontSize: 10 }}
@@ -357,15 +357,17 @@ export default function Analytics() {
                 />
                 <YAxis
                   tick={{ fontSize: 10 }}
+                  tickCount={5}
+                  allowDecimals={false}
                   tickFormatter={v => `$${v >= 1000 ? `${(v/1000).toFixed(0)}k` : v}`}
                 />
                 <Tooltip
                   formatter={(v: number, key: string) => [formatUSD(v), key === 'income' ? 'Ingresos' : 'Gastos']}
                   contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid hsl(var(--border))' }}
                 />
-                <Bar dataKey="income" fill="hsl(var(--success, 142 71% 45%))" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="expenses" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} />
-              </BarChart>
+                <Area type="monotone" dataKey="income" stroke="hsl(var(--success, 142 71% 45%))" fill="hsl(var(--success, 142 71% 45%))" fillOpacity={0.15} strokeWidth={2} />
+                <Area type="monotone" dataKey="expenses" stroke="hsl(var(--destructive))" fill="hsl(var(--destructive))" fillOpacity={0.15} strokeWidth={2} />
+              </AreaChart>
             </ResponsiveContainer>
           </div>
           <div className="flex gap-4 justify-center mt-2">
@@ -387,9 +389,9 @@ export default function Analytics() {
             <>
               <div className="h-60">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={categoryMonthly}>
+                  <BarChart data={categoryMonthly.filter(m => visibleCategoriesForChart.some(cat => (m[cat.id] || 0) > 0))}>
                     <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-                    <YAxis tick={{ fontSize: 10 }} tickFormatter={v => `$${v >= 1000 ? `${(v/1000).toFixed(0)}k` : v}`} />
+                    <YAxis tick={{ fontSize: 10 }} tickCount={5} allowDecimals={false} tickFormatter={v => `$${v >= 1000 ? `${(v/1000).toFixed(0)}k` : v}`} />
                     <Tooltip
                       formatter={(v: number, name: string) => {
                         const cat = categoryTree.find(c => c.id === name);
@@ -403,18 +405,15 @@ export default function Analytics() {
                         dataKey={cat.id}
                         stackId="a"
                         fill={getCategoryHex(cat.name, cat.color) || CATEGORY_COLORS[idx % CATEGORY_COLORS.length]}
+                        radius={idx === visibleCategoriesForChart.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
                       />
                     ))}
                   </BarChart>
                 </ResponsiveContainer>
               </div>
-              <div className="flex flex-wrap gap-2 mt-3">
-                {visibleCategoriesForChart.map((cat, idx) => (
-                  <span key={cat.id} className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                    <span
-                      className="w-2.5 h-2.5 rounded-sm"
-                      style={{ backgroundColor: getCategoryHex(cat.name, cat.color) || CATEGORY_COLORS[idx % CATEGORY_COLORS.length] }}
-                    />
+              <div className="flex flex-wrap gap-x-3 gap-y-1 mt-3">
+                {visibleCategoriesForChart.map(cat => (
+                  <span key={cat.id} className="flex items-center gap-1 text-xs text-muted-foreground">
                     {cat.icon} {cat.name}
                   </span>
                 ))}
