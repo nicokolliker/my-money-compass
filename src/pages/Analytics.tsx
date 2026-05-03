@@ -3,12 +3,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useAccounts } from '@/hooks/useAccounts';
-import { useCategories } from '@/hooks/useCategories';
+import { useCategories, useSubcategories } from '@/hooks/useCategories';
+import { useCategoryTree } from '@/hooks/useCategoryTree';
 import { formatUSD } from '@/lib/constants';
 import { getCategoryHex } from '@/lib/categoryColors';
 import { getCategoryIcon, getBrandLogo, getInitialsColor } from '@/lib/brandLogos';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { ArrowUp, ArrowDown } from 'lucide-react';
+import { ArrowUp, ArrowDown, ChevronDown } from 'lucide-react';
 
 type Period = 'this_month' | 'last_month' | 'last_3' | 'ytd' | 'all';
 
