@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAccountBalances } from '@/hooks/useAccounts';
 import { useNetWorth } from '@/hooks/useNetWorth';
@@ -6,42 +7,36 @@ import { useTransactions } from '@/hooks/useTransactions';
 import { useRecurringExpenses } from '@/hooks/useRecurringExpenses';
 import { useDerivedInstances } from '@/hooks/useRecurringInstances';
 import { formatUSD, formatCurrency } from '@/lib/constants';
-import { toMonthlyAmount } from '@/lib/money';
-import { getCategoryColor, getCategoryHex } from '@/lib/categoryColors';
+import { getCategoryColor } from '@/lib/categoryColors';
 import { getCategoryIcon } from '@/lib/brandLogos';
 import { MerchantLogo } from '@/components/MerchantLogo';
-import { TrendingUp, TrendingDown, ArrowUpDown, DollarSign, ArrowUp, ArrowDown, CalendarDays, Repeat, Building, AlertTriangle } from 'lucide-react';
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { TrendingUp, TrendingDown, ArrowUp, ArrowDown, CalendarDays, DollarSign } from 'lucide-react';
 import { useBlueDollarRate } from '@/hooks/useBlueDollar';
-import { Badge } from '@/components/ui/badge';
-import { isBefore, format } from 'date-fns';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { RecurringStatusBadge } from '@/components/recurring/RecurringStatusBadge';
 import { DemoDataBanner } from '@/components/DemoDataBanner';
 import { useDemoData } from '@/hooks/useDemoData';
-import { useUserId } from '@/hooks/useAuthUser';
+import { useHomeAlerts } from '@/hooks/useHomeAlerts';
+import { cn } from '@/lib/utils';
+
+function greeting() {
+  const h = new Date().getHours();
+  if (h < 12) return 'Buenos días';
+  if (h < 19) return 'Buenas tardes';
+  return 'Buenas noches';
+}
 
 export default function Dashboard() {
-  const userId = useUserId();
+  const navigate = useNavigate();
   const { data: accountBalances, isLoading } = useAccountBalances();
   const { data: transactions } = useTransactions();
   const { data: blueDollar } = useBlueDollarRate();
   const { data: recurringItems } = useRecurringExpenses();
   const { data: instances } = useDerivedInstances();
-  const { totalAssetsUsd: totalAssets, totalLiabilitiesUsd: totalLiabilities, netWorthUsd: netWorth } = useNetWorth();
-
+  const { netWorthUsd: netWorth, totalAssetsUsd: totalAssets, totalLiabilitiesUsd: totalLiabilities } = useNetWorth();
   const { hasDemoData, onCleared: onDemoCleared } = useDemoData();
-
-  const { data: snapshots } = useQuery({
-    queryKey: ['net-worth-snapshots', userId],
-    enabled: !!userId,
-    queryFn: async () => {
-      const { data, error } = await supabase.from('net_worth_snapshots').select('*').order('date');
-      if (error) throw error;
-      return data;
-    },
-  });
+  const alerts = useHomeAlerts();
 
   const now = new Date();
   const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
@@ -56,13 +51,13 @@ export default function Dashboard() {
   const momChange = totalPrevMonthSpending > 0 ? ((totalMonthSpending - totalPrevMonthSpending) / totalPrevMonthSpending) * 100 : 0;
 
   const monthIncome = Math.abs(transactions?.filter(t => t.type === 'income' && t.date >= monthStart).reduce((s, t) => s + Number(t.amount_usd), 0) || 0);
-  const savingsRate = monthIncome > 0 ? ((monthIncome - totalMonthSpending) / monthIncome) * 100 : 0;
+  const monthSavings = monthIncome - totalMonthSpending;
 
   const topCategories = useMemo(() => {
     const map: Record<string, { name: string; total: number; icon: string | null; color: string | null }> = {};
     monthExpenses.forEach(t => {
       const cat = (t as any).categories;
-      const catName = cat?.name || 'Uncategorized';
+      const catName = cat?.name || 'Sin categoría';
       if (!map[catName]) map[catName] = { name: catName, total: 0, icon: cat?.icon || null, color: cat?.color || null };
       map[catName].total += Math.abs(Number(t.amount_usd));
     });
@@ -71,159 +66,108 @@ export default function Dashboard() {
 
   const maxCatSpend = topCategories[0]?.total || 1;
 
-  const subsData = useMemo(() => {
-    const subs = new Set<string>();
-    let subTotal = 0;
-    transactions?.filter(t => t.is_subscription && t.type === 'expense').forEach(t => {
-      const key = (t.merchant || t.description || '').toLowerCase();
-      if (!subs.has(key)) { subs.add(key); subTotal += Math.abs(Number(t.amount_usd)); }
-    });
-    const pct = totalMonthSpending > 0 ? (subTotal / totalMonthSpending * 100) : 0;
-    return { count: subs.size, total: subTotal, pct };
-  }, [transactions, totalMonthSpending]);
-
-  // Recurring intelligence — uses canonical derived instance state
-  const recurringInsights = useMemo(() => {
-    if (!recurringItems) return { monthlyTotal: 0, overdue: 0, upcoming: [] as any[], fixedPct: 0 };
-    const active = recurringItems.filter(i => i.is_active);
-    let monthlyTotal = 0;
-    active.forEach(i => {
-      monthlyTotal += toMonthlyAmount(Math.abs(Number(i.amount)), i.frequency);
-    });
-    const overdue = (instances || []).filter(i => i.derived === 'missing').length;
-    // Use canonical instances for upcoming list — single source of truth
-    const upcoming = (instances || [])
-      .filter(i => i.derived === 'upcoming' || i.derived === 'needs_review' || i.derived === 'missing')
-      .sort((a, b) => (a.expected_date > b.expected_date ? 1 : -1))
+  const upcoming = useMemo(() => {
+    return (instances || [])
+      .filter((i: any) => i.derived === 'upcoming' || i.derived === 'needs_review' || i.derived === 'missing')
+      .sort((a: any, b: any) => (a.expected_date > b.expected_date ? 1 : -1))
       .slice(0, 4);
-    const fixedPct = totalMonthSpending > 0 ? (monthlyTotal / totalMonthSpending * 100) : 0;
-    return { monthlyTotal, overdue, upcoming, fixedPct };
-  }, [recurringItems, instances, totalMonthSpending]);
-
-  const byCurrency: Record<string, number> = {};
-  accountBalances?.forEach(a => { byCurrency[a.currency] = (byCurrency[a.currency] || 0) + a.computed_balance; });
+  }, [instances]);
 
   if (isLoading) return <div className="flex items-center justify-center h-64 text-muted-foreground">Loading...</div>;
 
   return (
     <div className="space-y-5">
       {hasDemoData && <DemoDataBanner onCleared={onDemoCleared} />}
-      <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
+
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-bold text-foreground">{greeting()}, Nico</h1>
+        <p className="text-sm text-muted-foreground capitalize">
+          {format(now, "EEEE d 'de' MMMM, yyyy", { locale: es })}
+        </p>
+      </div>
 
       {/* Net Worth */}
       <Card className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground border-0 shadow-elevated">
         <CardContent className="pt-6 pb-6">
-          <p className="text-sm opacity-80 font-medium">Total Net Worth</p>
+          <p className="text-sm opacity-80 font-medium">Net Worth</p>
           <p className="text-4xl font-extrabold mt-1 tracking-tight">{formatUSD(netWorth)}</p>
-          <p className="text-xs opacity-60 mt-1">Updated today</p>
+          <p className="text-xs opacity-60 mt-1">Actualizado hoy</p>
           <div className="flex gap-6 mt-4 text-sm">
-            <div className="flex items-center gap-1.5"><TrendingUp className="h-4 w-4" /><span>Assets: {formatUSD(totalAssets)}</span></div>
-            <div className="flex items-center gap-1.5"><TrendingDown className="h-4 w-4" /><span>Debt: {formatUSD(totalLiabilities)}</span></div>
+            <div className="flex items-center gap-1.5"><TrendingUp className="h-4 w-4" /><span>Activos: {formatUSD(totalAssets)}</span></div>
+            <div className="flex items-center gap-1.5"><TrendingDown className="h-4 w-4" /><span>Deuda: {formatUSD(totalLiabilities)}</span></div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Key Metrics */}
-      <div className="grid grid-cols-3 gap-3">
-        <Card className="border-success/20">
-          <CardContent className="pt-4 pb-4">
-            <div className="flex items-center gap-1.5 text-success text-xs font-medium mb-1"><TrendingUp className="h-3.5 w-3.5" /> Assets</div>
-            <p className="text-lg font-bold text-foreground">{formatUSD(totalAssets)}</p>
-          </CardContent>
-        </Card>
-        <Card className="border-destructive/20">
-          <CardContent className="pt-4 pb-4">
-            <div className="flex items-center gap-1.5 text-destructive text-xs font-medium mb-1"><TrendingDown className="h-3.5 w-3.5" /> Liabilities</div>
-            <p className="text-lg font-bold text-foreground">{formatUSD(totalLiabilities)}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4 pb-4">
-            <div className="flex items-center gap-1.5 text-muted-foreground text-xs font-medium mb-1"><ArrowUpDown className="h-3.5 w-3.5" /> This Month</div>
-            <p className="text-lg font-bold text-foreground">{formatUSD(totalMonthSpending)}</p>
-            {momChange !== 0 && (
-              <p className={`text-[10px] flex items-center gap-0.5 mt-0.5 font-medium ${momChange > 0 ? 'text-destructive' : 'text-success'}`}>
-                {momChange > 0 ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
-                {Math.abs(momChange).toFixed(0)}% vs last month
-              </p>
-            )}
-          </CardContent>
-        </Card>
+      {/* Este mes */}
+      <div>
+        <h2 className="text-sm font-semibold text-foreground mb-2">Este mes</h2>
+        <div className="grid grid-cols-3 gap-3">
+          <Card className="border-success/20">
+            <CardContent className="pt-4 pb-4">
+              <div className="flex items-center gap-1.5 text-success text-xs font-medium mb-1"><TrendingUp className="h-3.5 w-3.5" /> Ingresos</div>
+              <p className="text-lg font-bold text-foreground">{formatUSD(monthIncome)}</p>
+            </CardContent>
+          </Card>
+          <Card className="border-destructive/20">
+            <CardContent className="pt-4 pb-4">
+              <div className="flex items-center gap-1.5 text-destructive text-xs font-medium mb-1"><TrendingDown className="h-3.5 w-3.5" /> Gastos</div>
+              <p className="text-lg font-bold text-foreground">{formatUSD(totalMonthSpending)}</p>
+              {momChange !== 0 && (
+                <p className={`text-[10px] flex items-center gap-0.5 mt-0.5 font-medium ${momChange > 0 ? 'text-destructive' : 'text-success'}`}>
+                  {momChange > 0 ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
+                  {Math.abs(momChange).toFixed(0)}% vs mes anterior
+                </p>
+              )}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-4 pb-4">
+              <div className="flex items-center gap-1.5 text-muted-foreground text-xs font-medium mb-1">Ahorro</div>
+              <p className={cn('text-lg font-bold', monthSavings >= 0 ? 'text-foreground' : 'text-destructive')}>{formatUSD(monthSavings)}</p>
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
-      {/* Insights */}
-      <div className="grid grid-cols-3 gap-3">
-        <Card>
-          <CardContent className="pt-3 pb-3">
-            <p className="text-[10px] text-muted-foreground font-medium">Savings Rate</p>
-            <p className="text-lg font-bold text-foreground">{savingsRate.toFixed(0)}%</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-3 pb-3">
-            <p className="text-[10px] text-muted-foreground font-medium">Subscriptions</p>
-            <p className="text-lg font-bold text-foreground">{subsData.count}</p>
-            <p className="text-[10px] text-muted-foreground">{subsData.pct.toFixed(0)}% of expenses</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-3 pb-3">
-            <p className="text-[10px] text-muted-foreground font-medium">Top Category</p>
-            {topCategories[0] ? (
-              <div className="flex items-center gap-1 mt-0.5">
-                <span className="text-base">{getCategoryIcon(topCategories[0].name, topCategories[0].icon)}</span>
-                <span className="text-sm font-bold text-foreground truncate">{topCategories[0].name}</span>
-              </div>
-            ) : (
-              <p className="text-sm font-bold text-foreground">—</p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+      {/* Alertas */}
+      {alerts.length > 0 && (
+        <div className="space-y-2">
+          {alerts.map(alert => (
+            <div key={alert.id} className={cn(
+              'flex items-center justify-between px-4 py-2.5 rounded-xl text-sm',
+              alert.type === 'warning'
+                ? 'bg-destructive/10 text-destructive border border-destructive/20'
+                : 'bg-primary/10 text-primary border border-primary/20'
+            )}>
+              <span>{alert.message}</span>
+              {alert.action && (
+                <button onClick={() => navigate(alert.action!)} className="text-xs font-semibold underline shrink-0 ml-3">
+                  {alert.actionLabel}
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
-      {/* Intelligence Insights */}
-      <Card className="border-primary/20">
-        <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-primary" /> Insights</CardTitle></CardHeader>
-        <CardContent className="space-y-2">
-          {recurringInsights.fixedPct > 0 && (
-            <p className="text-xs text-muted-foreground">💡 <span className="font-medium text-foreground">{recurringInsights.fixedPct.toFixed(0)}%</span> of your spending is fixed/recurring ({formatUSD(recurringInsights.monthlyTotal)}/mo)</p>
-          )}
-          {momChange > 10 && (
-            <p className="text-xs text-muted-foreground">📈 Spending is <span className="font-medium text-destructive">up {momChange.toFixed(0)}%</span> vs last month</p>
-          )}
-          {momChange < -10 && (
-            <p className="text-xs text-muted-foreground">📉 Spending is <span className="font-medium text-success">down {Math.abs(momChange).toFixed(0)}%</span> vs last month</p>
-          )}
-          {topCategories[0] && totalMonthSpending > 0 && (topCategories[0].total / totalMonthSpending) > 0.3 && (
-            <p className="text-xs text-muted-foreground">⚠️ <span className="font-medium text-foreground">{topCategories[0].name}</span> is {((topCategories[0].total / totalMonthSpending) * 100).toFixed(0)}% of your spending</p>
-          )}
-          {recurringInsights.overdue > 0 && (
-            <p className="text-xs text-destructive">🔴 <span className="font-medium">{recurringInsights.overdue} overdue</span> recurring payment{recurringInsights.overdue > 1 ? 's' : ''}</p>
-          )}
-          {recurringInsights.fixedPct === 0 && momChange <= 10 && momChange >= -10 && recurringInsights.overdue === 0 && (
-            <p className="text-xs text-muted-foreground">✅ Everything looks good this month</p>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Upcoming Payments */}
-      {recurringInsights.upcoming.length > 0 && (
+      {/* Próximos pagos */}
+      {upcoming.length > 0 && (
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold flex items-center gap-2"><CalendarDays className="h-4 w-4 text-muted-foreground" /> Upcoming Payments</CardTitle></CardHeader>
+          <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold flex items-center gap-2"><CalendarDays className="h-4 w-4 text-muted-foreground" /> Próximos pagos</CardTitle></CardHeader>
           <CardContent className="space-y-2">
-            {recurringInsights.upcoming.map((inst: any) => {
+            {upcoming.map((inst: any) => {
               const r = inst.recurring_expenses;
-              const cat = r?.categories;
               const pm = r?.payment_methods;
               const dueDate = new Date(inst.expected_date + 'T12:00:00');
               return (
                 <div key={inst.id} className="flex items-center gap-3 py-1.5">
                   <MerchantLogo name={r?.name || ''} size={32} />
-                  {void cat /* keep cat in scope */}
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">{r?.name || 'Recurring'}</p>
+                    <p className="text-sm font-medium text-foreground truncate">{r?.name || 'Recurrente'}</p>
                     <p className="text-[10px] text-muted-foreground truncate">
-                      {format(dueDate, 'MMM d')}{pm ? ` · ${pm.name}` : ''}
+                      {format(dueDate, 'd MMM', { locale: es })}{pm ? ` · ${pm.name}` : ''}
                     </p>
                   </div>
                   <div className="text-right shrink-0">
@@ -237,31 +181,10 @@ export default function Dashboard() {
         </Card>
       )}
 
-      {/* Blue Dollar */}
-      {blueDollar && (
-        <Card className="border-primary/20">
-          <CardContent className="pt-4 pb-4 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-              <DollarSign className="h-5 w-5 text-primary" />
-            </div>
-            <div className="flex-1">
-              <p className="text-xs text-muted-foreground">ARS/USD (Blue)</p>
-              <p className="text-lg font-bold text-foreground">
-                1 USD = {blueDollar.blue_avg ? Math.round(blueDollar.blue_avg).toLocaleString() : Math.round(1 / blueDollar.rate).toLocaleString()} ARS
-              </p>
-              <p className="text-[10px] text-muted-foreground">
-                Updated: {new Date(blueDollar.updated_at).toLocaleString()}
-                {blueDollar.cached && ' (cached)'}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Top Spending */}
+      {/* Mayor gasto este mes */}
       {topCategories.length > 0 && (
         <Card>
-          <CardHeader className="pb-3"><CardTitle className="text-sm font-semibold">Top Spending This Month</CardTitle></CardHeader>
+          <CardHeader className="pb-3"><CardTitle className="text-sm font-semibold">Mayor gasto este mes</CardTitle></CardHeader>
           <CardContent className="space-y-3">
             {topCategories.map(cat => {
               const colors = getCategoryColor(cat.name, cat.color);
@@ -287,46 +210,22 @@ export default function Dashboard() {
         </Card>
       )}
 
-      {/* Net Worth Trend */}
-      {snapshots && snapshots.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Net Worth Trend</CardTitle></CardHeader>
-          <CardContent>
-            <div className="h-48">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={snapshots}>
-                  <defs>
-                    <linearGradient id="nwGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={d => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} />
-                  <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `$${(v / 1000).toFixed(1)}k`} />
-                  <Tooltip formatter={(v: number) => formatUSD(v)} labelFormatter={d => new Date(d).toLocaleDateString()} />
-                  <Area type="monotone" dataKey="net_worth_usd" stroke="hsl(var(--primary))" fill="url(#nwGrad)" strokeWidth={2} />
-                </AreaChart>
-              </ResponsiveContainer>
+      {/* Dólar Blue */}
+      {blueDollar && (
+        <Card className="border-primary/20">
+          <CardContent className="pt-3 pb-3 flex items-center gap-3">
+            <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+              <DollarSign className="h-4 w-4 text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] text-muted-foreground">Dólar Blue</p>
+              <p className="text-sm font-bold text-foreground">
+                1 USD = {blueDollar.blue_avg ? Math.round(blueDollar.blue_avg).toLocaleString('es-AR') : Math.round(1 / blueDollar.rate).toLocaleString('es-AR')} ARS
+              </p>
             </div>
           </CardContent>
         </Card>
       )}
-
-      {/* By Currency */}
-      <Card>
-        <CardHeader className="pb-3"><CardTitle className="text-sm font-semibold">By Currency</CardTitle></CardHeader>
-        <CardContent className="space-y-2">
-          {Object.entries(byCurrency).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).map(([currency, balance]) => (
-            <div key={currency} className="flex justify-between items-center text-sm py-1.5 px-2 rounded-lg hover:bg-accent/50 transition-colors">
-              <div className="flex items-center gap-2">
-                <span className="text-base">{currency === 'USD' ? '🇺🇸' : currency === 'ARS' ? '🇦🇷' : currency === 'EUR' ? '🇪🇺' : currency === 'GBP' ? '🇬🇧' : '💱'}</span>
-                <span className="text-muted-foreground font-medium">{currency}</span>
-              </div>
-              <span className="font-bold text-foreground tabular-nums">{formatCurrency(balance, currency)}</span>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
     </div>
   );
 }
