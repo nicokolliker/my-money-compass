@@ -78,10 +78,69 @@ export default function DebtsPage() {
         ))}
       </div>
 
+      <DebtImportStatus />
+
       <ViejoSettlementWizard open={openViejo} onOpenChange={setOpenViejo} />
       <SplitwiseSettlementWizard open={openSw} onOpenChange={setOpenSw} />
       <TransferDialog account={transferTarget} onClose={() => setTransferTarget(null)} />
     </div>
+  );
+}
+
+const DEBT_SOURCES: { key: 'banco_ciudad' | 'santander'; label: string }[] = [
+  { key: 'banco_ciudad', label: 'Banco Ciudad' },
+  { key: 'santander', label: 'Santander' },
+];
+const DEBT_MONTH_LABELS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+
+function DebtImportStatus() {
+  const { data } = useImportLog();
+  const today = new Date();
+  const months = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date(today.getFullYear(), today.getMonth() - (5 - i), 1);
+    return {
+      key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+      label: DEBT_MONTH_LABELS[d.getMonth()],
+    };
+  });
+
+  return (
+    <Card>
+      <CardContent className="p-4 space-y-2">
+        <p className="text-sm font-medium">Estado de importaciones</p>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-muted-foreground">
+                <th className="text-left font-medium pb-2 pr-3"></th>
+                {months.map((m) => (
+                  <th key={m.key} className="text-center font-medium pb-2 px-2 min-w-[44px]">{m.label}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {DEBT_SOURCES.map((src) => {
+                const monthsWithData = new Set((data || []).filter((t: any) => t.source === src.key).map((t: any) => t.month));
+                return (
+                  <tr key={src.key} className="border-t border-border">
+                    <td className="py-2 pr-3 font-medium text-foreground">{src.label}</td>
+                    {months.map((m) => (
+                      <td key={m.key} className="text-center py-2 px-2">
+                        {monthsWithData.has(m.key) ? (
+                          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-500/15 text-green-600 dark:text-green-400 text-sm">✓</span>
+                        ) : (
+                          <span className="inline-block text-muted-foreground/50">—</span>
+                        )}
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
