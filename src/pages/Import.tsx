@@ -728,6 +728,7 @@ export default function ImportPage() {
 
           {bcRows.length > 0 && (
             <div className="space-y-3">
+              <MonthConfirm month={bcMonth} onChange={setBcMonth} count={bcRows.length} />
               <div className="flex gap-2 flex-wrap">
                 <Badge>{bcSelectedCount} seleccionadas</Badge>
                 {bcDupCount > 0 && <Badge variant="secondary">{bcDupCount} duplicadas</Badge>}
@@ -737,7 +738,7 @@ export default function ImportPage() {
               )}
               <Button
                 onClick={handleBcImport}
-                disabled={bcImporting || bcSelectedCount === 0 || !bcAccount}
+                disabled={bcImporting || bcSelectedCount === 0 || !bcAccount || !bcMonth}
                 className="w-full"
               >
                 {bcImporting ? 'Importando...' : `Importar ${bcSelectedCount} seleccionadas`}
