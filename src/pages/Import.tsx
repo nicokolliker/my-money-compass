@@ -1540,3 +1540,291 @@ function ImportStatusPanel() {
     </Card>
   );
 }
+
+// ============================================================================
+// Settlement Dialog — Cerrar mes con el viejo
+// ============================================================================
+
+const STORAGE_KEY = 'settlement_defaults';
+
+interface SettlementItem {
+  key: string;
+  label: string;
+  amountARS: number;
+  editable: boolean;
+  labelEditable?: boolean;
+  categoryName: string;
+}
+
+function SettlementDialog({
+  open,
+  onClose,
+  bcTotalARS,
+  santTotalARS,
+  arsToUsd,
+  defaultBlueRate,
+  accounts,
+  categories,
+  qc,
+}: {
+  open: boolean;
+  onClose: () => void;
+  bcTotalARS: number;
+  santTotalARS: number;
+  arsToUsd: number;
+  defaultBlueRate: number;
+  accounts: any[];
+  categories: any[];
+  qc: ReturnType<typeof useQueryClient>;
+}) {
+  const [items, setItems] = useState<SettlementItem[]>([]);
+  const [tcBlue, setTcBlue] = useState<number>(defaultBlueRate);
+  const [usdAPagar, setUsdAPagar] = useState<number>(0);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    let saved: any = {};
+    try { saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch {}
+    const initial: SettlementItem[] = [
+      { key: 'visa_ciudad',    label: 'VISA Ciudad',       amountARS: bcTotalARS,                                editable: false, categoryName: 'Casa' },
+      { key: 'visa_santander', label: 'VISA Santander',    amountARS: santTotalARS || saved.visa_santander || 0, editable: santTotalARS === 0, categoryName: 'Casa' },
+      { key: 'amex',           label: 'AMEX Santander',    amountARS: saved.amex || 0,        editable: true, categoryName: 'Casa' },
+      { key: 'prestamo',       label: 'Préstamo + Seguro', amountARS: saved.prestamo || 0,    editable: true, categoryName: 'Auto' },
+      { key: 'obra_social',    label: 'Obra Social',       amountARS: saved.obra_social || 0, editable: true, categoryName: 'Salud' },
+      { key: 'expensas',       label: 'Expensas',          amountARS: saved.expensas || 0,    editable: true, categoryName: 'Casa' },
+      { key: 'cochera',        label: 'Cochera + Lavado',  amountARS: saved.cochera || 0,     editable: true, categoryName: 'Auto' },
+      { key: 'patente',        label: 'Patente',           amountARS: saved.patente || 0,     editable: true, categoryName: 'Auto' },
+      { key: 'multa',          label: 'Multa',             amountARS: saved.multa || 0,       editable: true, categoryName: 'Auto' },
+      { key: 'otro1',          label: saved.otro1_label || 'Otro',   amountARS: 0, editable: true, labelEditable: true, categoryName: 'Casa' },
+      { key: 'otro2',          label: saved.otro2_label || 'Otro 2', amountARS: 0, editable: true, labelEditable: true, categoryName: 'Casa' },
+    ];
+    setItems(initial);
+    setTcBlue(defaultBlueRate);
+  }, [open, bcTotalARS, santTotalARS, defaultBlueRate]);
+
+  const totalARS = items.reduce((s, i) => s + (i.amountARS || 0), 0);
+  const usdExacto = tcBlue > 0 ? totalARS / tcBlue : 0;
+
+  useEffect(() => {
+    setUsdAPagar(Math.round(usdExacto / 100) * 100);
+  }, [usdExacto]);
+
+  const vueltoARS = Math.max(0, usdAPagar * tcBlue - totalARS);
+
+  function updateItem(key: string, patch: Partial<SettlementItem>) {
+    setItems((rows) => rows.map((r) => (r.key === key ? { ...r, ...patch } : r)));
+  }
+
+  async function handleConfirm() {
+    setSubmitting(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+      const today = new Date().toISOString().split('T')[0];
+      const monthLabel = format(new Date(), 'MMMM yyyy', { locale: es });
+
+      const tarjetaViejoAcc = accounts.find((a) => /viejo|tarjeta.*viejo/i.test(a.name));
+      const cashAcc = accounts.find((a) => /cash/i.test(a.name) && a.currency === 'USD');
+      const mpAcc = accounts.find((a) => /mercado.*pago|mercadopago/i.test(a.name));
+
+      if (!tarjetaViejoAcc || !cashAcc || !mpAcc) {
+        toast.error('Faltan cuentas: verificá que existan Tarjeta viejo, Cash USD y Mercado Pago');
+        setSubmitting(false);
+        return;
+      }
+
+      const editableItems = items.filter((i) => i.editable && i.amountARS > 0);
+      const fxArsUsd = arsToUsd || (tcBlue > 0 ? 1 / tcBlue : 0);
+
+      for (const item of editableItems) {
+        const cat = categories.find((c) => c.name === item.categoryName);
+        await supabase.from('transactions').insert({
+          user_id: user.id,
+          account_id: tarjetaViejoAcc.id,
+          date: today,
+          description: `${item.label} — ${monthLabel}`,
+          amount: -item.amountARS,
+          currency: 'ARS',
+          fx_rate: fxArsUsd,
+          amount_usd: -(item.amountARS * fxArsUsd),
+          type: 'expense' as const,
+          category_id: cat?.id || null,
+        });
+      }
+
+      await supabase.from('transactions').insert({
+        user_id: user.id,
+        account_id: cashAcc.id,
+        date: today,
+        description: `Liquidación ${monthLabel} — viejo`,
+        amount: -usdAPagar,
+        currency: 'USD',
+        fx_rate: 1,
+        amount_usd: -usdAPagar,
+        type: 'expense' as const,
+        notes: JSON.stringify({
+          settlement: true,
+          month: format(new Date(), 'yyyy-MM'),
+          breakdown: Object.fromEntries(items.filter((i) => i.amountARS > 0).map((i) => [i.key, i.amountARS])),
+          tcBlue,
+          totalARS,
+          usdPagado: usdAPagar,
+          vueltoARS,
+        }),
+      });
+
+      if (vueltoARS > 0) {
+        await supabase.from('transactions').insert({
+          user_id: user.id,
+          account_id: mpAcc.id,
+          date: today,
+          description: `Vuelto liquidación ${monthLabel} — viejo`,
+          amount: vueltoARS,
+          currency: 'ARS',
+          fx_rate: fxArsUsd,
+          amount_usd: vueltoARS * fxArsUsd,
+          type: 'income' as const,
+          notes: `vuelto_settlement_${format(new Date(), 'yyyy-MM')}`,
+        });
+      }
+
+      const defaults: Record<string, any> = {};
+      items.filter((i) => i.editable).forEach((i) => {
+        defaults[i.key] = i.amountARS;
+        if (i.key === 'otro1') defaults['otro1_label'] = i.label;
+        if (i.key === 'otro2') defaults['otro2_label'] = i.label;
+      });
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(defaults));
+
+      qc.invalidateQueries({ queryKey: ['transactions'] });
+      qc.invalidateQueries({ queryKey: ['account-balances'] });
+      toast.success(`Liquidación registrada: $${usdAPagar} USD pagados · ARS ${vueltoARS.toLocaleString()} pendiente en MP`);
+      onClose();
+    } catch (e: any) {
+      toast.error(e.message || 'Error al confirmar liquidación');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Cerrar mes con el viejo</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="border rounded-lg overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-xs">Concepto</TableHead>
+                  <TableHead className="text-xs text-right">ARS</TableHead>
+                  <TableHead className="text-xs">Categoría</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {items.map((it) => (
+                  <TableRow key={it.key}>
+                    <TableCell className="text-xs">
+                      {it.labelEditable ? (
+                        <Input
+                          value={it.label}
+                          onChange={(e) => updateItem(it.key, { label: e.target.value })}
+                          className="h-7 text-xs"
+                        />
+                      ) : it.editable ? (
+                        it.label
+                      ) : (
+                        <span className="text-muted-foreground">🔒 {it.label}</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {it.editable ? (
+                        <Input
+                          type="number"
+                          value={it.amountARS || ''}
+                          onChange={(e) => updateItem(it.key, { amountARS: parseFloat(e.target.value) || 0 })}
+                          className="h-7 text-xs text-right font-mono w-32 ml-auto"
+                        />
+                      ) : (
+                        <span className="text-xs font-mono text-muted-foreground">
+                          {it.amountARS.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {it.editable ? (
+                        <Select
+                          value={it.categoryName}
+                          onValueChange={(v) => updateItem(it.key, { categoryName: v })}
+                        >
+                          <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {categories.map((c) => (
+                              <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">{it.categoryName}</span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+                <TableRow className="font-medium">
+                  <TableCell className="text-xs">Total</TableCell>
+                  <TableCell className="text-xs text-right font-mono">
+                    {totalARS.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+                  </TableCell>
+                  <TableCell />
+                </TableRow>
+              </TableBody>
+            </Table>
+          </div>
+
+          <div className="space-y-2 text-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Total ARS:</span>
+              <span className="font-mono">${totalARS.toLocaleString('es-AR', { maximumFractionDigits: 0 })}</span>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-muted-foreground">TC Blue:</span>
+              <Input
+                type="number"
+                value={tcBlue}
+                onChange={(e) => setTcBlue(parseFloat(e.target.value) || 0)}
+                className="h-7 text-xs text-right font-mono w-32"
+              />
+            </div>
+            <div className="border-t pt-2 flex items-center justify-between">
+              <span className="text-muted-foreground">USD exacto:</span>
+              <span className="font-mono">${usdExacto.toFixed(2)}</span>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-muted-foreground">USD a pagar:</span>
+              <Input
+                type="number"
+                value={usdAPagar}
+                onChange={(e) => setUsdAPagar(parseFloat(e.target.value) || 0)}
+                className="h-7 text-xs text-right font-mono w-32"
+              />
+            </div>
+            <div className="border-t pt-2 flex items-center justify-between text-success">
+              <span>Vuelto ARS:</span>
+              <span className="font-mono">+${vueltoARS.toLocaleString('es-AR', { maximumFractionDigits: 0 })}</span>
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <Button variant="outline" className="flex-1" onClick={onClose} disabled={submitting}>Cancelar</Button>
+            <Button className="flex-1" onClick={handleConfirm} disabled={submitting || usdAPagar <= 0}>
+              {submitting ? 'Registrando...' : 'Confirmar liquidación'}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
