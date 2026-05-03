@@ -99,6 +99,8 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
   const [topTab, setTopTab] = useState<'library' | 'tracking'>('library');
   const [digitalExpanded, setDigitalExpanded] = useState(false);
   const [digitalSubExpanded, setDigitalSubExpanded] = useState(false);
+  const [collapsedSubgroups, setCollapsedSubgroups] = useState<Record<string, boolean>>({});
+  const toggleSubgroup = (key: string) => setCollapsedSubgroups(v => ({ ...v, [key]: !v[key] }));
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
   const toggleGroup = (id: string) => setCollapsedGroups(prev => ({ ...prev, [id]: !prev[id] }));
   const { hasDemoData, onCleared: onDemoCleared } = useDemoData();
