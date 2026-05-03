@@ -52,10 +52,13 @@ function normalizeDate(s: string): string | null {
 }
 
 export function parseSplitwise(
+export function parseSplitwise(
   csvText: string,
   userColumn: string = 'nicolaskolliker',
   arsToUsd: number = 0,
+  cutoffDate?: string,
 ): SplitwiseRow[] {
+  const CUTOFF = cutoffDate || DEFAULT_CUTOFF;
   const lines = csvText.split(/\r?\n/).filter((l) => l.trim().length > 0);
   if (lines.length < 2) return [];
   const header = parseCsvLine(lines[0]).map((h) => h.trim());
