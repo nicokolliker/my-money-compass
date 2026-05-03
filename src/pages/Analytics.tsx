@@ -77,16 +77,59 @@ export default function Analytics() {
   const incomes = useMemo(() => transactions.filter(t => t.type === 'income'), [transactions]);
   const prevExpenses = useMemo(() => prevTransactions.filter(t => t.type === 'expense'), [prevTransactions]);
 
+  // Map subcategory_id -> parent category_id
+  const subcatToParent = useMemo(() => {
+    const m: Record<string, string> = {};
+    (allSubcategories || []).forEach(s => { m[s.id] = s.category_id; });
+    return m;
+  }, [allSubcategories]);
+
+  // Sum per category from tree, attributing subcategory transactions to parent
   const byCategory = useMemo(() => {
-    const map: Record<string, { name: string; total: number; icon: string | null; color: string | null }> = {};
+    const totals: Record<string, number> = {};
     expenses.forEach(t => {
-      const cat = (t as any).categories;
-      const catName = cat?.name || 'Uncategorized';
-      if (!map[catName]) map[catName] = { name: catName, total: 0, icon: cat?.icon || null, color: cat?.color || null };
-      map[catName].total += Math.abs(Number(t.amount_usd));
+      const cid = t.category_id as string | null;
+      if (!cid) return;
+      // If category_id is actually a subcategory, roll up
+      const parent = subcatToParent[cid] || cid;
+      totals[parent] = (totals[parent] || 0) + Math.abs(Number(t.amount_usd));
     });
-    return Object.values(map).sort((a, b) => b.total - a.total);
-  }, [expenses]);
+    return categoryTree
+      .map(c => ({ id: c.id, name: c.name, total: totals[c.id] || 0, icon: c.icon, color: c.color, isDigital: c.isDigital, children: c.children }))
+      .filter(c => c.total > 0)
+      .sort((a, b) => b.total - a.total);
+  }, [expenses, categoryTree, subcatToParent]);
+
+  const digitalBreakdown = useMemo(() => {
+    const digital = categoryTree.find(c => c.isDigital);
+    if (!digital) return [];
+    const totals: Record<string, number> = {};
+    expenses.forEach(t => {
+      const cid = t.category_id as string | null;
+      if (!cid) return;
+      // direct subcategory hit
+      if (subcatToParent[cid] === digital.id) {
+        totals[cid] = (totals[cid] || 0) + Math.abs(Number(t.amount_usd));
+      }
+    });
+    return digital.children.map(s => ({ id: s.id, name: s.name, total: totals[s.id] || 0 }))
+      .sort((a, b) => b.total - a.total);
+  }, [expenses, categoryTree, subcatToParent]);
+
+  const pieData = useMemo(() => {
+    if (!digitalExpanded) return byCategory;
+    const expanded: any[] = [];
+    byCategory.forEach(c => {
+      if (c.isDigital) {
+        digitalBreakdown.forEach(s => {
+          if (s.total > 0) expanded.push({ id: s.id, name: `${c.name} · ${s.name}`, total: s.total, icon: c.icon, color: c.color });
+        });
+      } else {
+        expanded.push(c);
+      }
+    });
+    return expanded;
+  }, [byCategory, digitalBreakdown, digitalExpanded]);
 
   const totalExpenses = Math.abs(expenses.reduce((s, t) => s + Number(t.amount_usd), 0));
   const prevTotalExpenses = Math.abs(prevExpenses.reduce((s, t) => s + Number(t.amount_usd), 0));
