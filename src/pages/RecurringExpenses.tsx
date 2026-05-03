@@ -40,6 +40,30 @@ const LEGACY_TYPE_TO_NAME: Record<string, string> = {
   ocio: 'Ocio', digital: 'Digital',
 };
 
+// Digital subcategory labels + name-based matching (legacy items have null subtype)
+const DIGITAL_SUBTYPES: Record<string, { label: string; icon: string }> = {
+  ia:                 { label: 'IA',                          icon: '🤖' },
+  creatividad:        { label: 'Creatividad & Productividad', icon: '🎨' },
+  entretenimiento:    { label: 'Entretenimiento',             icon: '🎬' },
+  delivery_movilidad: { label: 'Delivery & Movilidad',        icon: '🚚' },
+  otros:              { label: 'Otros',                       icon: '✨' },
+};
+
+const DIGITAL_NAME_MAP: Record<string, string[]> = {
+  ia: ['chatgpt', 'claude', 'gemini', 'perplexity', 'copilot', 'openai', 'google ai', 'midjourney', 'runway', 'gamma', 'notebooklm'],
+  entretenimiento: ['netflix', 'spotify', 'youtube', 'amazon prime', 'disney', 'hbo', 'apple tv', 'paramount', 'crunchyroll', 'blinkist'],
+  creatividad: ['adobe', 'figma', 'canva', 'notion', 'loom', 'grammarly', 'icloud', 'apple one'],
+  delivery_movilidad: ['uber', 'didi', 'rappi', 'pedidos ya', 'glovo', 'cabify'],
+};
+
+const getDigitalSubtype = (name: string): string => {
+  const lower = (name || '').toLowerCase();
+  for (const [key, patterns] of Object.entries(DIGITAL_NAME_MAP)) {
+    if (patterns.some(p => lower.includes(p))) return key;
+  }
+  return 'otros';
+};
+
 function getNextDate(current: Date, frequency: string): Date {
   switch (frequency) {
     case 'weekly': return addWeeks(current, 1);
