@@ -14,6 +14,7 @@ import { parseArqStatements, type ParsedTransaction } from '@/lib/importers/arqP
 import { parseMercadoPago } from '@/lib/importers/mercadoPagoParser';
 import { parseBancoCiudad, parseBancoCiudadObSoc } from '@/lib/importers/bancoCiudadParser';
 import { useImportLog } from '@/hooks/useImportLog';
+import { MerchantLogo } from '@/components/MerchantLogo';
 import { AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -706,7 +707,10 @@ export default function ImportPage() {
       {/* ARQ */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">ARQ</CardTitle>
+          <CardTitle className="text-base flex items-center gap-2">
+            <MerchantLogo name="ARQ" domain="arq.com.ar" size={28} />
+            ARQ
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -759,7 +763,10 @@ export default function ImportPage() {
       {/* MercadoPago */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">MercadoPago</CardTitle>
+          <CardTitle className="text-base flex items-center gap-2">
+            <MerchantLogo name="MercadoPago" size={28} />
+            MercadoPago
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -814,7 +821,10 @@ export default function ImportPage() {
       {/* Banco Ciudad — Tarjeta viejo */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Banco Ciudad — Tarjeta viejo</CardTitle>
+          <CardTitle className="text-base flex items-center gap-2">
+            <MerchantLogo name="Banco Ciudad" domain="bancociudad.com.ar" size={28} />
+            Banco Ciudad — Tarjeta viejo
+          </CardTitle>
           <p className="text-xs text-muted-foreground pt-1">
             Tarjeta 1689 (titular IEBRA) y solo cargos OB SOC / PODER JUD de tarjeta 8157 (titular KOLLIKER ALFREDO)
           </p>
@@ -868,7 +878,10 @@ export default function ImportPage() {
       <div ref={wiseSectionRef}>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Wise (manual)</CardTitle>
+            <CardTitle className="text-base flex items-center gap-2">
+              <MerchantLogo name="Wise" size={28} />
+              Wise (manual)
+            </CardTitle>
             <p className="text-xs text-muted-foreground pt-1">
               Si la integración API falla, importá el CSV exportado desde wise.com.
               Las cuentas se identifican por moneda (USD/EUR).

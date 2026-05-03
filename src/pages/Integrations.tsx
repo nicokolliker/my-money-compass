@@ -12,6 +12,7 @@ import { useAccounts } from '@/hooks/useAccounts';
 import { formatDistanceToNow } from 'date-fns';
 import { useQueryClient } from '@tanstack/react-query';
 import { getBrandLogo } from '@/lib/brandLogos';
+import { MerchantLogo } from '@/components/MerchantLogo';
 
 export default function IntegrationsPage() {
   const { data: settings, isLoading } = useUserSettings();
@@ -91,13 +92,7 @@ export default function IntegrationsPage() {
       <Card>
         <CardContent className="pt-5 space-y-4">
           <div className="flex items-center gap-3">
-            {brand ? (
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg ${brand.bg}`}>{brand.icon}</div>
-            ) : (
-              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                <Wifi className="h-5 w-5 text-primary" />
-              </div>
-            )}
+            <MerchantLogo name="Wise" size={40} />
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <p className="font-semibold text-foreground">Wise</p>
