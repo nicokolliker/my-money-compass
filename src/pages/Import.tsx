@@ -1,13 +1,317 @@
-import ImportTab from '@/components/settings/ImportTab';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import * as pdfjsLib from 'pdfjs-dist';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { FileSpreadsheet, Upload, CheckCircle2, X } from 'lucide-react';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { useAccounts } from '@/hooks/useAccounts';
+import { useLatestFxRate } from '@/hooks/useFxRates';
+import { parseArqStatements, type ParsedTransaction } from '@/lib/importers/arqParser';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+
+async function extractPdfText(file: File): Promise<string> {
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  let text = '';
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    text += content.items.map((it: any) => it.str).join(' ') + '\n';
+  }
+  return text;
+}
+
+interface PreviewRow extends ParsedTransaction {
+  selected: boolean;
+  duplicate: boolean;
+}
+
+function PdfDropzone({ label, file, onFile }: { label: string; file: File | null; onFile: (f: File | null) => void }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  return (
+    <div
+      className="border-2 border-dashed border-border rounded-lg p-4 flex flex-col items-center gap-2 hover:bg-muted/30 transition-colors cursor-pointer"
+      onClick={() => inputRef.current?.click()}
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={(e) => {
+        e.preventDefault();
+        const f = e.dataTransfer.files?.[0];
+        if (f && f.type === 'application/pdf') onFile(f);
+      }}
+    >
+      <FileSpreadsheet className="h-7 w-7 text-muted-foreground" />
+      <p className="text-xs font-medium text-foreground">{label}</p>
+      {file ? (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span className="truncate max-w-[180px]">{file.name}</span>
+          <button onClick={(e) => { e.stopPropagation(); onFile(null); }} className="text-muted-foreground hover:text-destructive">
+            <X className="h-3 w-3" />
+          </button>
+        </div>
+      ) : (
+        <p className="text-[11px] text-muted-foreground">Arrastrá o hacé click para seleccionar</p>
+      )}
+      <input
+        ref={inputRef}
+        type="file"
+        accept="application/pdf"
+        className="hidden"
+        onChange={(e) => onFile(e.target.files?.[0] || null)}
+      />
+    </div>
+  );
+}
 
 export default function ImportPage() {
+  const { data: accounts } = useAccounts();
+  const arsToUsd = useLatestFxRate('ARS', 'USD');
+
+  const [arsFile, setArsFile] = useState<File | null>(null);
+  const [usdFile, setUsdFile] = useState<File | null>(null);
+  const [processing, setProcessing] = useState(false);
+  const [rows, setRows] = useState<PreviewRow[]>([]);
+  const [importing, setImporting] = useState(false);
+  const [resultMsg, setResultMsg] = useState<string | null>(null);
+
+  const arqAccount = useMemo(() => {
+    if (!accounts) return null;
+    return (
+      accounts.find((a) => a.currency === 'ARS' && /arq|dolarapp/i.test(a.name)) ||
+      accounts.find((a) => /arq|dolarapp/i.test(a.name)) ||
+      null
+    );
+  }, [accounts]);
+
+  async function handleProcess() {
+    if (!arsFile) {
+      toast.error('Subí el estado ARS');
+      return;
+    }
+    setProcessing(true);
+    setResultMsg(null);
+    try {
+      const [arsText, usdText] = await Promise.all([
+        extractPdfText(arsFile),
+        usdFile ? extractPdfText(usdFile) : Promise.resolve(''),
+      ]);
+      const parsed = parseArqStatements(usdText, arsText, arsToUsd || 0);
+      if (parsed.length === 0) {
+        toast.error('No se encontraron transacciones en el PDF');
+        setRows([]);
+        return;
+      }
+
+      // Detect duplicates by external_id
+      const ids = parsed.map((p) => p.external_id);
+      const { data: existing } = await supabase
+        .from('transactions')
+        .select('external_id')
+        .in('external_id', ids);
+      const dupSet = new Set((existing || []).map((r: any) => r.external_id));
+
+      setRows(
+        parsed.map((p) => ({
+          ...p,
+          duplicate: dupSet.has(p.external_id),
+          selected: !dupSet.has(p.external_id) && p.type !== 'transfer',
+        })),
+      );
+      toast.success(`${parsed.length} transacciones detectadas`);
+    } catch (e: any) {
+      toast.error(e.message || 'Error al procesar PDF');
+    } finally {
+      setProcessing(false);
+    }
+  }
+
+  function toggleRow(i: number) {
+    setRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, selected: !r.selected } : r)));
+  }
+
+  async function handleImport() {
+    if (!arqAccount) {
+      toast.error('No se encontró cuenta ARQ/DolarApp en ARS');
+      return;
+    }
+    const toImport = rows.filter((r) => r.selected && !r.duplicate);
+    if (toImport.length === 0) {
+      toast.error('Seleccioná al menos una fila');
+      return;
+    }
+    setImporting(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const payload = toImport.map((r) => {
+        const fxRate = r.amountARS > 0 ? r.amountUSD / r.amountARS : (arsToUsd || 0);
+        const isTransfer = r.type === 'transfer';
+        return {
+          user_id: user.id,
+          account_id: arqAccount.id,
+          date: r.date,
+          description: r.description,
+          merchant: r.transferTarget || r.description,
+          amount: -r.amountARS,
+          currency: 'ARS',
+          fx_rate: fxRate,
+          amount_usd: -r.amountUSD,
+          type: isTransfer ? ('transfer' as const) : ('expense' as const),
+          external_id: r.external_id,
+          raw_imported_description: r.description,
+        };
+      });
+
+      const { error } = await supabase.from('transactions').insert(payload);
+      if (error) throw error;
+
+      const dupCount = rows.filter((r) => r.duplicate).length;
+      setResultMsg(`${toImport.length} transacciones importadas, ${dupCount} duplicados ignorados`);
+      toast.success('Importación completa');
+      setRows([]);
+      setArsFile(null);
+      setUsdFile(null);
+    } catch (e: any) {
+      toast.error(e.message || 'Error al importar');
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  const selectedCount = rows.filter((r) => r.selected && !r.duplicate).length;
+  const dupCount = rows.filter((r) => r.duplicate).length;
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-foreground">Import</h1>
-        <p className="text-sm text-muted-foreground">Upload CSV statements, download templates and reconcile transactions</p>
+        <p className="text-sm text-muted-foreground">Importá estados de cuenta de tus integraciones</p>
       </div>
-      <ImportTab />
+
+      {/* ARQ */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">ARQ</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <PdfDropzone label="Estado USD (.pdf)" file={usdFile} onFile={setUsdFile} />
+            <PdfDropzone label="Estado ARS (.pdf)" file={arsFile} onFile={setArsFile} />
+          </div>
+          <div className="flex items-center gap-3">
+            <Button onClick={handleProcess} disabled={!arsFile || processing}>
+              <Upload className="h-4 w-4 mr-2" />
+              {processing ? 'Procesando...' : 'Procesar'}
+            </Button>
+            {!usdFile && arsFile && (
+              <p className="text-xs text-muted-foreground">
+                Sin estado USD usaremos el tipo de cambio del día (1 ARS = {arsToUsd?.toFixed(6) || '—'} USD)
+              </p>
+            )}
+            {!arqAccount && (
+              <Badge variant="outline" className="text-amber-600">
+                No se encontró cuenta ARQ/DolarApp
+              </Badge>
+            )}
+          </div>
+
+          {resultMsg && (
+            <div className="flex items-center gap-2 text-sm text-success">
+              <CheckCircle2 className="h-4 w-4" /> {resultMsg}
+            </div>
+          )}
+
+          {rows.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex gap-2 flex-wrap">
+                <Badge>{selectedCount} seleccionadas</Badge>
+                {dupCount > 0 && <Badge variant="secondary">{dupCount} duplicadas</Badge>}
+              </div>
+              <div className="border rounded-lg max-h-[420px] overflow-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-8"></TableHead>
+                      <TableHead className="text-xs">Fecha</TableHead>
+                      <TableHead className="text-xs">Merchant / Descripción</TableHead>
+                      <TableHead className="text-xs text-right">ARS</TableHead>
+                      <TableHead className="text-xs text-right">USD</TableHead>
+                      <TableHead className="text-xs">Tipo</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {rows.map((r, i) => (
+                      <TableRow key={r.external_id} className={r.duplicate ? 'opacity-50' : ''}>
+                        <TableCell>
+                          <Checkbox
+                            checked={r.selected}
+                            disabled={r.duplicate}
+                            onCheckedChange={() => toggleRow(i)}
+                          />
+                        </TableCell>
+                        <TableCell className="text-xs">{r.date}</TableCell>
+                        <TableCell className="text-xs max-w-[260px] truncate">{r.description}</TableCell>
+                        <TableCell className="text-xs text-right font-mono tabular-nums">
+                          {r.amountARS.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </TableCell>
+                        <TableCell className="text-xs text-right font-mono tabular-nums">
+                          {r.amountUSD ? r.amountUSD.toFixed(2) : '—'}
+                          {!r.matched && r.amountUSD > 0 && r.type !== 'transfer' && (
+                            <span className="ml-1 text-[10px] text-muted-foreground">est.</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {r.duplicate ? (
+                            <Badge variant="outline" className="text-[10px] h-4 px-1.5">Ya importado</Badge>
+                          ) : r.type === 'transfer' ? (
+                            <Badge className="text-[10px] h-4 px-1.5 bg-orange-500 hover:bg-orange-500/90">Transfer</Badge>
+                          ) : r.type === 'fee' ? (
+                            <Badge variant="secondary" className="text-[10px] h-4 px-1.5">Fee</Badge>
+                          ) : (
+                            <Badge variant="default" className="text-[10px] h-4 px-1.5">Gasto</Badge>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <Button
+                onClick={handleImport}
+                disabled={importing || selectedCount === 0 || !arqAccount}
+                className="w-full"
+              >
+                {importing ? 'Importando...' : `Importar ${selectedCount} seleccionadas`}
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* MercadoPago */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">MercadoPago</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">Próximamente</p>
+        </CardContent>
+      </Card>
+
+      {/* Wise */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Wise</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">Próximamente</p>
+        </CardContent>
+      </Card>
     </div>
   );
 }
