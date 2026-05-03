@@ -708,7 +708,7 @@ export default function ImportPage() {
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base flex items-center gap-2">
-            <MerchantLogo name="ARQ" domain="arq.com.ar" size={28} />
+            <MerchantLogo name="DolarApp" domain="dolarapp.com" size={28} />
             ARQ
           </CardTitle>
         </CardHeader>
