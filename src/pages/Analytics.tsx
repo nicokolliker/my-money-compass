@@ -259,6 +259,37 @@ export default function Analytics() {
 
   const maxMerchant = topMerchants[0]?.total || 1;
 
+  const topExpenses = useMemo(() => {
+    return [...displayExpenses]
+      .sort((a, b) => Math.abs(Number(b.amount_usd)) - Math.abs(Number(a.amount_usd)))
+      .slice(0, 5);
+  }, [displayExpenses]);
+
+  const prevByCategory = useMemo(() => {
+    const totals: Record<string, number> = {};
+    prevExpenses.forEach(t => {
+      const cid = t.category_id as string | null;
+      if (!cid) return;
+      const parent = subcatToParent[cid] || cid;
+      totals[parent] = (totals[parent] || 0) + Math.abs(Number(t.amount_usd));
+    });
+    return totals;
+  }, [prevExpenses, subcatToParent]);
+
+  const categoryTrends = useMemo(() => {
+    return byCategory
+      .map(c => {
+        const prev = prevByCategory[c.id] || 0;
+        if (prev === 0) return null;
+        const delta = ((c.total - prev) / prev) * 100;
+        return { ...c, delta };
+      })
+      .filter((c): c is NonNullable<typeof c> => c !== null && Math.abs(c.delta) > 10)
+      .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
+  }, [byCategory, prevByCategory]);
+
+  const monthlyLast6 = useMemo(() => monthly.slice(-6), [monthly]);
+
   if (isLoading) return <div className="flex items-center justify-center h-64 text-muted-foreground">Cargando...</div>;
 
   return (
@@ -350,13 +381,149 @@ export default function Analytics() {
         </Card>
       </div>
 
+      {/* DISTRIBUCIÓN POR CATEGORÍA — donut + lista */}
+      {byCategory.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Distribución por categoría</CardTitle></CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+              <div className="relative h-56">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={byCategory}
+                      dataKey="total"
+                      nameKey="name"
+                      innerRadius={50}
+                      outerRadius={80}
+                      paddingAngle={2}
+                      stroke="none"
+                    >
+                      {byCategory.map((c, idx) => (
+                        <Cell key={c.id} fill={getCategoryHex(c.name, c.color) || CATEGORY_COLORS[idx % CATEGORY_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(v: number, name: string) => [formatUSD(v), name]}
+                      contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid hsl(var(--border))' }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                  <span className="text-[10px] text-muted-foreground">Total</span>
+                  <span className="text-base font-bold text-foreground tabular-nums">{formatUSD(totalExpenses)}</span>
+                </div>
+              </div>
+              <div className="space-y-2">
+                {byCategory.map((c, idx) => {
+                  const pct = totalExpenses > 0 ? (c.total / totalExpenses * 100) : 0;
+                  const color = getCategoryHex(c.name, c.color) || CATEGORY_COLORS[idx % CATEGORY_COLORS.length];
+                  return (
+                    <div key={c.id} className="flex items-center gap-2 text-sm">
+                      <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: color }} />
+                      <span className="text-base">{getCategoryIcon(c.name, c.icon)}</span>
+                      <span className="text-foreground font-medium truncate flex-1">{c.name}</span>
+                      <span className="text-xs text-muted-foreground tabular-nums">{pct.toFixed(0)}%</span>
+                      <span className="font-semibold text-foreground tabular-nums">{formatUSD(c.total)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* TOP GASTOS DEL PERÍODO */}
+      {topExpenses.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Top gastos del período</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            {topExpenses.map(t => {
+              const cat = categoryTree.find(c => c.id === (subcatToParent[t.category_id] || t.category_id));
+              const color = cat ? (getCategoryHex(cat.name, cat.color) || CATEGORY_COLORS[0]) : 'hsl(var(--muted-foreground))';
+              const name = t.merchant || t.description || 'Sin descripción';
+              return (
+                <div key={t.id} className="flex items-center gap-3">
+                  <MerchantLogo name={name} size={32} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">{name}</p>
+                    {cat && (
+                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color }} />
+                        {cat.name}
+                      </p>
+                    )}
+                  </div>
+                  <span className="font-bold text-foreground tabular-nums shrink-0">{formatUSD(Math.abs(Number(t.amount_usd)))}</span>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* FIJOS vs VARIABLES */}
+      <Card>
+        <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Fijos vs Variables</CardTitle></CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            <div>
+              <p className="text-xs text-muted-foreground font-medium">Gastos fijos</p>
+              <p className="text-lg font-bold text-foreground tabular-nums">{formatUSD(fixedAmount)}</p>
+              <p className="text-xs text-muted-foreground">{fixedPct.toFixed(0)}% del total</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground font-medium">Gastos variables</p>
+              <p className="text-lg font-bold text-foreground tabular-nums">{formatUSD(variableAmount)}</p>
+              <p className="text-xs text-muted-foreground">{(100 - fixedPct).toFixed(0)}% del total</p>
+            </div>
+          </div>
+          {totalExpenses > 0 && (
+            <div className="w-full h-3 bg-muted rounded-full overflow-hidden flex">
+              <div className="h-full bg-primary transition-all duration-500" style={{ width: `${fixedPct}%` }} />
+              <div className="h-full bg-amber-500 transition-all duration-500" style={{ width: `${100 - fixedPct}%` }} />
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* TOP MERCHANTS */}
+      {topMerchants.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Top merchants</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            {topMerchants.map(m => (
+              <div key={m.name} className="flex items-center gap-3">
+                <MerchantLogo name={m.name} size={32} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-foreground font-medium truncate">{m.name}</span>
+                    <span className="font-bold text-foreground tabular-nums shrink-0">{formatUSD(m.total)}</span>
+                  </div>
+                  <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden mt-1">
+                    <div className="h-full rounded-full bg-primary transition-all duration-500" style={{ width: `${(m.total / maxMerchant) * 100}%` }} />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* SECCIÓN 2 — EVOLUCIÓN */}
+      <div className="pt-4 border-t border-border">
+        <h2 className="text-lg font-semibold text-foreground mb-1">Evolución · últimos 6 meses</h2>
+        <p className="text-xs text-muted-foreground mb-4">Tendencia independiente del filtro de período</p>
+      </div>
+
       {/* EVOLUCIÓN MENSUAL */}
       <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Evolución mensual</CardTitle></CardHeader>
+        <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Ingresos vs Gastos</CardTitle></CardHeader>
         <CardContent>
           <div className="h-52">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={monthly}>
+              <AreaChart data={monthlyLast6}>
                 <XAxis
                   dataKey="month"
                   tick={{ fontSize: 10 }}
@@ -378,218 +545,34 @@ export default function Analytics() {
             </ResponsiveContainer>
           </div>
           <div className="flex gap-4 justify-center mt-2">
-            <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500" /> Ingresos
             </span>
-            <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <span className="w-2.5 h-2.5 rounded-sm bg-destructive" /> Gastos
             </span>
           </div>
         </CardContent>
       </Card>
 
-      {/* GASTO POR CATEGORÍA (mes a mes) */}
-      <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Gasto por categoría · últimos 6 meses</CardTitle></CardHeader>
-        <CardContent>
-          {categoryChartData.length < 2 ? (
-            <p className="text-xs text-muted-foreground py-8 text-center">
-              Se necesitan al menos 2 meses de datos para mostrar tendencias
-            </p>
-          ) : (
-            <>
-              <div className="h-60">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={categoryChartData} barCategoryGap="30%" barGap={4}>
-                    <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-                    <YAxis tick={{ fontSize: 10 }} tickCount={4} allowDecimals={false} domain={[0, 'dataMax']} tickFormatter={v => `$${v >= 1000 ? `${(v/1000).toFixed(0)}k` : v}`} />
-                    <Tooltip
-                      formatter={(v: number, name: string) => {
-                        const cat = categoryTree.find(c => c.id === name);
-                        return [formatUSD(v), cat ? `${cat.icon} ${cat.name}` : name];
-                      }}
-                      contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid hsl(var(--border))' }}
-                    />
-                    {visibleCategoriesForChart.map((cat, idx) => (
-                      <Bar
-                        key={cat.id}
-                        dataKey={cat.id}
-                        stackId="a"
-                        fill={getCategoryHex(cat.name, cat.color) || CATEGORY_COLORS[idx % CATEGORY_COLORS.length]}
-                        radius={idx === visibleCategoriesForChart.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
-                      />
-                    ))}
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="flex flex-wrap gap-x-3 gap-y-1 mt-3">
-                {visibleCategoriesForChart.map(cat => (
-                  <span key={cat.id} className="flex items-center gap-1 text-xs text-muted-foreground">
-                    {cat.icon} {cat.name}
+      {/* TENDENCIAS POR CATEGORÍA */}
+      {categoryTrends.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Tendencias por categoría</CardTitle></CardHeader>
+          <CardContent className="space-y-2">
+            {categoryTrends.map(c => {
+              const isUp = c.delta > 0;
+              return (
+                <div key={c.id} className="flex items-center gap-2 text-sm py-1">
+                  <span className="text-base">{getCategoryIcon(c.name, c.icon)}</span>
+                  <span className="text-foreground font-medium flex-1 truncate">{c.name}</span>
+                  <span className={cn('flex items-center gap-1 font-semibold tabular-nums', isUp ? 'text-destructive' : 'text-emerald-600')}>
+                    {isUp ? <ArrowUp className="h-3.5 w-3.5" /> : <ArrowDown className="h-3.5 w-3.5" />}
+                    {Math.abs(c.delta).toFixed(0)}%
                   </span>
-                ))}
-              </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* POR CATEGORÍA — horizontal bars, no pie */}
-      <Card>
-        <CardHeader className="pb-2 flex flex-row items-center justify-between">
-          <CardTitle className="text-sm font-semibold">Por categoría</CardTitle>
-          <span className="text-xs text-muted-foreground tabular-nums">{formatUSD(totalExpenses)} total</span>
-        </CardHeader>
-        <CardContent>
-          {byCategory.length === 0 ? (
-            <p className="text-xs text-muted-foreground py-8 text-center">Sin gastos en este período</p>
-          ) : (
-            <div className="space-y-3">
-              {byCategory.map((c, idx) => {
-                const pct = totalExpenses > 0 ? (c.total / totalExpenses * 100) : 0;
-                const color = getCategoryHex(c.name, c.color) || CATEGORY_COLORS[idx % CATEGORY_COLORS.length];
-                return (
-                  <div key={c.id}>
-                    <div
-                      className={cn(
-                        'flex items-center justify-between text-sm py-1 rounded-lg transition-colors',
-                        c.isDigital && 'cursor-pointer hover:bg-accent/50'
-                      )}
-                      onClick={() => c.isDigital && setDigitalExpanded(v => !v)}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="text-base">{getCategoryIcon(c.name, c.icon)}</span>
-                        <span className="text-foreground font-medium">{c.name}</span>
-                        {c.isDigital && (
-                          <ChevronDown className={cn('h-3.5 w-3.5 text-muted-foreground transition-transform', digitalExpanded && 'rotate-180')} />
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground tabular-nums">{pct.toFixed(0)}%</span>
-                        <span className="font-bold text-foreground tabular-nums">{formatUSD(c.total)}</span>
-                      </div>
-                    </div>
-                    <div className="w-full h-2 bg-muted rounded-full overflow-hidden mt-1">
-                      <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, backgroundColor: color }} />
-                    </div>
-                    {c.isDigital && digitalExpanded && digitalBreakdown.filter(s => s.total > 0).length > 0 && (
-                      <div className="ml-6 mt-2 space-y-2">
-                        {digitalBreakdown.filter(s => s.total > 0).map(s => {
-                          const sPct = totalExpenses > 0 ? (s.total / totalExpenses * 100) : 0;
-                          return (
-                            <div key={s.id}>
-                              <div className="flex items-center justify-between text-xs py-0.5 text-muted-foreground">
-                                <span>{s.name}</span>
-                                <div className="flex items-center gap-2">
-                                  <span className="tabular-nums">{sPct.toFixed(0)}%</span>
-                                  <span className="tabular-nums">{formatUSD(s.total)}</span>
-                                </div>
-                              </div>
-                              <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden mt-0.5">
-                                <div className="h-full rounded-full bg-muted-foreground/40" style={{ width: `${sPct}%` }} />
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* FIJOS vs VARIABLES */}
-      <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Fijos vs Variables</CardTitle></CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 gap-3 mb-3">
-            <div>
-              <p className="text-[10px] text-muted-foreground font-medium">Gastos fijos</p>
-              <p className="text-lg font-bold text-foreground tabular-nums">{formatUSD(fixedAmount)}</p>
-              <p className="text-[10px] text-muted-foreground">{fixedPct.toFixed(0)}% del total</p>
-            </div>
-            <div>
-              <p className="text-[10px] text-muted-foreground font-medium">Gastos variables</p>
-              <p className="text-lg font-bold text-foreground tabular-nums">{formatUSD(variableAmount)}</p>
-              <p className="text-[10px] text-muted-foreground">{(100 - fixedPct).toFixed(0)}% del total</p>
-            </div>
-          </div>
-          {totalExpenses > 0 && (
-            <div className="w-full h-3 bg-muted rounded-full overflow-hidden flex">
-              <div className="h-full bg-primary transition-all duration-500" style={{ width: `${fixedPct}%` }} />
-              <div className="h-full bg-amber-500 transition-all duration-500" style={{ width: `${100 - fixedPct}%` }} />
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* PRESUPUESTO vs REAL */}
-      {budgetVsActual.some(m => m.budgeted > 0 || m.actual > 0) && (
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Presupuesto vs Real</CardTitle></CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {budgetVsActual.filter(m => m.budgeted > 0 || m.actual > 0).map(m => {
-                const isOver = m.deviation > 0 && m.budgeted > 0;
-                const pctUsed = m.budgeted > 0 ? Math.min((m.actual / m.budgeted) * 100, 100) : 0;
-                return (
-                  <div key={m.month}>
-                    <div className="flex items-center justify-between text-xs mb-1">
-                      <span className="text-foreground font-medium">{m.label}</span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-muted-foreground tabular-nums">
-                          {formatUSD(m.actual)} / {formatUSD(m.budgeted || 0)}
-                        </span>
-                        {m.budgeted > 0 && (
-                          <span className={cn('tabular-nums font-medium', isOver ? 'text-destructive' : 'text-emerald-600')}>
-                            {isOver ? '+' : ''}{m.pct}%
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    {m.budgeted > 0 ? (
-                      <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                        <div
-                          className={cn(
-                            'h-full rounded-full transition-all duration-500',
-                            isOver ? 'bg-destructive' : pctUsed > 80 ? 'bg-amber-500' : 'bg-emerald-500'
-                          )}
-                          style={{ width: `${pctUsed}%` }}
-                        />
-                      </div>
-                    ) : (
-                      <p className="text-[10px] text-muted-foreground italic">Sin presupuesto definido</p>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* TOP MERCHANTS */}
-      {topMerchants.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Top merchants</CardTitle></CardHeader>
-          <CardContent className="space-y-3">
-            {topMerchants.map(m => (
-              <div key={m.name} className="flex items-center gap-3">
-                <MerchantLogo name={m.name} size={32} />
-                <div className="flex-1 min-w-0">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-foreground font-medium truncate">{m.name}</span>
-                    <span className="font-bold text-foreground tabular-nums shrink-0">{formatUSD(m.total)}</span>
-                  </div>
-                  <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden mt-1">
-                    <div className="h-full rounded-full bg-primary transition-all duration-500" style={{ width: `${(m.total / maxMerchant) * 100}%` }} />
-                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </CardContent>
         </Card>
       )}
