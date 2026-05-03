@@ -29,7 +29,7 @@ function greeting() {
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { data: accountBalances, isLoading } = useAccountBalances();
+  const { isLoading } = useNetWorth();
   const { data: transactions } = useTransactions();
   const { data: blueDollar } = useBlueDollarRate();
   const { data: recurringItems } = useRecurringExpenses();
