@@ -214,8 +214,8 @@ export default function Accounts() {
                     const balUsd = a.computed_balance_usd;
                     const pct = totalNetWorth !== 0 ? (balUsd / totalNetWorth * 100) : 0;
                     return (
-                      <div key={a.id}>
-                        <button onClick={() => openEdit(a)} className="flex items-center gap-3 w-full py-3 text-left hover:bg-accent/50 active:bg-accent rounded-lg px-2 -mx-2 transition-colors">
+                      <div key={a.id} className="flex items-center gap-1">
+                        <button onClick={() => openEdit(a)} className="flex items-center gap-3 flex-1 min-w-0 py-3 text-left hover:bg-accent/50 active:bg-accent rounded-lg px-2 -mx-2 transition-colors">
                           <AccountLogo name={a.name} institution={(a as any).institution} />
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5">
@@ -235,6 +235,30 @@ export default function Accounts() {
                             </div>
                           </div>
                         </button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive">
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>¿Eliminar cuenta?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Esta acción no se puede deshacer. Se eliminará la cuenta "{a.name}" y todas sus transacciones asociadas.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                onClick={() => handleDeleteAccount(a.id)}
+                              >
+                                Eliminar
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
                     );
                   })}
