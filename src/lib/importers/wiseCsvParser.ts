@@ -49,12 +49,9 @@ export function parseWiseCsv(csvText: string): ParsedTransaction[] {
       type,
       external_id,
       matched: false,
-      // store raw for downstream
-      // @ts-expect-error allow extra field
       _currency: currency,
-      // @ts-expect-error allow extra field
       _amount: abs,
-    });
+    } as ParsedTransaction & { _currency: string; _amount: number });
   }
   return out;
 }
