@@ -13,11 +13,20 @@ import { useLatestFxRate } from '@/hooks/useFxRates';
 import { parseArqStatements, type ParsedTransaction } from '@/lib/importers/arqParser';
 import { parseMercadoPago } from '@/lib/importers/mercadoPagoParser';
 import { parseBancoCiudad, parseBancoCiudadObSoc } from '@/lib/importers/bancoCiudadParser';
+import { parseSantander } from '@/lib/importers/santanderParser';
 import { parseSplitwise, type SplitwiseRow } from '@/lib/importers/splitwiseParser';
 import { useImportLog } from '@/hooks/useImportLog';
 import { MerchantLogo } from '@/components/MerchantLogo';
 import { AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useCategories } from '@/hooks/useCategories';
+import { useBlueDollarRate } from '@/hooks/useBlueDollar';
+import { inferCategoryName } from '@/hooks/useRuleSuggestions';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
@@ -510,6 +519,7 @@ export default function ImportPage() {
       setBcMonth('');
       setBcIebraFile(null);
       setBcKollikerFile(null);
+      setShowSettlement(true);
     } catch (e: any) {
       toast.error(e.message || 'Error al importar');
     } finally {
@@ -519,6 +529,118 @@ export default function ImportPage() {
 
   const bcSelectedCount = bcRows.filter((r) => r.selected && !r.duplicate).length;
   const bcDupCount = bcRows.filter((r) => r.duplicate).length;
+
+  // ---- Santander state ----
+  const [santFile, setSantFile] = useState<File | null>(null);
+  const [santProcessing, setSantProcessing] = useState(false);
+  const [santRows, setSantRows] = useState<PreviewRow[]>([]);
+  const [santImporting, setSantImporting] = useState(false);
+  const [santResultMsg, setSantResultMsg] = useState<string | null>(null);
+  const [santMonth, setSantMonth] = useState<string>('');
+  const [santImportedTotal, setSantImportedTotal] = useState<number>(0);
+
+  const santAccount = useMemo(
+    () => accounts?.find((a) => /santander/i.test(a.name)) || null,
+    [accounts],
+  );
+
+  async function handleSantProcess() {
+    if (!santFile) return;
+    setSantProcessing(true);
+    setSantResultMsg(null);
+    try {
+      const text = await extractPdfText(santFile);
+      const parsed = parseSantander(text, arsToUsd || 0);
+      if (parsed.length === 0) {
+        toast.error('No se encontraron consumos en tarjeta 5829');
+        setSantRows([]);
+        return;
+      }
+      const ids = parsed.map((p) => p.external_id);
+      const { data: existing } = await supabase
+        .from('transactions')
+        .select('external_id')
+        .in('external_id', ids);
+      const dupSet = new Set((existing || []).map((r: any) => r.external_id));
+      setSantRows(
+        parsed.map((p) => ({ ...p, duplicate: dupSet.has(p.external_id), selected: !dupSet.has(p.external_id) })),
+      );
+      setSantMonth(detectPredominantMonth(parsed));
+      toast.success(`${parsed.length} consumos detectados`);
+    } catch (e: any) {
+      toast.error(e.message || 'Error al procesar PDF');
+    } finally {
+      setSantProcessing(false);
+    }
+  }
+
+  async function handleSantImport() {
+    if (!santAccount) {
+      toast.error('Creá una cuenta Santander en Accounts primero');
+      return;
+    }
+    const toImport = santRows.filter((r) => r.selected && !r.duplicate);
+    if (toImport.length === 0) return;
+    setSantImporting(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+      const payload = toImport.map((r) => {
+        const fxRate = r.amountARS > 0 && r.amountUSD > 0 ? r.amountUSD / r.amountARS : (arsToUsd || 0);
+        return {
+          user_id: user.id,
+          account_id: santAccount.id,
+          date: r.date,
+          description: r.description,
+          merchant: r.description,
+          amount: -r.amountARS,
+          currency: 'ARS',
+          fx_rate: fxRate,
+          amount_usd: -r.amountUSD,
+          type: 'expense' as const,
+          external_id: r.external_id,
+          raw_imported_description: r.description,
+        };
+      });
+      const { error } = await supabase.from('transactions').insert(payload);
+      if (error) throw error;
+      if (santMonth) {
+        await supabase.from('import_log').upsert(
+          {
+            user_id: user.id,
+            source: 'santander',
+            month: santMonth,
+            transaction_count: toImport.length,
+            imported_at: new Date().toISOString(),
+          },
+          { onConflict: 'user_id,source,month' },
+        );
+        qc.invalidateQueries({ queryKey: ['import-log'] });
+      }
+      const totalARS = toImport.reduce((s, r) => s + r.amountARS, 0);
+      setSantImportedTotal(totalARS);
+      const dups = santRows.filter((r) => r.duplicate).length;
+      setSantResultMsg(`${toImport.length} consumos importados, ${dups} duplicados ignorados`);
+      toast.success('Importación completa');
+      setSantRows([]);
+      setSantMonth('');
+      setSantFile(null);
+      setShowSettlement(true);
+    } catch (e: any) {
+      toast.error(e.message || 'Error al importar');
+    } finally {
+      setSantImporting(false);
+    }
+  }
+
+  const santSelectedCount = santRows.filter((r) => r.selected && !r.duplicate).length;
+  const santDupCount = santRows.filter((r) => r.duplicate).length;
+
+  // ---- Settlement panel state ----
+  const [showSettlement, setShowSettlement] = useState(false);
+  const { data: categories } = useCategories();
+  const { data: blueRate } = useBlueDollarRate();
+
 
   // ---- Splitwise state ----
   const [swFile, setSwFile] = useState<File | null>(null);
@@ -571,6 +693,12 @@ export default function ImportPage() {
     }
   }
 
+  function inferredCategoryId(name: string): string | null {
+    const catName = inferCategoryName(name);
+    if (!catName) return null;
+    return categories?.find((c) => c.name === catName)?.id || null;
+  }
+
   async function handleSwImport() {
     if (!cashUsdAccount) {
       toast.error('No se encontró cuenta Cash USD');
@@ -584,8 +712,11 @@ export default function ImportPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      if (expenses.length > 0) {
-        const payload = expenses.map((r) => ({
+      const splitwiseAcc = accounts?.find((a) => /splitwise/i.test(a.name));
+      const payload: any[] = [];
+
+      for (const r of expenses) {
+        payload.push({
           user_id: user.id,
           account_id: cashUsdAccount.id,
           date: r.date,
@@ -596,9 +727,32 @@ export default function ImportPage() {
           fx_rate: 1,
           amount_usd: -r.amountUSD,
           type: 'expense' as const,
+          category_id: inferredCategoryId(r.description),
           external_id: r.external_id,
           raw_imported_description: r.description,
-        }));
+        });
+      }
+
+      for (const r of receivables) {
+        if (!splitwiseAcc) continue;
+        payload.push({
+          user_id: user.id,
+          account_id: splitwiseAcc.id,
+          date: r.date,
+          description: r.description,
+          merchant: r.description,
+          amount: -r.amountUSD,
+          currency: 'USD',
+          fx_rate: 1,
+          amount_usd: -r.amountUSD,
+          type: 'expense' as const,
+          category_id: inferredCategoryId(r.description),
+          external_id: r.external_id,
+          raw_imported_description: r.description,
+        });
+      }
+
+      if (payload.length > 0) {
         const { error } = await supabase.from('transactions').insert(payload);
         if (error) throw error;
       }
@@ -619,7 +773,10 @@ export default function ImportPage() {
 
       const owedTotal = receivables.reduce((s, r) => s + r.amountUSD, 0);
       const parts = [`${expenses.length} gastos importados`];
-      if (receivables.length > 0) parts.push(`Te deben un total de $${owedTotal.toFixed(2)} USD`);
+      if (receivables.length > 0) {
+        if (splitwiseAcc) parts.push(`${receivables.length} deudas registradas en Splitwise`);
+        else parts.push(`Te deben un total de $${owedTotal.toFixed(2)} USD`);
+      }
       setSwResultMsg(parts.join(' · '));
       toast.success('Importación completa');
       setSwRows([]);
@@ -631,6 +788,7 @@ export default function ImportPage() {
       setSwImporting(false);
     }
   }
+
 
   const swSelectedCount = swRows.filter((r) => r.selected && !r.duplicate).length;
   const swOwedTotal = swRows
@@ -992,7 +1150,62 @@ export default function ImportPage() {
         </CardContent>
       </Card>
 
-      {/* Splitwise */}
+      {/* Santander */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base flex items-center gap-2">
+            <MerchantLogo name="Santander" domain="santander.com.ar" size={32} />
+            Santander
+          </CardTitle>
+          <p className="text-xs text-muted-foreground pt-1">
+            Solo se importan consumos de la tarjeta 5829 (N. Kolliker)
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <PdfDropzone label="Resumen Santander (.pdf)" file={santFile} onFile={setSantFile} />
+          </div>
+          <div className="flex items-center gap-3">
+            <Button onClick={handleSantProcess} disabled={!santFile || santProcessing}>
+              <Upload className="h-4 w-4 mr-2" />
+              {santProcessing ? 'Procesando...' : 'Procesar'}
+            </Button>
+            {!santAccount && (
+              <Badge variant="outline" className="text-amber-600">
+                Creá una cuenta Santander en Accounts primero
+              </Badge>
+            )}
+          </div>
+
+          {santResultMsg && (
+            <div className="flex items-center gap-2 text-sm text-success">
+              <CheckCircle2 className="h-4 w-4" /> {santResultMsg}
+            </div>
+          )}
+
+          {santRows.length > 0 && (
+            <div className="space-y-3">
+              <MonthConfirm month={santMonth} onChange={setSantMonth} count={santRows.length} />
+              <div className="flex gap-2 flex-wrap">
+                <Badge>{santSelectedCount} seleccionadas</Badge>
+                {santDupCount > 0 && <Badge variant="secondary">{santDupCount} duplicadas</Badge>}
+              </div>
+              {renderPreviewTable(santRows, (i) =>
+                setSantRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, selected: !r.selected } : r))),
+              )}
+              <Button
+                onClick={handleSantImport}
+                disabled={santImporting || santSelectedCount === 0 || !santAccount || !santMonth}
+                className="w-full"
+              >
+                {santImporting ? 'Importando...' : `Importar ${santSelectedCount} seleccionadas`}
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base flex items-center gap-2">
@@ -1165,14 +1378,27 @@ export default function ImportPage() {
           </CardContent>
         </Card>
       </div>
+
+      <SettlementDialog
+        open={showSettlement}
+        onClose={() => setShowSettlement(false)}
+        bcTotalARS={bcRows.filter((r) => r.selected && !r.duplicate).reduce((s, r) => s + r.amountARS, 0)}
+        santTotalARS={santImportedTotal}
+        arsToUsd={arsToUsd || 0}
+        defaultBlueRate={blueRate?.rate || (arsToUsd ? 1 / arsToUsd : 1390)}
+        accounts={accounts || []}
+        categories={categories || []}
+        qc={qc}
+      />
     </div>
   );
 }
 
-const SOURCES: { key: 'arq' | 'mercadopago' | 'banco_ciudad' | 'splitwise'; label: string }[] = [
+const SOURCES: { key: 'arq' | 'mercadopago' | 'banco_ciudad' | 'santander' | 'splitwise'; label: string }[] = [
   { key: 'arq', label: 'ARQ ARS' },
   { key: 'mercadopago', label: 'MercadoPago' },
   { key: 'banco_ciudad', label: 'Banco Ciudad' },
+  { key: 'santander', label: 'Santander' },
   { key: 'splitwise', label: 'Splitwise' },
 ];
 
@@ -1312,5 +1538,293 @@ function ImportStatusPanel() {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+// ============================================================================
+// Settlement Dialog — Cerrar mes con el viejo
+// ============================================================================
+
+const STORAGE_KEY = 'settlement_defaults';
+
+interface SettlementItem {
+  key: string;
+  label: string;
+  amountARS: number;
+  editable: boolean;
+  labelEditable?: boolean;
+  categoryName: string;
+}
+
+function SettlementDialog({
+  open,
+  onClose,
+  bcTotalARS,
+  santTotalARS,
+  arsToUsd,
+  defaultBlueRate,
+  accounts,
+  categories,
+  qc,
+}: {
+  open: boolean;
+  onClose: () => void;
+  bcTotalARS: number;
+  santTotalARS: number;
+  arsToUsd: number;
+  defaultBlueRate: number;
+  accounts: any[];
+  categories: any[];
+  qc: ReturnType<typeof useQueryClient>;
+}) {
+  const [items, setItems] = useState<SettlementItem[]>([]);
+  const [tcBlue, setTcBlue] = useState<number>(defaultBlueRate);
+  const [usdAPagar, setUsdAPagar] = useState<number>(0);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    let saved: any = {};
+    try { saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch {}
+    const initial: SettlementItem[] = [
+      { key: 'visa_ciudad',    label: 'VISA Ciudad',       amountARS: bcTotalARS,                                editable: false, categoryName: 'Casa' },
+      { key: 'visa_santander', label: 'VISA Santander',    amountARS: santTotalARS || saved.visa_santander || 0, editable: santTotalARS === 0, categoryName: 'Casa' },
+      { key: 'amex',           label: 'AMEX Santander',    amountARS: saved.amex || 0,        editable: true, categoryName: 'Casa' },
+      { key: 'prestamo',       label: 'Préstamo + Seguro', amountARS: saved.prestamo || 0,    editable: true, categoryName: 'Auto' },
+      { key: 'obra_social',    label: 'Obra Social',       amountARS: saved.obra_social || 0, editable: true, categoryName: 'Salud' },
+      { key: 'expensas',       label: 'Expensas',          amountARS: saved.expensas || 0,    editable: true, categoryName: 'Casa' },
+      { key: 'cochera',        label: 'Cochera + Lavado',  amountARS: saved.cochera || 0,     editable: true, categoryName: 'Auto' },
+      { key: 'patente',        label: 'Patente',           amountARS: saved.patente || 0,     editable: true, categoryName: 'Auto' },
+      { key: 'multa',          label: 'Multa',             amountARS: saved.multa || 0,       editable: true, categoryName: 'Auto' },
+      { key: 'otro1',          label: saved.otro1_label || 'Otro',   amountARS: 0, editable: true, labelEditable: true, categoryName: 'Casa' },
+      { key: 'otro2',          label: saved.otro2_label || 'Otro 2', amountARS: 0, editable: true, labelEditable: true, categoryName: 'Casa' },
+    ];
+    setItems(initial);
+    setTcBlue(defaultBlueRate);
+  }, [open, bcTotalARS, santTotalARS, defaultBlueRate]);
+
+  const totalARS = items.reduce((s, i) => s + (i.amountARS || 0), 0);
+  const usdExacto = tcBlue > 0 ? totalARS / tcBlue : 0;
+
+  useEffect(() => {
+    setUsdAPagar(Math.round(usdExacto / 100) * 100);
+  }, [usdExacto]);
+
+  const vueltoARS = Math.max(0, usdAPagar * tcBlue - totalARS);
+
+  function updateItem(key: string, patch: Partial<SettlementItem>) {
+    setItems((rows) => rows.map((r) => (r.key === key ? { ...r, ...patch } : r)));
+  }
+
+  async function handleConfirm() {
+    setSubmitting(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+      const today = new Date().toISOString().split('T')[0];
+      const monthLabel = format(new Date(), 'MMMM yyyy', { locale: es });
+
+      const tarjetaViejoAcc = accounts.find((a) => /viejo|tarjeta.*viejo/i.test(a.name));
+      const cashAcc = accounts.find((a) => /cash/i.test(a.name) && a.currency === 'USD');
+      const mpAcc = accounts.find((a) => /mercado.*pago|mercadopago/i.test(a.name));
+
+      if (!tarjetaViejoAcc || !cashAcc || !mpAcc) {
+        toast.error('Faltan cuentas: verificá que existan Tarjeta viejo, Cash USD y Mercado Pago');
+        setSubmitting(false);
+        return;
+      }
+
+      const editableItems = items.filter((i) => i.editable && i.amountARS > 0);
+      const fxArsUsd = arsToUsd || (tcBlue > 0 ? 1 / tcBlue : 0);
+
+      for (const item of editableItems) {
+        const cat = categories.find((c) => c.name === item.categoryName);
+        await supabase.from('transactions').insert({
+          user_id: user.id,
+          account_id: tarjetaViejoAcc.id,
+          date: today,
+          description: `${item.label} — ${monthLabel}`,
+          amount: -item.amountARS,
+          currency: 'ARS',
+          fx_rate: fxArsUsd,
+          amount_usd: -(item.amountARS * fxArsUsd),
+          type: 'expense' as const,
+          category_id: cat?.id || null,
+        });
+      }
+
+      await supabase.from('transactions').insert({
+        user_id: user.id,
+        account_id: cashAcc.id,
+        date: today,
+        description: `Liquidación ${monthLabel} — viejo`,
+        amount: -usdAPagar,
+        currency: 'USD',
+        fx_rate: 1,
+        amount_usd: -usdAPagar,
+        type: 'expense' as const,
+        notes: JSON.stringify({
+          settlement: true,
+          month: format(new Date(), 'yyyy-MM'),
+          breakdown: Object.fromEntries(items.filter((i) => i.amountARS > 0).map((i) => [i.key, i.amountARS])),
+          tcBlue,
+          totalARS,
+          usdPagado: usdAPagar,
+          vueltoARS,
+        }),
+      });
+
+      if (vueltoARS > 0) {
+        await supabase.from('transactions').insert({
+          user_id: user.id,
+          account_id: mpAcc.id,
+          date: today,
+          description: `Vuelto liquidación ${monthLabel} — viejo`,
+          amount: vueltoARS,
+          currency: 'ARS',
+          fx_rate: fxArsUsd,
+          amount_usd: vueltoARS * fxArsUsd,
+          type: 'income' as const,
+          notes: `vuelto_settlement_${format(new Date(), 'yyyy-MM')}`,
+        });
+      }
+
+      const defaults: Record<string, any> = {};
+      items.filter((i) => i.editable).forEach((i) => {
+        defaults[i.key] = i.amountARS;
+        if (i.key === 'otro1') defaults['otro1_label'] = i.label;
+        if (i.key === 'otro2') defaults['otro2_label'] = i.label;
+      });
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(defaults));
+
+      qc.invalidateQueries({ queryKey: ['transactions'] });
+      qc.invalidateQueries({ queryKey: ['account-balances'] });
+      toast.success(`Liquidación registrada: $${usdAPagar} USD pagados · ARS ${vueltoARS.toLocaleString()} pendiente en MP`);
+      onClose();
+    } catch (e: any) {
+      toast.error(e.message || 'Error al confirmar liquidación');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Cerrar mes con el viejo</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="border rounded-lg overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-xs">Concepto</TableHead>
+                  <TableHead className="text-xs text-right">ARS</TableHead>
+                  <TableHead className="text-xs">Categoría</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {items.map((it) => (
+                  <TableRow key={it.key}>
+                    <TableCell className="text-xs">
+                      {it.labelEditable ? (
+                        <Input
+                          value={it.label}
+                          onChange={(e) => updateItem(it.key, { label: e.target.value })}
+                          className="h-7 text-xs"
+                        />
+                      ) : it.editable ? (
+                        it.label
+                      ) : (
+                        <span className="text-muted-foreground">🔒 {it.label}</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {it.editable ? (
+                        <Input
+                          type="number"
+                          value={it.amountARS || ''}
+                          onChange={(e) => updateItem(it.key, { amountARS: parseFloat(e.target.value) || 0 })}
+                          className="h-7 text-xs text-right font-mono w-32 ml-auto"
+                        />
+                      ) : (
+                        <span className="text-xs font-mono text-muted-foreground">
+                          {it.amountARS.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {it.editable ? (
+                        <Select
+                          value={it.categoryName}
+                          onValueChange={(v) => updateItem(it.key, { categoryName: v })}
+                        >
+                          <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {categories.map((c) => (
+                              <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">{it.categoryName}</span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+                <TableRow className="font-medium">
+                  <TableCell className="text-xs">Total</TableCell>
+                  <TableCell className="text-xs text-right font-mono">
+                    {totalARS.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+                  </TableCell>
+                  <TableCell />
+                </TableRow>
+              </TableBody>
+            </Table>
+          </div>
+
+          <div className="space-y-2 text-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Total ARS:</span>
+              <span className="font-mono">${totalARS.toLocaleString('es-AR', { maximumFractionDigits: 0 })}</span>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-muted-foreground">TC Blue:</span>
+              <Input
+                type="number"
+                value={tcBlue}
+                onChange={(e) => setTcBlue(parseFloat(e.target.value) || 0)}
+                className="h-7 text-xs text-right font-mono w-32"
+              />
+            </div>
+            <div className="border-t pt-2 flex items-center justify-between">
+              <span className="text-muted-foreground">USD exacto:</span>
+              <span className="font-mono">${usdExacto.toFixed(2)}</span>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-muted-foreground">USD a pagar:</span>
+              <Input
+                type="number"
+                value={usdAPagar}
+                onChange={(e) => setUsdAPagar(parseFloat(e.target.value) || 0)}
+                className="h-7 text-xs text-right font-mono w-32"
+              />
+            </div>
+            <div className="border-t pt-2 flex items-center justify-between text-success">
+              <span>Vuelto ARS:</span>
+              <span className="font-mono">+${vueltoARS.toLocaleString('es-AR', { maximumFractionDigits: 0 })}</span>
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <Button variant="outline" className="flex-1" onClick={onClose} disabled={submitting}>Cancelar</Button>
+            <Button className="flex-1" onClick={handleConfirm} disabled={submitting || usdAPagar <= 0}>
+              {submitting ? 'Registrando...' : 'Confirmar liquidación'}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
