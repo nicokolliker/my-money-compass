@@ -1,8 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { format, subMonths } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { format } from 'date-fns';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -13,17 +11,17 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { useAccountBalances, useCreateAccount, useUpdateAccount } from '@/hooks/useAccounts';
 import { useAccountGroups, useCreateAccountGroup, useUpdateAccountGroup, useDeleteAccountGroup } from '@/hooks/useAccountGroups';
 import { useNetWorth } from '@/hooks/useNetWorth';
-import { useImportLog } from '@/hooks/useImportLog';
 import { supabase } from '@/integrations/supabase/client';
 import { ACCOUNT_TYPE_LABELS, CURRENCIES, formatCurrency, formatUSD } from '@/lib/constants';
 import { MerchantLogo } from '@/components/MerchantLogo';
 import { getAccountStyle } from '@/lib/accountIcons';
-import { Plus, ChevronDown, FolderPlus, Pencil, Trash2, FileUp, PenLine, Wifi, Clock, ArrowLeftRight } from 'lucide-react';
+import { Plus, ChevronDown, FolderPlus, Pencil, Trash2, FileUp, PenLine, Wifi, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { DemoDataBanner } from '@/components/DemoDataBanner';
 import { useDemoData } from '@/hooks/useDemoData';
 import { Badge } from '@/components/ui/badge';
 import { FundFlowDiagram } from '@/components/accounts/FundFlowDiagram';
+
 
 const HUB_ACCOUNTS = ['wise', 'arq', 'dolarapp'];
 const isHub = (name: string) => HUB_ACCOUNTS.some(h => name.toLowerCase().includes(h));
