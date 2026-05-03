@@ -389,9 +389,9 @@ export default function Analytics() {
             <>
               <div className="h-60">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={categoryMonthly}>
+                  <BarChart data={categoryMonthly.filter(m => visibleCategoriesForChart.some(cat => (m[cat.id] || 0) > 0))}>
                     <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-                    <YAxis tick={{ fontSize: 10 }} tickFormatter={v => `$${v >= 1000 ? `${(v/1000).toFixed(0)}k` : v}`} />
+                    <YAxis tick={{ fontSize: 10 }} tickCount={5} allowDecimals={false} tickFormatter={v => `$${v >= 1000 ? `${(v/1000).toFixed(0)}k` : v}`} />
                     <Tooltip
                       formatter={(v: number, name: string) => {
                         const cat = categoryTree.find(c => c.id === name);
@@ -405,18 +405,15 @@ export default function Analytics() {
                         dataKey={cat.id}
                         stackId="a"
                         fill={getCategoryHex(cat.name, cat.color) || CATEGORY_COLORS[idx % CATEGORY_COLORS.length]}
+                        radius={idx === visibleCategoriesForChart.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
                       />
                     ))}
                   </BarChart>
                 </ResponsiveContainer>
               </div>
-              <div className="flex flex-wrap gap-2 mt-3">
-                {visibleCategoriesForChart.map((cat, idx) => (
-                  <span key={cat.id} className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                    <span
-                      className="w-2.5 h-2.5 rounded-sm"
-                      style={{ backgroundColor: getCategoryHex(cat.name, cat.color) || CATEGORY_COLORS[idx % CATEGORY_COLORS.length] }}
-                    />
+              <div className="flex flex-wrap gap-x-3 gap-y-1 mt-3">
+                {visibleCategoriesForChart.map(cat => (
+                  <span key={cat.id} className="flex items-center gap-1 text-xs text-muted-foreground">
                     {cat.icon} {cat.name}
                   </span>
                 ))}
