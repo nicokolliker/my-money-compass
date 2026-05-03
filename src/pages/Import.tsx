@@ -1158,10 +1158,11 @@ export default function ImportPage() {
   );
 }
 
-const SOURCES: { key: 'arq' | 'mercadopago' | 'banco_ciudad'; label: string }[] = [
+const SOURCES: { key: 'arq' | 'mercadopago' | 'banco_ciudad' | 'splitwise'; label: string }[] = [
   { key: 'arq', label: 'ARQ ARS' },
   { key: 'mercadopago', label: 'MercadoPago' },
   { key: 'banco_ciudad', label: 'Banco Ciudad' },
+  { key: 'splitwise', label: 'Splitwise' },
 ];
 
 const MONTH_LABELS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
