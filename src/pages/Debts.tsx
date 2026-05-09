@@ -32,7 +32,7 @@ async function extractPdfText(file: File): Promise<string> {
   if (!(window as any).pdfjsLib) {
     await new Promise<void>((resolve, reject) => {
       const script = document.createElement('script');
-      script.src = 'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.min.js';
+      script.src = 'https://unpkg.com/pdfjs-dist@4.4.168/build/pdf.min.js';
       script.onload = () => resolve();
       script.onerror = () => reject(new Error('Failed to load pdfjs'));
       document.head.appendChild(script);
@@ -41,7 +41,7 @@ async function extractPdfText(file: File): Promise<string> {
 
   const pdfjsLib = (window as any).pdfjsLib;
   pdfjsLib.GlobalWorkerOptions.workerSrc =
-    'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+    'https://unpkg.com/pdfjs-dist@4.4.168/build/pdf.worker.min.js';
 
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
@@ -709,12 +709,14 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
 
 function FileSlot({ label, file, onChange }: { label: string; file: File | null; onChange: (f: File | null) => void }) {
   return (
-    <div>
+    <div className="overflow-hidden">
       <Label className="text-xs">{label}</Label>
       {file ? (
-        <div className="mt-1 flex items-center gap-2 rounded-md border p-2">
-          <CheckCircle2 className="h-4 w-4 text-success" />
-          <span className="text-xs flex-1 truncate">{file.name}</span>
+        <div className="mt-1 flex items-center gap-2 rounded-md border p-2 overflow-hidden">
+          <CheckCircle2 className="h-4 w-4 text-success shrink-0" />
+          <span className="text-xs text-foreground truncate max-w-[240px] block">
+            {file.name}
+          </span>
           <Button size="sm" variant="ghost" onClick={() => onChange(null)}><X className="h-3 w-3" /></Button>
         </div>
       ) : (
