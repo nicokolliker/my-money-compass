@@ -714,8 +714,33 @@ function SplitwiseSettlementWizard({ open, onOpenChange }: { open: boolean; onOp
   const [processing, setProcessing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [payFromId, setPayFromId] = useState<string>('');
+  const [splitwiseAccId, setSplitwiseAccId] = useState<string | null>(null);
 
   const splitwiseAcc = accounts?.find((a: any) => /splitwise/i.test(a.name));
+
+  async function ensureSplitwiseAccount(userId: string): Promise<string> {
+    const { data: existing } = await supabase
+      .from('accounts')
+      .select('id')
+      .ilike('name', 'Splitwise')
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (existing?.id) return existing.id;
+    const { data: created, error } = await supabase
+      .from('accounts')
+      .insert({
+        user_id: userId,
+        name: 'Splitwise',
+        type: 'receivable',
+        currency: 'USD',
+        opening_balance: 0,
+        is_active: true,
+      })
+      .select('id')
+      .single();
+    if (error) throw error;
+    return created.id;
+  }
   const splitwiseBalance = Number(splitwiseAcc?.computed_balance_usd || 0);
   const splitwiseDebt = splitwiseBalance < 0 ? Math.abs(splitwiseBalance) : 0;
 
