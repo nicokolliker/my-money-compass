@@ -803,7 +803,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
               <p className="font-medium mb-1">📋 Ítems contra "Tarjeta viejo":</p>
               <ul className="space-y-0.5 text-xs text-muted-foreground">
                 {items.filter((i) => i.editable && i.amountARS > 0).map((i) => (
-                  <li key={i.key}>• {i.label} ${i.amountARS.toLocaleString('es-AR', { maximumFractionDigits: 0 })} ARS → {i.categoryName}</li>
+                  <li key={i.key}>• {i.label} {formatARS(i.amountARS)} ARS → {i.categoryName}</li>
                 ))}
               </ul>
             </div>
