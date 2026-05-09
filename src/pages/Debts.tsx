@@ -618,9 +618,10 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
       const defaults: Record<string, any> = {};
       items.filter((i) => i.editable).forEach((i) => {
         defaults[i.key] = i.amountARS;
-        if (i.key === 'otro1') defaults['otro1_label'] = i.label;
-        if (i.key === 'otro2') defaults['otro2_label'] = i.label;
       });
+      defaults.extras = extraItems
+        .filter((e) => e.label.trim())
+        .map((e) => ({ label: e.label, categoryName: e.categoryName, emoji: e.emoji }));
       localStorage.setItem(STORAGE_KEY, JSON.stringify(defaults));
 
       qc.invalidateQueries({ queryKey: ['transactions'] });
