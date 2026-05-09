@@ -7,7 +7,8 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Upload, CheckCircle2, X, Plus } from 'lucide-react';
+import { Upload, CheckCircle2, X, Plus, ChevronDown } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -97,11 +98,14 @@ export default function DebtsPage() {
       </div>
 
       {viejoAccount && (
-        <ViejoDebtCard
-          account={viejoAccount}
-          importLog={importLog || []}
-          onOpen={() => setOpenViejo(true)}
-        />
+        <>
+          <ViejoDebtCard
+            account={viejoAccount}
+            importLog={importLog || []}
+            onOpen={() => setOpenViejo(true)}
+          />
+          <ViejoCycleHistory importLog={importLog || []} />
+        </>
       )}
 
       {splitwiseAccount ? (
@@ -1222,5 +1226,196 @@ function TransferDialog({ account, onClose }: { account: any; onClose: () => voi
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ============================================================================
+// Viejo — Historial de ciclos
+// ============================================================================
+
+const ITEM_META: Record<string, { label: string; emoji: string }> = {
+  visa_ciudad: { label: 'VISA Ciudad', emoji: '🏦' },
+  visa_santander: { label: 'VISA Santander', emoji: '🏦' },
+  amex: { label: 'AMEX Santander', emoji: '💳' },
+  expensas: { label: 'Expensas', emoji: '🏠' },
+  prestamo: { label: 'Préstamo + Seguro', emoji: '🚗' },
+  cochera: { label: 'Cochera + Lavado', emoji: '🅿️' },
+  patente: { label: 'Patente', emoji: '📋' },
+  multa: { label: 'Multa', emoji: '⚠️' },
+  obra_social: { label: 'Obra Social', emoji: '❤️' },
+};
+
+const CARD_KEYS = ['visa_ciudad', 'visa_santander', 'amex'];
+
+function ViejoCycleHistory({ importLog }: { importLog: any[] }) {
+  const [open, setOpen] = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
+
+  const months = useMemo(() => {
+    const arr: { ym: string; label: string }[] = [];
+    const d = new Date();
+    d.setDate(1);
+    for (let i = 0; i < 12; i++) {
+      arr.push({ ym: format(d, 'yyyy-MM'), label: format(d, 'MMMM yyyy', { locale: es }) });
+      d.setMonth(d.getMonth() - 1);
+    }
+    return arr;
+  }, []);
+
+  const startDate = months[months.length - 1].ym + '-01';
+
+  const { data: liqs } = useQuery({
+    queryKey: ['liquidacion-history', startDate],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('transactions')
+        .select('id, date, description, amount_usd, notes')
+        .ilike('description', '%Liquidación%')
+        .gte('date', startDate)
+        .order('date', { ascending: false });
+      return data || [];
+    },
+  });
+
+  const byMonth = useMemo(() => {
+    const m: Record<string, { tx: any; parsed: any }> = {};
+    (liqs || []).forEach((tx: any) => {
+      let parsed: any = null;
+      try { parsed = tx.notes ? JSON.parse(tx.notes) : null; } catch {}
+      const ym = parsed?.month || (typeof tx.date === 'string' ? tx.date.slice(0, 7) : '');
+      if (ym && !m[ym]) m[ym] = { tx, parsed };
+    });
+    return m;
+  }, [liqs]);
+
+  const selected = selectedMonth ? byMonth[selectedMonth] : null;
+
+  return (
+    <>
+      <Collapsible open={open} onOpenChange={setOpen}>
+        <Card>
+          <CardContent className="p-0">
+            <CollapsibleTrigger asChild>
+              <button type="button" className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-muted/40 transition-colors">
+                <div>
+                  <p className="text-sm font-semibold">Historial de ciclos</p>
+                  <p className="text-xs text-muted-foreground">Últimos 12 meses</p>
+                </div>
+                <ChevronDown className={cn('h-4 w-4 transition-transform shrink-0', open && 'rotate-180')} />
+              </button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="border-t overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Mes</TableHead>
+                      <TableHead className="text-center">Resúmenes</TableHead>
+                      <TableHead className="text-center">Gastos manuales</TableHead>
+                      <TableHead className="text-center">Liquidado</TableHead>
+                      <TableHead className="text-right">Monto pagado</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {months.map(({ ym, label }) => {
+                      const liq = byMonth[ym];
+                      const hasImport = importLog.some((l: any) => ['banco_ciudad', 'santander'].includes(l.source) && l.month === ym);
+                      const liquidado = !!liq;
+                      const breakdown: Record<string, number> = liq?.parsed?.breakdown || {};
+                      const manualCount = Object.entries(breakdown).filter(([k, v]) => !CARD_KEYS.includes(k) && Number(v) > 0).length;
+                      const usd = liq?.parsed?.usdPagado ?? (liq ? Math.abs(Number(liq.tx.amount_usd) || 0) : 0);
+                      const clickable = liquidado;
+                      return (
+                        <TableRow
+                          key={ym}
+                          className={cn(clickable && 'cursor-pointer')}
+                          onClick={() => clickable && setSelectedMonth(ym)}
+                        >
+                          <TableCell className="capitalize text-sm font-medium">{label}</TableCell>
+                          <TableCell className="text-center text-sm">{hasImport ? '✓' : '—'}</TableCell>
+                          <TableCell className="text-center text-sm">{manualCount > 0 ? `✓ (${manualCount})` : '—'}</TableCell>
+                          <TableCell className="text-center text-sm">{liquidado ? '✓' : '—'}</TableCell>
+                          <TableCell className="text-right font-mono text-sm">{liquidado ? formatUSD(usd) : '—'}</TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </CollapsibleContent>
+          </CardContent>
+        </Card>
+      </Collapsible>
+
+      <Dialog open={!!selected} onOpenChange={(v) => !v && setSelectedMonth(null)}>
+        <DialogContent className="sm:max-w-lg w-full max-h-[90vh] overflow-y-auto overflow-x-hidden">
+          <DialogHeader>
+            <DialogTitle className="capitalize">
+              Liquidación {selectedMonth ? format(new Date(selectedMonth + '-01T00:00:00'), 'MMMM yyyy', { locale: es }) : ''}
+            </DialogTitle>
+          </DialogHeader>
+          {selected?.parsed ? (
+            <SettlementDetail parsed={selected.parsed} />
+          ) : (
+            <p className="text-sm text-muted-foreground">No hay detalles guardados para este mes.</p>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+function SettlementDetail({ parsed }: { parsed: any }) {
+  const breakdown: Record<string, number> = parsed.breakdown || {};
+
+  const groups = ITEM_GROUPS.map((g) => ({
+    label: g.label,
+    items: g.items
+      .filter((k) => Number(breakdown[k]) > 0)
+      .map((k) => ({ key: k, label: ITEM_META[k]?.label || k, amount: Number(breakdown[k]) })),
+  })).filter((g) => g.items.length > 0);
+
+  const otros = Object.entries(breakdown)
+    .filter(([k, v]) => !ITEM_META[k] && Number(v) > 0)
+    .map(([k, v]) => ({ key: k, label: k, amount: Number(v) }));
+  if (otros.length > 0) groups.push({ label: '➕ Otros', items: otros });
+
+  return (
+    <div className="space-y-4">
+      {groups.map((g) => (
+        <div key={g.label} className="space-y-1.5">
+          <p className="text-xs font-semibold text-muted-foreground">{g.label}</p>
+          <div className="rounded-lg border divide-y">
+            {g.items.map((it) => (
+              <div key={it.key} className="flex items-center justify-between px-3 py-2 text-sm">
+                <span className="truncate">{it.label}</span>
+                <span className="font-mono shrink-0 ml-2">{formatARS(it.amount)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+
+      <div className="rounded-lg bg-muted/40 p-3 space-y-1 text-sm">
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Total ARS</span>
+          <span className="font-mono font-semibold">{formatARS(parsed.totalARS || 0)}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">TC Blue</span>
+          <span className="font-mono">{formatARS(parsed.tcBlue || 0)}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">USD pagado</span>
+          <span className="font-mono font-semibold">{formatUSD(parsed.usdPagado || 0)}</span>
+        </div>
+        {Number(parsed.vueltoARS) > 0 && (
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Vuelto ARS</span>
+            <span className="font-mono">{formatARS(parsed.vueltoARS)}</span>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
