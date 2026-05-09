@@ -761,6 +761,11 @@ function SplitwiseSettlementWizard({ open, onOpenChange }: { open: boolean; onOp
     if (!file) return;
     setProcessing(true);
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+      const accId = await ensureSplitwiseAccount(user.id);
+      setSplitwiseAccId(accId);
+      qc.invalidateQueries({ queryKey: ['account-balances'] });
       const text = await file.text();
       const parsed = parseSplitwise(text, 'nicolaskolliker', arsToUsd || 0);
       if (parsed.length === 0) {
