@@ -599,7 +599,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
         await supabase.from('transactions').insert({
           user_id: user.id,
           account_id: tarjetaViejoAcc.id,
-          date: today,
+          date: settlementDate,
           description: `${item.label} — ${monthLabel}`,
           amount: -item.amountARS,
           currency: 'ARS',
@@ -613,7 +613,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
       await supabase.from('transactions').insert({
         user_id: user.id,
         account_id: cashAcc.id,
-        date: today,
+        date: settlementDate,
         description: `Liquidación ${monthLabel} — viejo`,
         amount: -usdAPagar,
         currency: 'USD',
@@ -632,7 +632,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
         await supabase.from('transactions').insert({
           user_id: user.id,
           account_id: mpAcc.id,
-          date: today,
+          date: settlementDate,
           description: `Vuelto liquidación ${monthLabel} — viejo`,
           amount: vueltoARS,
           currency: 'ARS',
