@@ -1370,88 +1370,88 @@ function ViejoCycleHistory({ importLog }: { importLog: any[] }) {
               </button>
             </CollapsibleTrigger>
             <CollapsibleContent>
-              <div className="border-t p-4 space-y-3">
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <Tabs defaultValue="table" className="w-auto">
+              <div className="border-t p-4">
+                <Tabs defaultValue="table">
+                  <div className="flex items-center justify-between gap-2 flex-wrap mb-3">
                     <TabsList className="h-8">
                       <TabsTrigger value="table" className="text-xs">Tabla</TabsTrigger>
                       <TabsTrigger value="chart" className="text-xs">Gráfico</TabsTrigger>
                     </TabsList>
-                    <TabsContent value="table" className="mt-3 -mx-4">
-                      <div className="overflow-x-auto">
-                        <Table>
-                          <TableHeader>
+                    <Select value={range} onValueChange={(v) => setRange(v as RangeFilter)}>
+                      <SelectTrigger className="h-8 w-36 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="6">Últimos 6 meses</SelectItem>
+                        <SelectItem value="12">Últimos 12 meses</SelectItem>
+                        <SelectItem value="24">Últimos 24 meses</SelectItem>
+                        <SelectItem value="all">Todo</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <TabsContent value="table" className="mt-0 -mx-4">
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Mes</TableHead>
+                            <TableHead className="text-center">Resúmenes</TableHead>
+                            <TableHead className="text-center">Manuales</TableHead>
+                            <TableHead className="text-center">Liquidado</TableHead>
+                            <TableHead className="text-right">Pagado</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {rows.length === 0 && (
                             <TableRow>
-                              <TableHead>Mes</TableHead>
-                              <TableHead className="text-center">Resúmenes</TableHead>
-                              <TableHead className="text-center">Manuales</TableHead>
-                              <TableHead className="text-center">Liquidado</TableHead>
-                              <TableHead className="text-right">Pagado</TableHead>
+                              <TableCell colSpan={5} className="text-center text-xs text-muted-foreground py-6">
+                                Sin registros para este rango.
+                              </TableCell>
                             </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {rows.length === 0 && (
-                              <TableRow>
-                                <TableCell colSpan={5} className="text-center text-xs text-muted-foreground py-6">
-                                  Sin registros para este rango.
-                                </TableCell>
-                              </TableRow>
-                            )}
-                            {rows.map((r) => (
-                              <TableRow
-                                key={r.ym}
-                                className={cn(r.liquidado && 'cursor-pointer')}
-                                onClick={() => r.liquidado && setSelectedMonth(r.ym)}
-                              >
-                                <TableCell className="capitalize text-sm font-medium">{r.label}</TableCell>
-                                <TableCell className="text-center text-sm">{r.hasImport ? '✓' : '—'}</TableCell>
-                                <TableCell className="text-center text-sm">{r.manualCount > 0 ? `✓ (${r.manualCount})` : '—'}</TableCell>
-                                <TableCell className="text-center text-sm">{r.liquidado ? '✓' : '—'}</TableCell>
-                                <TableCell className="text-right font-mono text-sm">{r.liquidado ? formatUSD(r.usd) : '—'}</TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
+                          )}
+                          {rows.map((r) => (
+                            <TableRow
+                              key={r.ym}
+                              className={cn(r.liquidado && 'cursor-pointer')}
+                              onClick={() => r.liquidado && setSelectedMonth(r.ym)}
+                            >
+                              <TableCell className="capitalize text-sm font-medium">{r.label}</TableCell>
+                              <TableCell className="text-center text-sm">{r.hasImport ? '✓' : '—'}</TableCell>
+                              <TableCell className="text-center text-sm">{r.manualCount > 0 ? `✓ (${r.manualCount})` : '—'}</TableCell>
+                              <TableCell className="text-center text-sm">{r.liquidado ? '✓' : '—'}</TableCell>
+                              <TableCell className="text-right font-mono text-sm">{r.liquidado ? formatUSD(r.usd) : '—'}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </TabsContent>
+                  <TabsContent value="chart" className="mt-0">
+                    {chartData.length === 0 ? (
+                      <p className="text-xs text-muted-foreground py-6 text-center">Sin registros para este rango.</p>
+                    ) : (
+                      <div className="h-64 w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                            <XAxis dataKey="month" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
+                            <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" tickFormatter={(v) => `$${v >= 1000 ? (v / 1000).toFixed(1) + 'k' : v}`} />
+                            <Tooltip
+                              contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: 8, fontSize: 12 }}
+                              formatter={(v: any) => [formatUSD(Number(v)), 'USD pagado']}
+                              cursor={{ fill: 'hsl(var(--muted) / 0.4)' }}
+                            />
+                            <Bar
+                              dataKey="usd"
+                              fill="hsl(var(--primary))"
+                              radius={[4, 4, 0, 0]}
+                              onClick={(d: any) => d?.ym && byMonth[d.ym] && setSelectedMonth(d.ym)}
+                              cursor="pointer"
+                            />
+                          </BarChart>
+                        </ResponsiveContainer>
                       </div>
-                    </TabsContent>
-                    <TabsContent value="chart" className="mt-3">
-                      {chartData.length === 0 ? (
-                        <p className="text-xs text-muted-foreground py-6 text-center">Sin registros para este rango.</p>
-                      ) : (
-                        <div className="h-64 w-full">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                              <XAxis dataKey="month" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-                              <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" tickFormatter={(v) => `$${v >= 1000 ? (v / 1000).toFixed(1) + 'k' : v}`} />
-                              <Tooltip
-                                contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: 8, fontSize: 12 }}
-                                formatter={(v: any) => [formatUSD(Number(v)), 'USD pagado']}
-                                cursor={{ fill: 'hsl(var(--muted) / 0.4)' }}
-                              />
-                              <Bar
-                                dataKey="usd"
-                                fill="hsl(var(--primary))"
-                                radius={[4, 4, 0, 0]}
-                                onClick={(d: any) => d?.ym && byMonth[d.ym] && setSelectedMonth(d.ym)}
-                                cursor="pointer"
-                              />
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </div>
-                      )}
-                    </TabsContent>
-                  </Tabs>
-                  <Select value={range} onValueChange={(v) => setRange(v as RangeFilter)}>
-                    <SelectTrigger className="h-8 w-32 text-xs"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="6">Últimos 6 meses</SelectItem>
-                      <SelectItem value="12">Últimos 12 meses</SelectItem>
-                      <SelectItem value="24">Últimos 24 meses</SelectItem>
-                      <SelectItem value="all">Todo</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                    )}
+                  </TabsContent>
+                </Tabs>
               </div>
             </CollapsibleContent>
           </CardContent>
