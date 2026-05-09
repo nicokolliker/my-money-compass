@@ -668,7 +668,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
         {step === 2 && (
           <div className="space-y-4">
             <p className="text-xs text-muted-foreground">
-              BC: ${bcTotalARS.toLocaleString('es-AR', { maximumFractionDigits: 0 })} ARS detectados · Santander: ${santTotalARS.toLocaleString('es-AR', { maximumFractionDigits: 0 })} ARS detectados
+              BC: {formatARS(bcTotalARS)} ARS detectados · Santander: {formatARS(santTotalARS)} ARS detectados
             </p>
             <div className="space-y-1">
               {ITEM_GROUPS.map((group) => {
