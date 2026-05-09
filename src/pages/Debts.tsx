@@ -418,6 +418,8 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
   const [santFile, setSantFile] = useState<File | null>(null);
   const [bcTotalARS, setBcTotalARS] = useState(0);
   const [santTotalARS, setSantTotalARS] = useState(0);
+  const [visaCiudadARS, setVisaCiudadARS] = useState(0);
+  const [obSocARS, setObSocARS] = useState(0);
   const [processing, setProcessing] = useState(false);
 
   const [items, setItems] = useState<SettlementItem[]>([]);
