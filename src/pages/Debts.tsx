@@ -788,7 +788,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
               <div className="flex items-center justify-between gap-3"><span className="text-muted-foreground">USD a pagar:</span>
                 <Input type="number" value={usdAPagar} onChange={(e) => setUsdAPagar(parseFloat(e.target.value) || 0)} className={cn('h-7 text-xs text-right font-mono w-32', NUMERIC_INPUT_CLS)} />
               </div>
-              <div className="border-t pt-2 flex items-center justify-between text-success"><span>Vuelto ARS:</span><span className="font-mono">+${vueltoARS.toLocaleString('es-AR', { maximumFractionDigits: 0 })}</span></div>
+              <div className="border-t pt-2 flex items-center justify-between text-success"><span>Vuelto ARS:</span><span className="font-mono">+{formatARS(vueltoARS)}</span></div>
             </div>
             <div className="flex justify-between">
               <Button variant="outline" onClick={() => setStep(1)}>← Atrás</Button>
