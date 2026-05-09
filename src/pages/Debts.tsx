@@ -79,12 +79,30 @@ export default function DebtsPage() {
         />
       )}
 
-      {splitwiseAccount && (
+      {splitwiseAccount ? (
         <SplitwiseDebtCard
           account={splitwiseAccount}
           importLog={importLog || []}
           onOpen={() => setOpenSw(true)}
         />
+      ) : (
+        <Card className="rounded-2xl">
+          <CardContent className="p-5">
+            <div className="flex items-center gap-3 mb-3">
+              <MerchantLogo name="Splitwise" domain="splitwise.com" size={36} />
+              <div>
+                <p className="text-sm font-semibold">Splitwise</p>
+                <p className="text-xs text-muted-foreground">Sin actividad aún</p>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground mb-3">
+              Cargá tu primer CSV para empezar a trackear los gastos del grupo.
+            </p>
+            <Button variant="outline" className="w-full" onClick={() => setOpenSw(true)}>
+              Cargar CSV de Splitwise →
+            </Button>
+          </CardContent>
+        </Card>
       )}
 
       {otherDebts.map((a: any) => (
@@ -714,8 +732,33 @@ function SplitwiseSettlementWizard({ open, onOpenChange }: { open: boolean; onOp
   const [processing, setProcessing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [payFromId, setPayFromId] = useState<string>('');
+  const [splitwiseAccId, setSplitwiseAccId] = useState<string | null>(null);
 
   const splitwiseAcc = accounts?.find((a: any) => /splitwise/i.test(a.name));
+
+  async function ensureSplitwiseAccount(userId: string): Promise<string> {
+    const { data: existing } = await supabase
+      .from('accounts')
+      .select('id')
+      .ilike('name', 'Splitwise')
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (existing?.id) return existing.id;
+    const { data: created, error } = await supabase
+      .from('accounts')
+      .insert({
+        user_id: userId,
+        name: 'Splitwise',
+        type: 'receivable',
+        currency: 'USD',
+        opening_balance: 0,
+        is_active: true,
+      })
+      .select('id')
+      .single();
+    if (error) throw error;
+    return created.id;
+  }
   const splitwiseBalance = Number(splitwiseAcc?.computed_balance_usd || 0);
   const splitwiseDebt = splitwiseBalance < 0 ? Math.abs(splitwiseBalance) : 0;
 
@@ -736,6 +779,11 @@ function SplitwiseSettlementWizard({ open, onOpenChange }: { open: boolean; onOp
     if (!file) return;
     setProcessing(true);
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+      const accId = await ensureSplitwiseAccount(user.id);
+      setSplitwiseAccId(accId);
+      qc.invalidateQueries({ queryKey: ['account-balances'] });
       const text = await file.text();
       const parsed = parseSplitwise(text, 'nicolaskolliker', arsToUsd || 0);
       if (parsed.length === 0) {
@@ -785,12 +833,12 @@ function SplitwiseSettlementWizard({ open, onOpenChange }: { open: boolean; onOp
           category_id: catId,
         });
       }
-      if (splitwiseAcc) {
+      if (splitwiseAccId) {
         for (const r of receivables) {
           const catId = r.categoryName ? (categories?.find((c: any) => c.name === r.categoryName)?.id || null) : null;
           payload.push({
             user_id: user.id,
-            account_id: splitwiseAcc.id,
+            account_id: splitwiseAccId,
             date: r.date,
             description: r.description,
             amount: -r.amountUSD,

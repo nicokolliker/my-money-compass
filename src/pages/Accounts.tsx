@@ -81,7 +81,8 @@ export default function Accounts() {
     const visibleAccounts = accounts.filter(a =>
       !/deel/i.test(a.name) &&
       !/deel/i.test((a as any).institution || '') &&
-      !['debt', 'credit_card'].includes(a.type)
+      !['debt', 'credit_card'].includes(a.type) &&
+      !/splitwise/i.test(a.name)
     );
     const result: { key: string; label: string; icon: string; isCustomGroup: boolean; accounts: typeof accounts }[] = [];
     const assignedIds = new Set<string>();
