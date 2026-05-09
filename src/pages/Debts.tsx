@@ -651,7 +651,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
 
         {step === 1 && (
           <>
-            <div className="space-y-4">
+            <div className="space-y-4 min-w-0 overflow-hidden">
               <p className="text-xs text-muted-foreground">
                 Subí los PDFs disponibles. Los faltantes podés cargarlos manualmente en el siguiente paso.
               </p>
@@ -659,7 +659,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
               <FileSlot label="BC KOLLIKER (8157)" file={kollikerFile} onChange={setKollikerFile} />
               <FileSlot label="Santander VISA" file={santFile} onChange={setSantFile} />
             </div>
-            <DialogFooter className="border-t pt-4 mt-4">
+            <DialogFooter className="border-t pt-4 mt-4 min-w-0">
               <Button onClick={handleProcessFiles} disabled={processing}>
                 {processing ? 'Procesando...' : 'Continuar →'}
               </Button>
@@ -847,7 +847,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
 
 function FileSlot({ label, file, onChange }: { label: string; file: File | null; onChange: (f: File | null) => void }) {
   return (
-    <div className="overflow-hidden">
+    <div className="overflow-hidden min-w-0 w-full" style={{ maxWidth: '100%' }}>
       <Label className="text-xs">{label}</Label>
       {file ? (
         <div style={{ maxWidth: '100%' }} className="mt-1 flex items-center gap-2 overflow-hidden rounded-lg border border-border bg-muted/30 px-3 py-2">
