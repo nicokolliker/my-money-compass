@@ -395,7 +395,8 @@ function SimpleDebtCard({ account, onTransfer }: { account: any; onTransfer: () 
 const STORAGE_KEY = 'settlement_defaults';
 
 function formatARS(n: number): string {
-  return n ? Math.round(n).toLocaleString('es-AR') : '';
+  if (!n && n !== 0) return '';
+  return '$' + Math.round(n).toLocaleString('es-AR');
 }
 
 function parseARSInput(v: string): number {
