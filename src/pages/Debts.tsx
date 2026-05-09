@@ -831,7 +831,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
             <div className="rounded-md border p-4 bg-success/10 text-sm space-y-1">
               <p className="font-medium">✅ Liquidación registrada</p>
               <p>Pagaste ${resultUsd.toLocaleString()} USD al viejo</p>
-              {resultVuelto > 0 && <p>ARS {resultVuelto.toLocaleString('es-AR')} pendientes de ingresar a Mercado Pago</p>}
+              {resultVuelto > 0 && <p>{formatARS(resultVuelto)} ARS pendientes de ingresar a Mercado Pago</p>}
             </div>
             <div className="flex justify-end">
               <Button onClick={() => onOpenChange(false)}>Cerrar</Button>
