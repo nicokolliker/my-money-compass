@@ -639,7 +639,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
           fx_rate: fxArsUsd,
           amount_usd: vueltoARS * fxArsUsd,
           type: 'income' as const,
-          notes: `vuelto_settlement_${format(new Date(), 'yyyy-MM')}`,
+          notes: `vuelto_settlement_${settlementMonth}`,
         });
       }
 
