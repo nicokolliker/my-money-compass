@@ -442,11 +442,11 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
     let saved: any = {};
     try { saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch {}
     setItems([
-      { key: 'visa_ciudad',    label: 'VISA Ciudad',       amountARS: bcTotalARS, editable: bcTotalARS === 0, categoryName: 'Casa' },
+      { key: 'visa_ciudad',    label: 'VISA Ciudad',       amountARS: visaCiudadARS || bcTotalARS, editable: (visaCiudadARS || bcTotalARS) === 0, categoryName: 'Casa' },
       { key: 'visa_santander', label: 'VISA Santander',    amountARS: santTotalARS || saved.visa_santander || 0, editable: santTotalARS === 0, categoryName: 'Casa' },
       { key: 'amex',           label: 'AMEX Santander',    amountARS: saved.amex || 0,        editable: true, categoryName: 'Casa' },
       { key: 'prestamo',       label: 'Préstamo + Seguro', amountARS: saved.prestamo || 0,    editable: true, categoryName: 'Auto' },
-      { key: 'obra_social',    label: 'Obra Social',       amountARS: saved.obra_social || 0, editable: true, categoryName: 'Salud' },
+      { key: 'obra_social',    label: 'Obra Social',       amountARS: obSocARS || saved.obra_social || 0, editable: true, categoryName: 'Salud' },
       { key: 'expensas',       label: 'Expensas',          amountARS: saved.expensas || 0,    editable: true, categoryName: 'Casa' },
       { key: 'cochera',        label: 'Cochera + Lavado',  amountARS: saved.cochera || 0,     editable: true, categoryName: 'Auto' },
       { key: 'patente',        label: 'Patente',           amountARS: saved.patente || 0,     editable: true, categoryName: 'Auto' },
