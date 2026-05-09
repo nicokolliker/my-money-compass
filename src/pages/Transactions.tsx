@@ -1,5 +1,4 @@
-import { useState, useMemo, useRef } from 'react';
-import * as pdfjsLib from 'pdfjs-dist';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useTransactions, useDeleteTransaction, useUpdateTransaction } from '@/hooks/useTransactions';
@@ -31,9 +30,30 @@ import { es } from 'date-fns/locale';
 import { parseMercadoPago } from '@/lib/importers/mercadoPagoParser';
 import { parseArqStatements } from '@/lib/importers/arqParser';
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.js`;
+const PDFJS_VERSION = '3.11.174';
+const PDFJS_SRC = `https://unpkg.com/pdfjs-dist@${PDFJS_VERSION}/build/pdf.min.js`;
+const PDFJS_WORKER = `https://unpkg.com/pdfjs-dist@${PDFJS_VERSION}/build/pdf.worker.min.js`;
+
+let pdfjsPromise: Promise<any> | null = null;
+function loadPdfjs(): Promise<any> {
+  if ((window as any).pdfjsLib) return Promise.resolve((window as any).pdfjsLib);
+  if (pdfjsPromise) return pdfjsPromise;
+  pdfjsPromise = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = PDFJS_SRC;
+    script.onload = () => {
+      const lib = (window as any).pdfjsLib;
+      lib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER;
+      resolve(lib);
+    };
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+  return pdfjsPromise;
+}
 
 async function extractPdfText(file: File): Promise<string> {
+  const pdfjsLib = await loadPdfjs();
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
   let text = '';
