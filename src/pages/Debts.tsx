@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
+import pdfjsWorker from 'pdfjs-dist/build/pdf.worker?url';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -28,7 +29,7 @@ import { parseSplitwise, type SplitwiseRow } from '@/lib/importers/splitwisePars
 import { inferCategoryName } from '@/hooks/useRuleSuggestions';
 import { useImportLog } from '@/hooks/useImportLog';
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.js`;
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 async function extractPdfText(file: File): Promise<string> {
   const ab = await file.arrayBuffer();
