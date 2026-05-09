@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Upload, CheckCircle2, X } from 'lucide-react';
+import { Upload, CheckCircle2, X, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -394,14 +394,40 @@ function SimpleDebtCard({ account, onTransfer }: { account: any; onTransfer: () 
 
 const STORAGE_KEY = 'settlement_defaults';
 
+function formatARS(n: number): string {
+  return n ? Math.round(n).toLocaleString('es-AR') : '';
+}
+
+function parseARSInput(v: string): number {
+  return parseFloat(v.replace(/\./g, '').replace(',', '.')) || 0;
+}
+
+const NUMERIC_INPUT_CLS = '[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none';
+
+interface ExtraItem {
+  id: string;
+  label: string;
+  amountARS: number;
+  categoryName: string;
+  emoji: string;
+}
+
 interface SettlementItem {
   key: string;
   label: string;
+  emoji: string;
   amountARS: number;
   editable: boolean;
   labelEditable?: boolean;
   categoryName: string;
 }
+
+const ITEM_GROUPS: { label: string; items: string[] }[] = [
+  { label: '🏦 Tarjetas', items: ['visa_ciudad', 'visa_santander', 'amex'] },
+  { label: '🏠 Casa', items: ['expensas'] },
+  { label: '🚗 Auto', items: ['prestamo', 'cochera', 'patente', 'multa'] },
+  { label: '❤️ Salud', items: ['obra_social'] },
+];
 
 function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
   const { data: accounts } = useAccountBalances();
@@ -423,6 +449,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
   const [processing, setProcessing] = useState(false);
 
   const [items, setItems] = useState<SettlementItem[]>([]);
+  const [extraItems, setExtraItems] = useState<ExtraItem[]>([]);
   const [tcBlue, setTcBlue] = useState(defaultBlueRate);
   const [usdAPagar, setUsdAPagar] = useState(0);
   const [submitting, setSubmitting] = useState(false);
@@ -434,6 +461,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
       setStep(1);
       setIebraFile(null); setKollikerFile(null); setSantFile(null);
       setBcTotalARS(0); setSantTotalARS(0); setVisaCiudadARS(0); setObSocARS(0);
+      setExtraItems([]);
     }
   }, [open]);
 
@@ -442,22 +470,31 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
     let saved: any = {};
     try { saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch {}
     setItems([
-      { key: 'visa_ciudad',    label: 'VISA Ciudad',       amountARS: visaCiudadARS || bcTotalARS, editable: (visaCiudadARS || bcTotalARS) === 0, categoryName: 'Casa' },
-      { key: 'visa_santander', label: 'VISA Santander',    amountARS: santTotalARS || saved.visa_santander || 0, editable: santTotalARS === 0, categoryName: 'Casa' },
-      { key: 'amex',           label: 'AMEX Santander',    amountARS: saved.amex || 0,        editable: true, categoryName: 'Casa' },
-      { key: 'prestamo',       label: 'Préstamo + Seguro', amountARS: saved.prestamo || 0,    editable: true, categoryName: 'Auto' },
-      { key: 'obra_social',    label: 'Obra Social',       amountARS: obSocARS || saved.obra_social || 0, editable: true, categoryName: 'Salud' },
-      { key: 'expensas',       label: 'Expensas',          amountARS: saved.expensas || 0,    editable: true, categoryName: 'Casa' },
-      { key: 'cochera',        label: 'Cochera + Lavado',  amountARS: saved.cochera || 0,     editable: true, categoryName: 'Auto' },
-      { key: 'patente',        label: 'Patente',           amountARS: saved.patente || 0,     editable: true, categoryName: 'Auto' },
-      { key: 'multa',          label: 'Multa',             amountARS: saved.multa || 0,       editable: true, categoryName: 'Auto' },
-      { key: 'otro1',          label: saved.otro1_label || 'Otro',   amountARS: 0, editable: true, labelEditable: true, categoryName: 'Casa' },
-      { key: 'otro2',          label: saved.otro2_label || 'Otro 2', amountARS: 0, editable: true, labelEditable: true, categoryName: 'Casa' },
+      { key: 'visa_ciudad',    label: 'VISA Ciudad',       emoji: '🏦', amountARS: visaCiudadARS || bcTotalARS, editable: (visaCiudadARS || bcTotalARS) === 0, categoryName: 'Casa' },
+      { key: 'visa_santander', label: 'VISA Santander',    emoji: '🏦', amountARS: santTotalARS || saved.visa_santander || 0, editable: santTotalARS === 0, categoryName: 'Casa' },
+      { key: 'amex',           label: 'AMEX Santander',    emoji: '💳', amountARS: saved.amex || 0,        editable: true, categoryName: 'Casa' },
+      { key: 'expensas',       label: 'Expensas',          emoji: '🏠', amountARS: saved.expensas || 0,    editable: true, categoryName: 'Casa' },
+      { key: 'prestamo',       label: 'Préstamo + Seguro', emoji: '🚗', amountARS: saved.prestamo || 0,    editable: true, categoryName: 'Auto' },
+      { key: 'cochera',        label: 'Cochera + Lavado',  emoji: '🅿️', amountARS: saved.cochera || 0,     editable: true, categoryName: 'Auto' },
+      { key: 'patente',        label: 'Patente',           emoji: '📋', amountARS: saved.patente || 0,     editable: true, categoryName: 'Auto' },
+      { key: 'multa',          label: 'Multa',             emoji: '⚠️', amountARS: saved.multa || 0,       editable: true, categoryName: 'Auto' },
+      { key: 'obra_social',    label: 'Obra Social',       emoji: '❤️', amountARS: obSocARS || saved.obra_social || 0, editable: true, categoryName: 'Salud' },
     ]);
+    if (Array.isArray(saved.extras)) {
+      setExtraItems(saved.extras.map((e: any) => ({
+        id: crypto.randomUUID(),
+        label: e.label || '',
+        amountARS: 0,
+        categoryName: e.categoryName || 'Casa',
+        emoji: e.emoji || '📌',
+      })));
+    } else {
+      setExtraItems([]);
+    }
     setTcBlue(defaultBlueRate);
   }, [step, bcTotalARS, santTotalARS, visaCiudadARS, obSocARS, defaultBlueRate]);
 
-  const totalARS = items.reduce((s, i) => s + (i.amountARS || 0), 0);
+  const totalARS = items.reduce((s, i) => s + (i.amountARS || 0), 0) + extraItems.reduce((s, i) => s + (i.amountARS || 0), 0);
   const usdExacto = tcBlue > 0 ? totalARS / tcBlue : 0;
   useEffect(() => { setUsdAPagar(Math.round(usdExacto / 100) * 100); }, [usdExacto]);
   const vueltoARS = Math.max(0, usdAPagar * tcBlue - totalARS);
@@ -521,9 +558,15 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
         return;
       }
       const editableItems = items.filter((i) => i.editable && i.amountARS > 0);
+      const validExtras = extraItems.filter((e) => e.amountARS > 0 && e.label.trim());
       const fxArsUsd = arsToUsd || (tcBlue > 0 ? 1 / tcBlue : 0);
 
-      for (const item of editableItems) {
+      const allManualItems: { label: string; amountARS: number; categoryName: string }[] = [
+        ...editableItems.map((i) => ({ label: i.label, amountARS: i.amountARS, categoryName: i.categoryName })),
+        ...validExtras.map((e) => ({ label: e.label, amountARS: e.amountARS, categoryName: e.categoryName })),
+      ];
+
+      for (const item of allManualItems) {
         const cat = categories.find((c: any) => c.name === item.categoryName);
         await supabase.from('transactions').insert({
           user_id: user.id,
@@ -575,9 +618,10 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
       const defaults: Record<string, any> = {};
       items.filter((i) => i.editable).forEach((i) => {
         defaults[i.key] = i.amountARS;
-        if (i.key === 'otro1') defaults['otro1_label'] = i.label;
-        if (i.key === 'otro2') defaults['otro2_label'] = i.label;
       });
+      defaults.extras = extraItems
+        .filter((e) => e.label.trim())
+        .map((e) => ({ label: e.label, categoryName: e.categoryName, emoji: e.emoji }));
       localStorage.setItem(STORAGE_KEY, JSON.stringify(defaults));
 
       qc.invalidateQueries({ queryKey: ['transactions'] });
@@ -625,55 +669,123 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
             <p className="text-xs text-muted-foreground">
               BC: ${bcTotalARS.toLocaleString('es-AR', { maximumFractionDigits: 0 })} ARS detectados · Santander: ${santTotalARS.toLocaleString('es-AR', { maximumFractionDigits: 0 })} ARS detectados
             </p>
-            <div className="border rounded-lg overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="text-xs">Concepto</TableHead>
-                    <TableHead className="text-xs text-right">ARS</TableHead>
-                    <TableHead className="text-xs">Categoría</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {items.map((it) => (
-                    <TableRow key={it.key}>
-                      <TableCell className="text-xs">
-                        {it.labelEditable ? (
-                          <Input value={it.label} onChange={(e) => updateItem(it.key, { label: e.target.value })} className="h-7 text-xs" />
-                        ) : it.editable ? it.label : <span className="text-muted-foreground">🔒 {it.label}</span>}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {it.editable ? (
-                          <Input type="number" value={it.amountARS || ''} onChange={(e) => updateItem(it.key, { amountARS: parseFloat(e.target.value) || 0 })} className="h-7 text-xs text-right font-mono w-32 ml-auto" />
-                        ) : (
-                          <span className="text-xs font-mono text-muted-foreground">{it.amountARS.toLocaleString('es-AR', { maximumFractionDigits: 0 })}</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {it.editable ? (
-                          <Select value={it.categoryName} onValueChange={(v) => updateItem(it.key, { categoryName: v })}>
-                            <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              {(categories || []).map((c: any) => (<SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>))}
-                            </SelectContent>
-                          </Select>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">{it.categoryName}</span>
-                        )}
-                      </TableCell>
-                    </TableRow>
+            <div className="space-y-1">
+              {ITEM_GROUPS.map((group) => {
+                const groupItems = group.items
+                  .map((key) => items.find((it) => it.key === key))
+                  .filter((it): it is SettlementItem => !!it);
+                if (groupItems.length === 0) return null;
+                return (
+                  <div key={group.label}>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide py-2 border-b border-border/50">
+                      {group.label}
+                    </p>
+                    {groupItems.map((it) => {
+                      const autoFilled = !it.editable;
+                      return (
+                        <div key={it.key} className="flex items-center gap-3 py-2.5">
+                          <span className="text-base w-6 shrink-0">{it.emoji}</span>
+                          <span className={cn('text-sm flex-1 min-w-0 truncate', autoFilled ? 'text-foreground' : 'text-muted-foreground')}>
+                            {it.label}
+                            {autoFilled && <span className="ml-1 text-[10px] text-muted-foreground">🔒</span>}
+                          </span>
+                          {autoFilled ? (
+                            <span className="text-sm font-mono text-foreground w-32 text-right shrink-0">{formatARS(it.amountARS)}</span>
+                          ) : (
+                            <Input
+                              type="text"
+                              inputMode="numeric"
+                              value={formatARS(it.amountARS)}
+                              onChange={(e) => updateItem(it.key, { amountARS: parseARSInput(e.target.value) })}
+                              className={cn('w-32 text-right text-sm h-8 shrink-0', NUMERIC_INPUT_CLS)}
+                              placeholder="0"
+                            />
+                          )}
+                          {!autoFilled ? (
+                            <Select value={it.categoryName} onValueChange={(v) => updateItem(it.key, { categoryName: v })}>
+                              <SelectTrigger className="w-28 h-8 text-xs shrink-0"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                {(categories || []).map((c: any) => (<SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>))}
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <span className="text-xs text-muted-foreground w-28 shrink-0">{it.categoryName}</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+
+              {extraItems.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide py-2 border-b border-border/50">
+                    ➕ Otros
+                  </p>
+                  {extraItems.map((extra) => (
+                    <div key={extra.id} className="flex items-center gap-3 py-2.5">
+                      <span className="text-base w-6 shrink-0">📌</span>
+                      <Input
+                        value={extra.label}
+                        onChange={(e) => setExtraItems((prev) => prev.map((x) => x.id === extra.id ? { ...x, label: e.target.value } : x))}
+                        className="flex-1 min-w-0 text-sm h-8"
+                        placeholder="Concepto"
+                      />
+                      <Input
+                        type="text"
+                        inputMode="numeric"
+                        value={formatARS(extra.amountARS)}
+                        onChange={(e) => {
+                          const num = parseARSInput(e.target.value);
+                          setExtraItems((prev) => prev.map((x) => x.id === extra.id ? { ...x, amountARS: num } : x));
+                        }}
+                        className={cn('w-28 text-right text-sm h-8 shrink-0', NUMERIC_INPUT_CLS)}
+                        placeholder="0"
+                      />
+                      <Select
+                        value={extra.categoryName}
+                        onValueChange={(v) => setExtraItems((prev) => prev.map((x) => x.id === extra.id ? { ...x, categoryName: v } : x))}
+                      >
+                        <SelectTrigger className="w-28 h-8 text-xs shrink-0"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {(categories || []).map((c: any) => (<SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>))}
+                        </SelectContent>
+                      </Select>
+                      <button
+                        type="button"
+                        onClick={() => setExtraItems((prev) => prev.filter((x) => x.id !== extra.id))}
+                        className="text-muted-foreground hover:text-destructive shrink-0"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   ))}
-                </TableBody>
-              </Table>
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setExtraItems((prev) => [...prev, {
+                  id: crypto.randomUUID(),
+                  label: '',
+                  amountARS: 0,
+                  categoryName: 'Casa',
+                  emoji: '📌',
+                }])}
+                className="flex items-center gap-2 text-sm text-primary hover:text-primary/80 py-2 w-full"
+              >
+                <Plus className="h-4 w-4" /> Agregar concepto
+              </button>
             </div>
             <div className="space-y-2 text-sm">
               <div className="flex items-center justify-between"><span className="text-muted-foreground">Total ARS:</span><span className="font-mono">${totalARS.toLocaleString('es-AR', { maximumFractionDigits: 0 })}</span></div>
               <div className="flex items-center justify-between gap-3"><span className="text-muted-foreground">TC Blue:</span>
-                <Input type="number" value={tcBlue} onChange={(e) => setTcBlue(parseFloat(e.target.value) || 0)} className="h-7 text-xs text-right font-mono w-32" />
+                <Input type="number" value={tcBlue} onChange={(e) => setTcBlue(parseFloat(e.target.value) || 0)} className={cn('h-7 text-xs text-right font-mono w-32', NUMERIC_INPUT_CLS)} />
               </div>
               <div className="border-t pt-2 flex items-center justify-between"><span className="text-muted-foreground">USD exacto:</span><span className="font-mono">${usdExacto.toFixed(2)}</span></div>
               <div className="flex items-center justify-between gap-3"><span className="text-muted-foreground">USD a pagar:</span>
-                <Input type="number" value={usdAPagar} onChange={(e) => setUsdAPagar(parseFloat(e.target.value) || 0)} className="h-7 text-xs text-right font-mono w-32" />
+                <Input type="number" value={usdAPagar} onChange={(e) => setUsdAPagar(parseFloat(e.target.value) || 0)} className={cn('h-7 text-xs text-right font-mono w-32', NUMERIC_INPUT_CLS)} />
               </div>
               <div className="border-t pt-2 flex items-center justify-between text-success"><span>Vuelto ARS:</span><span className="font-mono">+${vueltoARS.toLocaleString('es-AR', { maximumFractionDigits: 0 })}</span></div>
             </div>
@@ -735,17 +847,11 @@ function FileSlot({ label, file, onChange }: { label: string; file: File | null;
     <div className="overflow-hidden">
       <Label className="text-xs">{label}</Label>
       {file ? (
-        <div className="mt-1 flex items-center gap-2 rounded-md border p-2 overflow-hidden">
+        <div className="mt-1 flex items-center gap-2 w-full overflow-hidden rounded-lg border border-border bg-muted/30 px-3 py-2">
           <CheckCircle2 className="h-4 w-4 text-success shrink-0" />
-          <span className="text-xs text-foreground truncate min-w-0 flex-1">
-            {file.name}
-          </span>
-          <button
-            type="button"
-            onClick={() => onChange(null)}
-            className="shrink-0 text-muted-foreground hover:text-foreground"
-          >
-            <X className="h-3 w-3" />
+          <span className="text-xs truncate flex-1 min-w-0">{file.name}</span>
+          <button type="button" onClick={() => onChange(null)} className="shrink-0 ml-auto">
+            <X className="h-3.5 w-3.5 text-muted-foreground" />
           </button>
         </div>
       ) : (
