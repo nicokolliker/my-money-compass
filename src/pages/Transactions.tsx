@@ -30,39 +30,44 @@ import { es } from 'date-fns/locale';
 import { parseMercadoPago } from '@/lib/importers/mercadoPagoParser';
 import { parseArqStatements } from '@/lib/importers/arqParser';
 
-const PDFJS_VERSION = '3.11.174';
-const PDFJS_SRC = `https://unpkg.com/pdfjs-dist@${PDFJS_VERSION}/build/pdf.min.js`;
-const PDFJS_WORKER = `https://unpkg.com/pdfjs-dist@${PDFJS_VERSION}/build/pdf.worker.min.js`;
-
-let pdfjsPromise: Promise<any> | null = null;
-function loadPdfjs(): Promise<any> {
-  if ((window as any).pdfjsLib) return Promise.resolve((window as any).pdfjsLib);
-  if (pdfjsPromise) return pdfjsPromise;
-  pdfjsPromise = new Promise((resolve, reject) => {
-    const script = document.createElement('script');
-    script.src = PDFJS_SRC;
-    script.onload = () => {
-      const lib = (window as any).pdfjsLib;
-      lib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER;
-      resolve(lib);
-    };
-    script.onerror = reject;
-    document.head.appendChild(script);
-  });
-  return pdfjsPromise;
-}
-
 async function extractPdfText(file: File): Promise<string> {
-  const pdfjsLib = await loadPdfjs();
-  const arrayBuffer = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-  let text = '';
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const page = await pdf.getPage(i);
-    const content = await page.getTextContent();
-    text += content.items.map((it: any) => it.str).join(' ') + '\n';
-  }
-  return text;
+  return new Promise(async (resolve, reject) => {
+    try {
+      // Limpiar instancia previa si tiene versión incorrecta
+      if ((window as any).pdfjsLib?.version && (window as any).pdfjsLib.version !== '3.11.174') {
+        delete (window as any).pdfjsLib;
+      }
+
+      if (!(window as any).pdfjsLib) {
+        await new Promise<void>((res, rej) => {
+          const existing = document.querySelector('script[data-pdfjs]');
+          if (existing) { res(); return; }
+          const script = document.createElement('script');
+          script.setAttribute('data-pdfjs', '3.11.174');
+          script.src = 'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.min.js';
+          script.onload = () => res();
+          script.onerror = () => rej(new Error('No se pudo cargar pdf.js'));
+          document.head.appendChild(script);
+        });
+      }
+
+      const pdfjs = (window as any).pdfjsLib;
+      pdfjs.GlobalWorkerOptions.workerSrc =
+        'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjs.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
+      let text = '';
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        text += content.items.map((item: any) => item.str).join(' ') + '\n';
+      }
+      resolve(text);
+    } catch (e) {
+      reject(e);
+    }
+  });
 }
 
 const MONTH_LABELS_FULL = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
