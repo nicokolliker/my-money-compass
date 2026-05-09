@@ -433,7 +433,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
     if (!open) {
       setStep(1);
       setIebraFile(null); setKollikerFile(null); setSantFile(null);
-      setBcTotalARS(0); setSantTotalARS(0);
+      setBcTotalARS(0); setSantTotalARS(0); setVisaCiudadARS(0); setObSocARS(0);
     }
   }, [open]);
 
