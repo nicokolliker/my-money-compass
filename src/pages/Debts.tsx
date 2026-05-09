@@ -394,14 +394,40 @@ function SimpleDebtCard({ account, onTransfer }: { account: any; onTransfer: () 
 
 const STORAGE_KEY = 'settlement_defaults';
 
+function formatARS(n: number): string {
+  return n ? Math.round(n).toLocaleString('es-AR') : '';
+}
+
+function parseARSInput(v: string): number {
+  return parseFloat(v.replace(/\./g, '').replace(',', '.')) || 0;
+}
+
+const NUMERIC_INPUT_CLS = '[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none';
+
+interface ExtraItem {
+  id: string;
+  label: string;
+  amountARS: number;
+  categoryName: string;
+  emoji: string;
+}
+
 interface SettlementItem {
   key: string;
   label: string;
+  emoji: string;
   amountARS: number;
   editable: boolean;
   labelEditable?: boolean;
   categoryName: string;
 }
+
+const ITEM_GROUPS: { label: string; items: string[] }[] = [
+  { label: '🏦 Tarjetas', items: ['visa_ciudad', 'visa_santander', 'amex'] },
+  { label: '🏠 Casa', items: ['expensas'] },
+  { label: '🚗 Auto', items: ['prestamo', 'cochera', 'patente', 'multa'] },
+  { label: '❤️ Salud', items: ['obra_social'] },
+];
 
 function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
   const { data: accounts } = useAccountBalances();
