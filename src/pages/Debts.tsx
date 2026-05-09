@@ -395,11 +395,12 @@ function SimpleDebtCard({ account, onTransfer }: { account: any; onTransfer: () 
 const STORAGE_KEY = 'settlement_defaults';
 
 function formatARS(n: number): string {
-  return n ? Math.round(n).toLocaleString('es-AR') : '';
+  if (!n && n !== 0) return '';
+  return '$' + Math.round(n).toLocaleString('es-AR');
 }
 
 function parseARSInput(v: string): number {
-  return parseFloat(v.replace(/\./g, '').replace(',', '.')) || 0;
+  return parseFloat(v.replace(/[$\s]/g, '').replace(/\./g, '').replace(',', '.')) || 0;
 }
 
 const NUMERIC_INPUT_CLS = '[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none';
@@ -638,7 +639,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto overflow-x-hidden">
         <DialogHeader>
           <DialogTitle>
             {step === 1 && 'Liquidar con el viejo — Subir PDFs'}
@@ -667,7 +668,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
         {step === 2 && (
           <div className="space-y-4">
             <p className="text-xs text-muted-foreground">
-              BC: ${bcTotalARS.toLocaleString('es-AR', { maximumFractionDigits: 0 })} ARS detectados · Santander: ${santTotalARS.toLocaleString('es-AR', { maximumFractionDigits: 0 })} ARS detectados
+              BC: {formatARS(bcTotalARS)} ARS detectados · Santander: {formatARS(santTotalARS)} ARS detectados
             </p>
             <div className="space-y-1">
               {ITEM_GROUPS.map((group) => {
@@ -779,7 +780,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
               </button>
             </div>
             <div className="space-y-2 text-sm">
-              <div className="flex items-center justify-between"><span className="text-muted-foreground">Total ARS:</span><span className="font-mono">${totalARS.toLocaleString('es-AR', { maximumFractionDigits: 0 })}</span></div>
+              <div className="flex items-center justify-between"><span className="text-muted-foreground">Total ARS:</span><span className="font-mono">{formatARS(totalARS)}</span></div>
               <div className="flex items-center justify-between gap-3"><span className="text-muted-foreground">TC Blue:</span>
                 <Input type="number" value={tcBlue} onChange={(e) => setTcBlue(parseFloat(e.target.value) || 0)} className={cn('h-7 text-xs text-right font-mono w-32', NUMERIC_INPUT_CLS)} />
               </div>
@@ -787,7 +788,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
               <div className="flex items-center justify-between gap-3"><span className="text-muted-foreground">USD a pagar:</span>
                 <Input type="number" value={usdAPagar} onChange={(e) => setUsdAPagar(parseFloat(e.target.value) || 0)} className={cn('h-7 text-xs text-right font-mono w-32', NUMERIC_INPUT_CLS)} />
               </div>
-              <div className="border-t pt-2 flex items-center justify-between text-success"><span>Vuelto ARS:</span><span className="font-mono">+${vueltoARS.toLocaleString('es-AR', { maximumFractionDigits: 0 })}</span></div>
+              <div className="border-t pt-2 flex items-center justify-between text-success"><span>Vuelto ARS:</span><span className="font-mono">+{formatARS(vueltoARS)}</span></div>
             </div>
             <div className="flex justify-between">
               <Button variant="outline" onClick={() => setStep(1)}>← Atrás</Button>
@@ -802,7 +803,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
               <p className="font-medium mb-1">📋 Ítems contra "Tarjeta viejo":</p>
               <ul className="space-y-0.5 text-xs text-muted-foreground">
                 {items.filter((i) => i.editable && i.amountARS > 0).map((i) => (
-                  <li key={i.key}>• {i.label} ${i.amountARS.toLocaleString('es-AR', { maximumFractionDigits: 0 })} ARS → {i.categoryName}</li>
+                  <li key={i.key}>• {i.label} {formatARS(i.amountARS)} ARS → {i.categoryName}</li>
                 ))}
               </ul>
             </div>
@@ -813,7 +814,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
             {vueltoARS > 0 && (
               <div>
                 <p className="font-medium mb-1">💰 Vuelto esperado:</p>
-                <p className="text-xs text-muted-foreground">• Mercado Pago +ARS {vueltoARS.toLocaleString('es-AR', { maximumFractionDigits: 0 })}</p>
+                <p className="text-xs text-muted-foreground">• Mercado Pago +{formatARS(vueltoARS)} ARS</p>
               </div>
             )}
             <div className="flex justify-between pt-2">
@@ -830,7 +831,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
             <div className="rounded-md border p-4 bg-success/10 text-sm space-y-1">
               <p className="font-medium">✅ Liquidación registrada</p>
               <p>Pagaste ${resultUsd.toLocaleString()} USD al viejo</p>
-              {resultVuelto > 0 && <p>ARS {resultVuelto.toLocaleString('es-AR')} pendientes de ingresar a Mercado Pago</p>}
+              {resultVuelto > 0 && <p>{formatARS(resultVuelto)} ARS pendientes de ingresar a Mercado Pago</p>}
             </div>
             <div className="flex justify-end">
               <Button onClick={() => onOpenChange(false)}>Cerrar</Button>
@@ -847,10 +848,10 @@ function FileSlot({ label, file, onChange }: { label: string; file: File | null;
     <div className="overflow-hidden">
       <Label className="text-xs">{label}</Label>
       {file ? (
-        <div className="mt-1 flex items-center gap-2 w-full overflow-hidden rounded-lg border border-border bg-muted/30 px-3 py-2">
+        <div className="mt-1 flex items-center gap-2 w-full max-w-full overflow-hidden rounded-lg border border-border bg-muted/30 px-3 py-2">
           <CheckCircle2 className="h-4 w-4 text-success shrink-0" />
-          <span className="text-xs truncate flex-1 min-w-0">{file.name}</span>
-          <button type="button" onClick={() => onChange(null)} className="shrink-0 ml-auto">
+          <span className="text-xs truncate min-w-0 flex-1">{file.name}</span>
+          <button type="button" onClick={() => onChange(null)} className="shrink-0">
             <X className="h-3.5 w-3.5 text-muted-foreground" />
           </button>
         </div>
