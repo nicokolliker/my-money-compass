@@ -814,7 +814,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
             {vueltoARS > 0 && (
               <div>
                 <p className="font-medium mb-1">💰 Vuelto esperado:</p>
-                <p className="text-xs text-muted-foreground">• Mercado Pago +ARS {vueltoARS.toLocaleString('es-AR', { maximumFractionDigits: 0 })}</p>
+                <p className="text-xs text-muted-foreground">• Mercado Pago +{formatARS(vueltoARS)} ARS</p>
               </div>
             )}
             <div className="flex justify-between pt-2">
