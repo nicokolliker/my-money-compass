@@ -20,11 +20,38 @@ function parseDate(raw: string): string {
 }
 
 function extractCardBlock(pdfText: string, cardNumber: string): string | null {
-  const startIdx = pdfText.search(new RegExp(`Tarjeta\\s+${cardNumber}`, 'i'));
-  if (startIdx < 0) return null;
-  const tail = pdfText.slice(startIdx);
-  const endMatch = tail.slice(20).search(/Tarjeta\s+\d{4}|SALDO ACTUAL/i);
-  return endMatch >= 0 ? tail.slice(0, 20 + endMatch) : tail;
+  // En BC Ciudad, las transacciones de la tarjeta N aparecen DESPUÉS del
+  // "Total Consumos" de la tarjeta anterior y ANTES del "Total Consumos" de la tarjeta N.
+
+  // Encontrar la línea de cierre de esta tarjeta
+  const closingRegex = new RegExp(`Tarjeta\\s+${cardNumber}\\s+Total\\s+Consumos`, 'i');
+  const closingIdx = pdfText.search(closingRegex);
+  if (closingIdx < 0) return null;
+
+  // En el texto antes del cierre, buscar la última línea "Tarjeta XXXX Total Consumos"
+  const textBefore = pdfText.slice(0, closingIdx);
+  const prevTotalRegex = /Tarjeta\s+\d{4}\s+Total\s+Consumos[^\n]*\n/gi;
+  let lastMatch: RegExpExecArray | null = null;
+  let m: RegExpExecArray | null;
+  while ((m = prevTotalRegex.exec(textBefore)) !== null) {
+    lastMatch = m;
+  }
+
+  const startIdx = lastMatch ? lastMatch.index + lastMatch[0].length : 0;
+  return pdfText.slice(startIdx, closingIdx);
+}
+
+export function extractCardTotal(pdfText: string, cardNumber: string): { ars: number; usd: number } {
+  const regex = new RegExp(
+    `Tarjeta\\s+${cardNumber}\\s+Total\\s+Consumos[^\\d]*(\\d[\\d.,]+)(?:\\s+(\\d[\\d.,]+))?`,
+    'i',
+  );
+  const m = pdfText.match(regex);
+  if (!m) return { ars: 0, usd: 0 };
+  return {
+    ars: parseArsAmount(m[1]),
+    usd: m[2] ? parseArsAmount(m[2]) : 0,
+  };
 }
 
 function parseBlock(
