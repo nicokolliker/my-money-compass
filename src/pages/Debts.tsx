@@ -468,6 +468,8 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
       setIebraFile(null); setKollikerFile(null); setSantFile(null);
       setBcTotalARS(0); setSantTotalARS(0); setVisaCiudadARS(0); setObSocARS(0);
       setExtraItems([]);
+    } else if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debugLongName') === '1') {
+      setIebraFile(new File(['x'], 'extracto-banco-ciudad-iebra-resumen-cuenta-tarjeta-credito-1689-mayo-2026-larguisimo-archivo.pdf', { type: 'application/pdf' }));
     }
   }, [open]);
 
