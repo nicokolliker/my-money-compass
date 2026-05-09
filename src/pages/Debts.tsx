@@ -79,12 +79,30 @@ export default function DebtsPage() {
         />
       )}
 
-      {splitwiseAccount && (
+      {splitwiseAccount ? (
         <SplitwiseDebtCard
           account={splitwiseAccount}
           importLog={importLog || []}
           onOpen={() => setOpenSw(true)}
         />
+      ) : (
+        <Card className="rounded-2xl">
+          <CardContent className="p-5">
+            <div className="flex items-center gap-3 mb-3">
+              <MerchantLogo name="Splitwise" domain="splitwise.com" size={36} />
+              <div>
+                <p className="text-sm font-semibold">Splitwise</p>
+                <p className="text-xs text-muted-foreground">Sin actividad aún</p>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground mb-3">
+              Cargá tu primer CSV para empezar a trackear los gastos del grupo.
+            </p>
+            <Button variant="outline" className="w-full" onClick={() => setOpenSw(true)}>
+              Cargar CSV de Splitwise →
+            </Button>
+          </CardContent>
+        </Card>
       )}
 
       {otherDebts.map((a: any) => (
