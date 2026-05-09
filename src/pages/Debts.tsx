@@ -21,7 +21,7 @@ import { useBlueDollarRate } from '@/hooks/useBlueDollar';
 import { useCreateTransfer } from '@/hooks/useTransactions';
 import { MerchantLogo } from '@/components/MerchantLogo';
 import { formatUSD } from '@/lib/constants';
-import { parseBancoCiudad, parseBancoCiudadObSoc } from '@/lib/importers/bancoCiudadParser';
+import { parseBancoCiudad, parseBancoCiudadObSoc, extractCardTotal } from '@/lib/importers/bancoCiudadParser';
 import { parseSantander } from '@/lib/importers/santanderParser';
 import { parseSplitwise, type SplitwiseRow } from '@/lib/importers/splitwiseParser';
 import { inferCategoryName } from '@/hooks/useRuleSuggestions';
