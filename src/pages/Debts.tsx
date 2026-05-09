@@ -400,7 +400,7 @@ function formatARS(n: number): string {
 }
 
 function parseARSInput(v: string): number {
-  return parseFloat(v.replace(/\./g, '').replace(',', '.')) || 0;
+  return parseFloat(v.replace(/[$\s]/g, '').replace(/\./g, '').replace(',', '.')) || 0;
 }
 
 const NUMERIC_INPUT_CLS = '[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none';
