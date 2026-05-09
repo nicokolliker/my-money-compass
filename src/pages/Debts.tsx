@@ -668,10 +668,10 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg w-full max-h-[90vh] overflow-y-auto overflow-x-hidden">
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="capitalize">
             {step === 1 && 'Liquidar con el viejo — Subir PDFs'}
-            {step === 2 && 'Liquidar con el viejo — Completar ítems'}
-            {step === 3 && 'Liquidar con el viejo — Confirmar'}
+            {step === 2 && `Liquidar ${format(new Date(settlementMonth + '-01T00:00:00'), 'MMMM yyyy', { locale: es })} — Completar ítems`}
+            {step === 3 && `Liquidar ${format(new Date(settlementMonth + '-01T00:00:00'), 'MMMM yyyy', { locale: es })} — Confirmar`}
             {step === 4 && 'Liquidación registrada'}
           </DialogTitle>
         </DialogHeader>
