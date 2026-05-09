@@ -815,12 +815,12 @@ function SplitwiseSettlementWizard({ open, onOpenChange }: { open: boolean; onOp
           category_id: catId,
         });
       }
-      if (splitwiseAcc) {
+      if (splitwiseAccId) {
         for (const r of receivables) {
           const catId = r.categoryName ? (categories?.find((c: any) => c.name === r.categoryName)?.id || null) : null;
           payload.push({
             user_id: user.id,
-            account_id: splitwiseAcc.id,
+            account_id: splitwiseAccId,
             date: r.date,
             description: r.description,
             amount: -r.amountUSD,
