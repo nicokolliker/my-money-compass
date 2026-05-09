@@ -566,8 +566,16 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
-      const today = new Date().toISOString().split('T')[0];
-      const monthLabel = format(new Date(), 'MMMM yyyy', { locale: es });
+      const currentYM = format(new Date(), 'yyyy-MM');
+      const isCurrentMonth = settlementMonth === currentYM;
+      // Use today's date for current month, otherwise last day of selected month
+      const settlementDate = (() => {
+        if (isCurrentMonth) return new Date().toISOString().split('T')[0];
+        const [y, m] = settlementMonth.split('-').map(Number);
+        const lastDay = new Date(y, m, 0).getDate();
+        return `${settlementMonth}-${String(lastDay).padStart(2, '0')}`;
+      })();
+      const monthLabel = format(new Date(settlementMonth + '-01T00:00:00'), 'MMMM yyyy', { locale: es });
 
       const tarjetaViejoAcc = accounts.find((a: any) => /viejo|tarjeta.*viejo/i.test(a.name));
       const cashAcc = accounts.find((a: any) => /cash/i.test(a.name) && a.currency === 'USD');
