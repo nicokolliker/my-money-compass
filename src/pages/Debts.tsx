@@ -679,6 +679,17 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
         {step === 1 && (
           <>
             <div className="space-y-4 min-w-0 overflow-hidden">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Mes a liquidar</Label>
+                <Select value={settlementMonth} onValueChange={setSettlementMonth}>
+                  <SelectTrigger className="w-full capitalize"><SelectValue /></SelectTrigger>
+                  <SelectContent className="max-h-72">
+                    {monthOptions.map((m) => (
+                      <SelectItem key={m.ym} value={m.ym} className="capitalize">{m.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <p className="text-xs text-muted-foreground">
                 Subí los PDFs disponibles. Los faltantes podés cargarlos manualmente en el siguiente paso.
               </p>
