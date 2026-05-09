@@ -622,7 +622,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
         type: 'expense' as const,
         notes: JSON.stringify({
           settlement: true,
-          month: format(new Date(), 'yyyy-MM'),
+          month: settlementMonth,
           breakdown: Object.fromEntries(items.filter((i) => i.amountARS > 0).map((i) => [i.key, i.amountARS])),
           tcBlue, totalARS, usdPagado: usdAPagar, vueltoARS,
         }),
