@@ -455,7 +455,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
       { key: 'otro2',          label: saved.otro2_label || 'Otro 2', amountARS: 0, editable: true, labelEditable: true, categoryName: 'Casa' },
     ]);
     setTcBlue(defaultBlueRate);
-  }, [step, bcTotalARS, santTotalARS, defaultBlueRate]);
+  }, [step, bcTotalARS, santTotalARS, visaCiudadARS, obSocARS, defaultBlueRate]);
 
   const totalARS = items.reduce((s, i) => s + (i.amountARS || 0), 0);
   const usdExacto = tcBlue > 0 ? totalARS / tcBlue : 0;
