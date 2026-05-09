@@ -33,11 +33,14 @@ export const ASSET_TYPES = ['bank', 'digital_wallet', 'cash', 'receivable', 'inv
 export const CURRENCIES = ['USD', 'ARS', 'EUR', 'GBP', 'BRL', 'MXN'];
 
 export const formatCurrency = (amount: number, currency = 'USD'): string => {
+  if (currency === 'ARS') {
+    return '$' + new Intl.NumberFormat('es-AR', { maximumFractionDigits: 0 }).format(amount);
+  }
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency,
-    minimumFractionDigits: currency === 'ARS' ? 0 : 2,
-    maximumFractionDigits: currency === 'ARS' ? 0 : 2,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(amount);
 };
 
