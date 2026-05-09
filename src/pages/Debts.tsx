@@ -449,6 +449,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
   const [processing, setProcessing] = useState(false);
 
   const [items, setItems] = useState<SettlementItem[]>([]);
+  const [extraItems, setExtraItems] = useState<ExtraItem[]>([]);
   const [tcBlue, setTcBlue] = useState(defaultBlueRate);
   const [usdAPagar, setUsdAPagar] = useState(0);
   const [submitting, setSubmitting] = useState(false);
@@ -460,6 +461,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
       setStep(1);
       setIebraFile(null); setKollikerFile(null); setSantFile(null);
       setBcTotalARS(0); setSantTotalARS(0); setVisaCiudadARS(0); setObSocARS(0);
+      setExtraItems([]);
     }
   }, [open]);
 
@@ -468,22 +470,31 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
     let saved: any = {};
     try { saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch {}
     setItems([
-      { key: 'visa_ciudad',    label: 'VISA Ciudad',       amountARS: visaCiudadARS || bcTotalARS, editable: (visaCiudadARS || bcTotalARS) === 0, categoryName: 'Casa' },
-      { key: 'visa_santander', label: 'VISA Santander',    amountARS: santTotalARS || saved.visa_santander || 0, editable: santTotalARS === 0, categoryName: 'Casa' },
-      { key: 'amex',           label: 'AMEX Santander',    amountARS: saved.amex || 0,        editable: true, categoryName: 'Casa' },
-      { key: 'prestamo',       label: 'Préstamo + Seguro', amountARS: saved.prestamo || 0,    editable: true, categoryName: 'Auto' },
-      { key: 'obra_social',    label: 'Obra Social',       amountARS: obSocARS || saved.obra_social || 0, editable: true, categoryName: 'Salud' },
-      { key: 'expensas',       label: 'Expensas',          amountARS: saved.expensas || 0,    editable: true, categoryName: 'Casa' },
-      { key: 'cochera',        label: 'Cochera + Lavado',  amountARS: saved.cochera || 0,     editable: true, categoryName: 'Auto' },
-      { key: 'patente',        label: 'Patente',           amountARS: saved.patente || 0,     editable: true, categoryName: 'Auto' },
-      { key: 'multa',          label: 'Multa',             amountARS: saved.multa || 0,       editable: true, categoryName: 'Auto' },
-      { key: 'otro1',          label: saved.otro1_label || 'Otro',   amountARS: 0, editable: true, labelEditable: true, categoryName: 'Casa' },
-      { key: 'otro2',          label: saved.otro2_label || 'Otro 2', amountARS: 0, editable: true, labelEditable: true, categoryName: 'Casa' },
+      { key: 'visa_ciudad',    label: 'VISA Ciudad',       emoji: '🏦', amountARS: visaCiudadARS || bcTotalARS, editable: (visaCiudadARS || bcTotalARS) === 0, categoryName: 'Casa' },
+      { key: 'visa_santander', label: 'VISA Santander',    emoji: '🏦', amountARS: santTotalARS || saved.visa_santander || 0, editable: santTotalARS === 0, categoryName: 'Casa' },
+      { key: 'amex',           label: 'AMEX Santander',    emoji: '💳', amountARS: saved.amex || 0,        editable: true, categoryName: 'Casa' },
+      { key: 'expensas',       label: 'Expensas',          emoji: '🏠', amountARS: saved.expensas || 0,    editable: true, categoryName: 'Casa' },
+      { key: 'prestamo',       label: 'Préstamo + Seguro', emoji: '🚗', amountARS: saved.prestamo || 0,    editable: true, categoryName: 'Auto' },
+      { key: 'cochera',        label: 'Cochera + Lavado',  emoji: '🅿️', amountARS: saved.cochera || 0,     editable: true, categoryName: 'Auto' },
+      { key: 'patente',        label: 'Patente',           emoji: '📋', amountARS: saved.patente || 0,     editable: true, categoryName: 'Auto' },
+      { key: 'multa',          label: 'Multa',             emoji: '⚠️', amountARS: saved.multa || 0,       editable: true, categoryName: 'Auto' },
+      { key: 'obra_social',    label: 'Obra Social',       emoji: '❤️', amountARS: obSocARS || saved.obra_social || 0, editable: true, categoryName: 'Salud' },
     ]);
+    if (Array.isArray(saved.extras)) {
+      setExtraItems(saved.extras.map((e: any) => ({
+        id: crypto.randomUUID(),
+        label: e.label || '',
+        amountARS: 0,
+        categoryName: e.categoryName || 'Casa',
+        emoji: e.emoji || '📌',
+      })));
+    } else {
+      setExtraItems([]);
+    }
     setTcBlue(defaultBlueRate);
   }, [step, bcTotalARS, santTotalARS, visaCiudadARS, obSocARS, defaultBlueRate]);
 
-  const totalARS = items.reduce((s, i) => s + (i.amountARS || 0), 0);
+  const totalARS = items.reduce((s, i) => s + (i.amountARS || 0), 0) + extraItems.reduce((s, i) => s + (i.amountARS || 0), 0);
   const usdExacto = tcBlue > 0 ? totalARS / tcBlue : 0;
   useEffect(() => { setUsdAPagar(Math.round(usdExacto / 100) * 100); }, [usdExacto]);
   const vueltoARS = Math.max(0, usdAPagar * tcBlue - totalARS);
