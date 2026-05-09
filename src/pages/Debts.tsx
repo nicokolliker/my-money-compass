@@ -32,7 +32,7 @@ async function extractPdfText(file: File): Promise<string> {
   if (!(window as any).pdfjsLib) {
     await new Promise<void>((resolve, reject) => {
       const script = document.createElement('script');
-      script.src = 'https://unpkg.com/pdfjs-dist@4.4.168/build/pdf.min.js';
+      script.src = 'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.min.js';
       script.onload = () => resolve();
       script.onerror = () => reject(new Error('Failed to load pdfjs'));
       document.head.appendChild(script);
@@ -41,7 +41,7 @@ async function extractPdfText(file: File): Promise<string> {
 
   const pdfjsLib = (window as any).pdfjsLib;
   pdfjsLib.GlobalWorkerOptions.workerSrc =
-    'https://unpkg.com/pdfjs-dist@4.4.168/build/pdf.worker.min.js';
+    'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
 
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
@@ -714,10 +714,16 @@ function FileSlot({ label, file, onChange }: { label: string; file: File | null;
       {file ? (
         <div className="mt-1 flex items-center gap-2 rounded-md border p-2 overflow-hidden">
           <CheckCircle2 className="h-4 w-4 text-success shrink-0" />
-          <span className="text-xs text-foreground truncate max-w-[240px] block">
+          <span className="text-xs text-foreground truncate min-w-0 flex-1">
             {file.name}
           </span>
-          <Button size="sm" variant="ghost" onClick={() => onChange(null)}><X className="h-3 w-3" /></Button>
+          <button
+            type="button"
+            onClick={() => onChange(null)}
+            className="shrink-0 text-muted-foreground hover:text-foreground"
+          >
+            <X className="h-3 w-3" />
+          </button>
         </div>
       ) : (
         <label className="mt-1 flex items-center justify-center rounded-md border border-dashed p-3 cursor-pointer hover:bg-muted/50 text-xs text-muted-foreground gap-2">
