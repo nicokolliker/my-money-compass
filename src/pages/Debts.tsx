@@ -444,6 +444,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
   const defaultBlueRate = blueRate?.blue_avg ? Math.round(blueRate.blue_avg) : (arsToUsd > 0 ? Math.round(1 / arsToUsd) : 1390);
 
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+  const [settlementMonth, setSettlementMonth] = useState<string>(format(new Date(), 'yyyy-MM'));
   const [iebraFile, setIebraFile] = useState<File | null>(null);
   const [kollikerFile, setKollikerFile] = useState<File | null>(null);
   const [santFile, setSantFile] = useState<File | null>(null);
@@ -461,9 +462,23 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
   const [resultUsd, setResultUsd] = useState(0);
   const [resultVuelto, setResultVuelto] = useState(0);
 
+  const monthOptions = useMemo(() => {
+    const arr: { ym: string; label: string }[] = [];
+    const d = new Date();
+    d.setDate(1);
+    // 2 future months + current + 11 past
+    d.setMonth(d.getMonth() + 2);
+    for (let i = 0; i < 14; i++) {
+      arr.push({ ym: format(d, 'yyyy-MM'), label: format(d, 'MMMM yyyy', { locale: es }) });
+      d.setMonth(d.getMonth() - 1);
+    }
+    return arr;
+  }, []);
+
   useEffect(() => {
     if (!open) {
       setStep(1);
+      setSettlementMonth(format(new Date(), 'yyyy-MM'));
       setIebraFile(null); setKollikerFile(null); setSantFile(null);
       setBcTotalARS(0); setSantTotalARS(0); setVisaCiudadARS(0); setObSocARS(0);
       setExtraItems([]);
