@@ -22,7 +22,7 @@ async function extractPdfText(file: File): Promise<string> {
   if (!(window as any).pdfjsLib) {
     await new Promise<void>((resolve, reject) => {
       const script = document.createElement('script');
-      script.src = 'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.min.js';
+      script.src = 'https://unpkg.com/pdfjs-dist@4.4.168/build/pdf.min.js';
       script.onload = () => resolve();
       script.onerror = () => reject(new Error('Failed to load pdfjs'));
       document.head.appendChild(script);
@@ -31,7 +31,7 @@ async function extractPdfText(file: File): Promise<string> {
 
   const pdfjsLib = (window as any).pdfjsLib;
   pdfjsLib.GlobalWorkerOptions.workerSrc =
-    'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+    'https://unpkg.com/pdfjs-dist@4.4.168/build/pdf.worker.min.js';
 
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
