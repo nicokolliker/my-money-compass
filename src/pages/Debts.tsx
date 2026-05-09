@@ -781,7 +781,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
             <div className="space-y-2 text-sm">
               <div className="flex items-center justify-between"><span className="text-muted-foreground">Total ARS:</span><span className="font-mono">${totalARS.toLocaleString('es-AR', { maximumFractionDigits: 0 })}</span></div>
               <div className="flex items-center justify-between gap-3"><span className="text-muted-foreground">TC Blue:</span>
-                <Input type="number" value={tcBlue} onChange={(e) => setTcBlue(parseFloat(e.target.value) || 0)} className="h-7 text-xs text-right font-mono w-32" />
+                <Input type="number" value={tcBlue} onChange={(e) => setTcBlue(parseFloat(e.target.value) || 0)} className={cn('h-7 text-xs text-right font-mono w-32', NUMERIC_INPUT_CLS)} />
               </div>
               <div className="border-t pt-2 flex items-center justify-between"><span className="text-muted-foreground">USD exacto:</span><span className="font-mono">${usdExacto.toFixed(2)}</span></div>
               <div className="flex items-center justify-between gap-3"><span className="text-muted-foreground">USD a pagar:</span>
