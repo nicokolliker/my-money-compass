@@ -98,11 +98,14 @@ export default function DebtsPage() {
       </div>
 
       {viejoAccount && (
-        <ViejoDebtCard
-          account={viejoAccount}
-          importLog={importLog || []}
-          onOpen={() => setOpenViejo(true)}
-        />
+        <>
+          <ViejoDebtCard
+            account={viejoAccount}
+            importLog={importLog || []}
+            onOpen={() => setOpenViejo(true)}
+          />
+          <ViejoCycleHistory importLog={importLog || []} />
+        </>
       )}
 
       {splitwiseAccount ? (
