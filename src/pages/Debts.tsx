@@ -850,10 +850,21 @@ function FileSlot({ label, file, onChange }: { label: string; file: File | null;
     <div className="overflow-hidden">
       <Label className="text-xs">{label}</Label>
       {file ? (
-        <div className="mt-1 flex items-center gap-2 w-full max-w-full overflow-hidden rounded-lg border border-border bg-muted/30 px-3 py-2">
+        <div style={{ maxWidth: '100%' }} className="mt-1 flex items-center gap-2 overflow-hidden rounded-lg border border-border bg-muted/30 px-3 py-2">
           <CheckCircle2 className="h-4 w-4 text-success shrink-0" />
-          <span className="text-xs truncate min-w-0 flex-1">{file.name}</span>
-          <button type="button" onClick={() => onChange(null)} className="shrink-0">
+          <span
+            style={{
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              minWidth: 0,
+              flex: 1,
+            }}
+            className="text-xs"
+          >
+            {file.name}
+          </span>
+          <button type="button" onClick={() => onChange(null)} className="shrink-0 ml-1">
             <X className="h-3.5 w-3.5 text-muted-foreground" />
           </button>
         </div>
