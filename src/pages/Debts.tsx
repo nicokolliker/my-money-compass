@@ -847,7 +847,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
 
 function FileSlot({ label, file, onChange }: { label: string; file: File | null; onChange: (f: File | null) => void }) {
   return (
-    <div className="overflow-hidden">
+    <div className="overflow-hidden min-w-0 w-full" style={{ maxWidth: '100%' }}>
       <Label className="text-xs">{label}</Label>
       {file ? (
         <div style={{ maxWidth: '100%' }} className="mt-1 flex items-center gap-2 overflow-hidden rounded-lg border border-border bg-muted/30 px-3 py-2">
