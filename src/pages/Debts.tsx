@@ -558,9 +558,15 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
         return;
       }
       const editableItems = items.filter((i) => i.editable && i.amountARS > 0);
+      const validExtras = extraItems.filter((e) => e.amountARS > 0 && e.label.trim());
       const fxArsUsd = arsToUsd || (tcBlue > 0 ? 1 / tcBlue : 0);
 
-      for (const item of editableItems) {
+      const allManualItems: { label: string; amountARS: number; categoryName: string }[] = [
+        ...editableItems.map((i) => ({ label: i.label, amountARS: i.amountARS, categoryName: i.categoryName })),
+        ...validExtras.map((e) => ({ label: e.label, amountARS: e.amountARS, categoryName: e.categoryName })),
+      ];
+
+      for (const item of allManualItems) {
         const cat = categories.find((c: any) => c.name === item.categoryName);
         await supabase.from('transactions').insert({
           user_id: user.id,
