@@ -440,7 +440,12 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
   const defaultBlueRate = blueRate?.blue_avg ? Math.round(blueRate.blue_avg) : (arsToUsd > 0 ? Math.round(1 / arsToUsd) : 1390);
 
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
-  const [iebraFile, setIebraFile] = useState<File | null>(null);
+  const [iebraFile, setIebraFile] = useState<File | null>(() => {
+    if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debugLongName') === '1') {
+      return new File(['x'], 'extracto-banco-ciudad-iebra-resumen-cuenta-tarjeta-credito-1689-mayo-2026-larguisimo-archivo.pdf', { type: 'application/pdf' });
+    }
+    return null;
+  });
   const [kollikerFile, setKollikerFile] = useState<File | null>(null);
   const [santFile, setSantFile] = useState<File | null>(null);
   const [bcTotalARS, setBcTotalARS] = useState(0);
