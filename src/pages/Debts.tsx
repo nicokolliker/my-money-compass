@@ -650,19 +650,21 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
         </DialogHeader>
 
         {step === 1 && (
-          <div className="space-y-4">
-            <p className="text-xs text-muted-foreground">
-              Subí los PDFs disponibles. Los faltantes podés cargarlos manualmente en el siguiente paso.
-            </p>
-            <FileSlot label="BC IEBRA (1689)" file={iebraFile} onChange={setIebraFile} />
-            <FileSlot label="BC KOLLIKER (8157)" file={kollikerFile} onChange={setKollikerFile} />
-            <FileSlot label="Santander VISA" file={santFile} onChange={setSantFile} />
-            <div className="flex justify-end pt-2">
+          <>
+            <div className="space-y-4">
+              <p className="text-xs text-muted-foreground">
+                Subí los PDFs disponibles. Los faltantes podés cargarlos manualmente en el siguiente paso.
+              </p>
+              <FileSlot label="BC IEBRA (1689)" file={iebraFile} onChange={setIebraFile} />
+              <FileSlot label="BC KOLLIKER (8157)" file={kollikerFile} onChange={setKollikerFile} />
+              <FileSlot label="Santander VISA" file={santFile} onChange={setSantFile} />
+            </div>
+            <DialogFooter className="border-t pt-4 mt-4">
               <Button onClick={handleProcessFiles} disabled={processing}>
                 {processing ? 'Procesando...' : 'Continuar →'}
               </Button>
-            </div>
-          </div>
+            </DialogFooter>
+          </>
         )}
 
         {step === 2 && (
