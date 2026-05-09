@@ -21,7 +21,7 @@ import { useBlueDollarRate } from '@/hooks/useBlueDollar';
 import { useCreateTransfer } from '@/hooks/useTransactions';
 import { MerchantLogo } from '@/components/MerchantLogo';
 import { formatUSD } from '@/lib/constants';
-import { parseBancoCiudad, parseBancoCiudadObSoc } from '@/lib/importers/bancoCiudadParser';
+import { parseBancoCiudad, parseBancoCiudadObSoc, extractCardTotal } from '@/lib/importers/bancoCiudadParser';
 import { parseSantander } from '@/lib/importers/santanderParser';
 import { parseSplitwise, type SplitwiseRow } from '@/lib/importers/splitwiseParser';
 import { inferCategoryName } from '@/hooks/useRuleSuggestions';
@@ -418,6 +418,8 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
   const [santFile, setSantFile] = useState<File | null>(null);
   const [bcTotalARS, setBcTotalARS] = useState(0);
   const [santTotalARS, setSantTotalARS] = useState(0);
+  const [visaCiudadARS, setVisaCiudadARS] = useState(0);
+  const [obSocARS, setObSocARS] = useState(0);
   const [processing, setProcessing] = useState(false);
 
   const [items, setItems] = useState<SettlementItem[]>([]);
@@ -431,7 +433,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
     if (!open) {
       setStep(1);
       setIebraFile(null); setKollikerFile(null); setSantFile(null);
-      setBcTotalARS(0); setSantTotalARS(0);
+      setBcTotalARS(0); setSantTotalARS(0); setVisaCiudadARS(0); setObSocARS(0);
     }
   }, [open]);
 
@@ -440,11 +442,11 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
     let saved: any = {};
     try { saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch {}
     setItems([
-      { key: 'visa_ciudad',    label: 'VISA Ciudad',       amountARS: bcTotalARS, editable: bcTotalARS === 0, categoryName: 'Casa' },
+      { key: 'visa_ciudad',    label: 'VISA Ciudad',       amountARS: visaCiudadARS || bcTotalARS, editable: (visaCiudadARS || bcTotalARS) === 0, categoryName: 'Casa' },
       { key: 'visa_santander', label: 'VISA Santander',    amountARS: santTotalARS || saved.visa_santander || 0, editable: santTotalARS === 0, categoryName: 'Casa' },
       { key: 'amex',           label: 'AMEX Santander',    amountARS: saved.amex || 0,        editable: true, categoryName: 'Casa' },
       { key: 'prestamo',       label: 'Préstamo + Seguro', amountARS: saved.prestamo || 0,    editable: true, categoryName: 'Auto' },
-      { key: 'obra_social',    label: 'Obra Social',       amountARS: saved.obra_social || 0, editable: true, categoryName: 'Salud' },
+      { key: 'obra_social',    label: 'Obra Social',       amountARS: obSocARS || saved.obra_social || 0, editable: true, categoryName: 'Salud' },
       { key: 'expensas',       label: 'Expensas',          amountARS: saved.expensas || 0,    editable: true, categoryName: 'Casa' },
       { key: 'cochera',        label: 'Cochera + Lavado',  amountARS: saved.cochera || 0,     editable: true, categoryName: 'Auto' },
       { key: 'patente',        label: 'Patente',           amountARS: saved.patente || 0,     editable: true, categoryName: 'Auto' },
@@ -453,7 +455,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
       { key: 'otro2',          label: saved.otro2_label || 'Otro 2', amountARS: 0, editable: true, labelEditable: true, categoryName: 'Casa' },
     ]);
     setTcBlue(defaultBlueRate);
-  }, [step, bcTotalARS, santTotalARS, defaultBlueRate]);
+  }, [step, bcTotalARS, santTotalARS, visaCiudadARS, obSocARS, defaultBlueRate]);
 
   const totalARS = items.reduce((s, i) => s + (i.amountARS || 0), 0);
   const usdExacto = tcBlue > 0 ? totalARS / tcBlue : 0;
@@ -468,15 +470,21 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
     setProcessing(true);
     try {
       let bc = 0, sant = 0;
+      let visaCiudad = 0;
+      let obSoc = 0;
+      const fxFallback = arsToUsd || 0.00072;
       if (iebraFile) {
-        const text = await extractPdfText(iebraFile);
-        const rows = parseBancoCiudad(text, arsToUsd || 0);
+        const iebraText = await extractPdfText(iebraFile);
+        const rows = parseBancoCiudad(iebraText, arsToUsd || 0);
         bc += rows.reduce((s, r) => s + r.amountARS, 0);
+        const { ars: visaCiudadARSExtract, usd: visaCiudadUSD } = extractCardTotal(iebraText, '1689');
+        visaCiudad = visaCiudadARSExtract + (visaCiudadUSD > 0 ? visaCiudadUSD / fxFallback : 0);
       }
       if (kollikerFile) {
-        const text = await extractPdfText(kollikerFile);
-        const rows = parseBancoCiudadObSoc(text, arsToUsd || 0);
+        const kollikerText = await extractPdfText(kollikerFile);
+        const rows = parseBancoCiudadObSoc(kollikerText, fxFallback);
         bc += rows.reduce((s, r) => s + r.amountARS, 0);
+        obSoc = rows.reduce((s, t) => s + t.amountARS, 0);
       }
       if (santFile) {
         const text = await extractPdfText(santFile);
@@ -485,6 +493,8 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
       }
       setBcTotalARS(bc);
       setSantTotalARS(sant);
+      setVisaCiudadARS(visaCiudad);
+      setObSocARS(obSoc);
       setStep(2);
     } catch (e: any) {
       toast.error(e.message || 'Error procesando PDFs');
