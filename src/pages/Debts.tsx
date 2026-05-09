@@ -669,46 +669,114 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
             <p className="text-xs text-muted-foreground">
               BC: ${bcTotalARS.toLocaleString('es-AR', { maximumFractionDigits: 0 })} ARS detectados · Santander: ${santTotalARS.toLocaleString('es-AR', { maximumFractionDigits: 0 })} ARS detectados
             </p>
-            <div className="border rounded-lg overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="text-xs">Concepto</TableHead>
-                    <TableHead className="text-xs text-right">ARS</TableHead>
-                    <TableHead className="text-xs">Categoría</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {items.map((it) => (
-                    <TableRow key={it.key}>
-                      <TableCell className="text-xs">
-                        {it.labelEditable ? (
-                          <Input value={it.label} onChange={(e) => updateItem(it.key, { label: e.target.value })} className="h-7 text-xs" />
-                        ) : it.editable ? it.label : <span className="text-muted-foreground">🔒 {it.label}</span>}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {it.editable ? (
-                          <Input type="number" value={it.amountARS || ''} onChange={(e) => updateItem(it.key, { amountARS: parseFloat(e.target.value) || 0 })} className="h-7 text-xs text-right font-mono w-32 ml-auto" />
-                        ) : (
-                          <span className="text-xs font-mono text-muted-foreground">{it.amountARS.toLocaleString('es-AR', { maximumFractionDigits: 0 })}</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {it.editable ? (
-                          <Select value={it.categoryName} onValueChange={(v) => updateItem(it.key, { categoryName: v })}>
-                            <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              {(categories || []).map((c: any) => (<SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>))}
-                            </SelectContent>
-                          </Select>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">{it.categoryName}</span>
-                        )}
-                      </TableCell>
-                    </TableRow>
+            <div className="space-y-1">
+              {ITEM_GROUPS.map((group) => {
+                const groupItems = group.items
+                  .map((key) => items.find((it) => it.key === key))
+                  .filter((it): it is SettlementItem => !!it);
+                if (groupItems.length === 0) return null;
+                return (
+                  <div key={group.label}>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide py-2 border-b border-border/50">
+                      {group.label}
+                    </p>
+                    {groupItems.map((it) => {
+                      const autoFilled = !it.editable;
+                      return (
+                        <div key={it.key} className="flex items-center gap-3 py-2.5">
+                          <span className="text-base w-6 shrink-0">{it.emoji}</span>
+                          <span className={cn('text-sm flex-1 min-w-0 truncate', autoFilled ? 'text-foreground' : 'text-muted-foreground')}>
+                            {it.label}
+                            {autoFilled && <span className="ml-1 text-[10px] text-muted-foreground">🔒</span>}
+                          </span>
+                          {autoFilled ? (
+                            <span className="text-sm font-mono text-foreground w-32 text-right shrink-0">{formatARS(it.amountARS)}</span>
+                          ) : (
+                            <Input
+                              type="text"
+                              inputMode="numeric"
+                              value={formatARS(it.amountARS)}
+                              onChange={(e) => updateItem(it.key, { amountARS: parseARSInput(e.target.value) })}
+                              className={cn('w-32 text-right text-sm h-8 shrink-0', NUMERIC_INPUT_CLS)}
+                              placeholder="0"
+                            />
+                          )}
+                          {!autoFilled ? (
+                            <Select value={it.categoryName} onValueChange={(v) => updateItem(it.key, { categoryName: v })}>
+                              <SelectTrigger className="w-28 h-8 text-xs shrink-0"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                {(categories || []).map((c: any) => (<SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>))}
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <span className="text-xs text-muted-foreground w-28 shrink-0">{it.categoryName}</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+
+              {extraItems.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide py-2 border-b border-border/50">
+                    ➕ Otros
+                  </p>
+                  {extraItems.map((extra) => (
+                    <div key={extra.id} className="flex items-center gap-3 py-2.5">
+                      <span className="text-base w-6 shrink-0">📌</span>
+                      <Input
+                        value={extra.label}
+                        onChange={(e) => setExtraItems((prev) => prev.map((x) => x.id === extra.id ? { ...x, label: e.target.value } : x))}
+                        className="flex-1 min-w-0 text-sm h-8"
+                        placeholder="Concepto"
+                      />
+                      <Input
+                        type="text"
+                        inputMode="numeric"
+                        value={formatARS(extra.amountARS)}
+                        onChange={(e) => {
+                          const num = parseARSInput(e.target.value);
+                          setExtraItems((prev) => prev.map((x) => x.id === extra.id ? { ...x, amountARS: num } : x));
+                        }}
+                        className={cn('w-28 text-right text-sm h-8 shrink-0', NUMERIC_INPUT_CLS)}
+                        placeholder="0"
+                      />
+                      <Select
+                        value={extra.categoryName}
+                        onValueChange={(v) => setExtraItems((prev) => prev.map((x) => x.id === extra.id ? { ...x, categoryName: v } : x))}
+                      >
+                        <SelectTrigger className="w-28 h-8 text-xs shrink-0"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {(categories || []).map((c: any) => (<SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>))}
+                        </SelectContent>
+                      </Select>
+                      <button
+                        type="button"
+                        onClick={() => setExtraItems((prev) => prev.filter((x) => x.id !== extra.id))}
+                        className="text-muted-foreground hover:text-destructive shrink-0"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   ))}
-                </TableBody>
-              </Table>
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setExtraItems((prev) => [...prev, {
+                  id: crypto.randomUUID(),
+                  label: '',
+                  amountARS: 0,
+                  categoryName: 'Casa',
+                  emoji: '📌',
+                }])}
+                className="flex items-center gap-2 text-sm text-primary hover:text-primary/80 py-2 w-full"
+              >
+                <Plus className="h-4 w-4" /> Agregar concepto
+              </button>
             </div>
             <div className="space-y-2 text-sm">
               <div className="flex items-center justify-between"><span className="text-muted-foreground">Total ARS:</span><span className="font-mono">${totalARS.toLocaleString('es-AR', { maximumFractionDigits: 0 })}</span></div>
