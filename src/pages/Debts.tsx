@@ -470,15 +470,21 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
     setProcessing(true);
     try {
       let bc = 0, sant = 0;
+      let visaCiudad = 0;
+      let obSoc = 0;
+      const fxFallback = arsToUsd || 0.00072;
       if (iebraFile) {
-        const text = await extractPdfText(iebraFile);
-        const rows = parseBancoCiudad(text, arsToUsd || 0);
+        const iebraText = await extractPdfText(iebraFile);
+        const rows = parseBancoCiudad(iebraText, arsToUsd || 0);
         bc += rows.reduce((s, r) => s + r.amountARS, 0);
+        const { ars: visaCiudadARSExtract, usd: visaCiudadUSD } = extractCardTotal(iebraText, '1689');
+        visaCiudad = visaCiudadARSExtract + (visaCiudadUSD > 0 ? visaCiudadUSD / fxFallback : 0);
       }
       if (kollikerFile) {
-        const text = await extractPdfText(kollikerFile);
-        const rows = parseBancoCiudadObSoc(text, arsToUsd || 0);
+        const kollikerText = await extractPdfText(kollikerFile);
+        const rows = parseBancoCiudadObSoc(kollikerText, fxFallback);
         bc += rows.reduce((s, r) => s + r.amountARS, 0);
+        obSoc = rows.reduce((s, t) => s + t.amountARS, 0);
       }
       if (santFile) {
         const text = await extractPdfText(santFile);
@@ -487,6 +493,8 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
       }
       setBcTotalARS(bc);
       setSantTotalARS(sant);
+      setVisaCiudadARS(visaCiudad);
+      setObSocARS(obSoc);
       setStep(2);
     } catch (e: any) {
       toast.error(e.message || 'Error procesando PDFs');
