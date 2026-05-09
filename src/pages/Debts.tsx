@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Upload, CheckCircle2, X, Plus } from 'lucide-react';
@@ -639,7 +639,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto overflow-x-hidden">
+      <DialogContent className="sm:max-w-lg w-full max-h-[90vh] overflow-y-auto overflow-x-hidden">
         <DialogHeader>
           <DialogTitle>
             {step === 1 && 'Liquidar con el viejo — Subir PDFs'}
@@ -650,19 +650,21 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
         </DialogHeader>
 
         {step === 1 && (
-          <div className="space-y-4">
-            <p className="text-xs text-muted-foreground">
-              Subí los PDFs disponibles. Los faltantes podés cargarlos manualmente en el siguiente paso.
-            </p>
-            <FileSlot label="BC IEBRA (1689)" file={iebraFile} onChange={setIebraFile} />
-            <FileSlot label="BC KOLLIKER (8157)" file={kollikerFile} onChange={setKollikerFile} />
-            <FileSlot label="Santander VISA" file={santFile} onChange={setSantFile} />
-            <div className="flex justify-end pt-2">
+          <>
+            <div className="space-y-4">
+              <p className="text-xs text-muted-foreground">
+                Subí los PDFs disponibles. Los faltantes podés cargarlos manualmente en el siguiente paso.
+              </p>
+              <FileSlot label="BC IEBRA (1689)" file={iebraFile} onChange={setIebraFile} />
+              <FileSlot label="BC KOLLIKER (8157)" file={kollikerFile} onChange={setKollikerFile} />
+              <FileSlot label="Santander VISA" file={santFile} onChange={setSantFile} />
+            </div>
+            <DialogFooter className="border-t pt-4 mt-4">
               <Button onClick={handleProcessFiles} disabled={processing}>
                 {processing ? 'Procesando...' : 'Continuar →'}
               </Button>
-            </div>
-          </div>
+            </DialogFooter>
+          </>
         )}
 
         {step === 2 && (
@@ -848,10 +850,21 @@ function FileSlot({ label, file, onChange }: { label: string; file: File | null;
     <div className="overflow-hidden">
       <Label className="text-xs">{label}</Label>
       {file ? (
-        <div className="mt-1 flex items-center gap-2 w-full max-w-full overflow-hidden rounded-lg border border-border bg-muted/30 px-3 py-2">
+        <div style={{ maxWidth: '100%' }} className="mt-1 flex items-center gap-2 overflow-hidden rounded-lg border border-border bg-muted/30 px-3 py-2">
           <CheckCircle2 className="h-4 w-4 text-success shrink-0" />
-          <span className="text-xs truncate min-w-0 flex-1">{file.name}</span>
-          <button type="button" onClick={() => onChange(null)} className="shrink-0">
+          <span
+            style={{
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              minWidth: 0,
+              flex: 1,
+            }}
+            className="text-xs"
+          >
+            {file.name}
+          </span>
+          <button type="button" onClick={() => onChange(null)} className="shrink-0 ml-1">
             <X className="h-3.5 w-3.5 text-muted-foreground" />
           </button>
         </div>
