@@ -232,7 +232,7 @@ function ViejoDebtCard({ importLog, onOpen }: {
               Subí los resúmenes de BC + Santander y completá los gastos del mes para liquidar.
             </p>
             <Button className="w-full" onClick={onOpen}>
-              Liquidar {monthLabel} →
+              Liquidar →
             </Button>
           </>
         )}
