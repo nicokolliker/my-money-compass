@@ -537,30 +537,47 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
       const fxFallback = arsToUsd || 0.00072;
       let bc = 0, sant = 0, visaCiudad = 0, obSoc = 0;
 
-      if (iebraFile) {
-        const text = await extractPdfText(iebraFile);
-        const rows = parseBancoCiudad(text, fxFallback);
-        const { ars: vcARS, usd: vcUSD } = extractCardTotal(text, '1689');
-        visaCiudad = vcARS + (vcUSD > 0 ? vcUSD / fxFallback : 0);
-        bc += visaCiudad;
-        setIebraRows(rows.map(r => ({
-          ...r,
-          categoryName: inferCategoryName(r.description) || 'Casa',
-          selected: true,
-        })));
+      const bcFiles = [iebraFile, kollikerFile].filter((f): f is File => !!f);
+      const allIebra: ParsedTransaction[] = [];
+      const allKolliker: ParsedTransaction[] = [];
+      for (const f of bcFiles) {
+        const text = await extractPdfText(f);
+        // Card 1689 (mamá) — todos los gastos
+        const iebraRowsFromFile = parseBancoCiudad(text, fxFallback);
+        if (iebraRowsFromFile.length > 0) {
+          const { ars: vcARS, usd: vcUSD } = extractCardTotal(text, '1689');
+          visaCiudad += vcARS + (vcUSD > 0 ? vcUSD / fxFallback : 0);
+          allIebra.push(...iebraRowsFromFile);
+        }
+        // Card 8157 (papá) — solo OB SOC / PODER JUD
+        const kollikerRowsFromFile = parseBancoCiudadObSoc(text, fxFallback);
+        if (kollikerRowsFromFile.length > 0) allKolliker.push(...kollikerRowsFromFile);
       }
+      // Dedup por external_id
+      const dedup = (arr: ParsedTransaction[]) => {
+        const seen = new Set<string>();
+        return arr.filter((r) => {
+          const k = r.external_id || `${r.date}-${r.description}-${r.amountARS}`;
+          if (seen.has(k)) return false;
+          seen.add(k);
+          return true;
+        });
+      };
+      const iebraDedup = dedup(allIebra);
+      const kollikerDedup = dedup(allKolliker);
+      obSoc = kollikerDedup.reduce((s, r) => s + r.amountARS, 0);
+      bc = visaCiudad + obSoc;
 
-      if (kollikerFile) {
-        const text = await extractPdfText(kollikerFile);
-        const rows = parseBancoCiudadObSoc(text, fxFallback);
-        obSoc = rows.reduce((s, r) => s + r.amountARS, 0);
-        bc += obSoc;
-        setKollikerRows(rows.map(r => ({
-          ...r,
-          categoryName: 'Salud',
-          selected: true,
-        })));
-      }
+      setIebraRows(iebraDedup.map(r => ({
+        ...r,
+        categoryName: inferCategoryName(r.description) || 'Casa',
+        selected: true,
+      })));
+      setKollikerRows(kollikerDedup.map(r => ({
+        ...r,
+        categoryName: 'Salud',
+        selected: true,
+      })));
 
       if (santFile) {
         const text = await extractPdfText(santFile);
