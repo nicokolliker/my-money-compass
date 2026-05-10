@@ -725,6 +725,9 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
 
       qc.invalidateQueries({ queryKey: ['transactions'] });
       qc.invalidateQueries({ queryKey: ['account-balances'] });
+      qc.invalidateQueries({ queryKey: ['liquidacion-history-all'] });
+      qc.invalidateQueries({ queryKey: ['liquidacion-check'] });
+      qc.invalidateQueries({ queryKey: ['import-log'] });
       setResultUsd(usdAPagar);
       setResultVuelto(vueltoARS);
       setStep(4);
