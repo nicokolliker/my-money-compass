@@ -687,6 +687,26 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
       }
 
       // ── PASO 3: Pago total al viejo → Cash USD ───────────────────────
+      // Build per-key breakdown (cards + manual items by item key) and
+      // per-category aggregated breakdown (categoryName → ARS).
+      const breakdown: Record<string, number> = {};
+      for (const it of items) {
+        if (it.amountARS > 0) breakdown[it.key] = (breakdown[it.key] || 0) + it.amountARS;
+      }
+      const extrasForNotes = extraItems
+        .filter((e) => e.amountARS > 0 && e.label.trim())
+        .map((e) => ({ label: e.label, amountARS: e.amountARS, categoryName: e.categoryName, emoji: e.emoji }));
+
+      const categoryBreakdown: Record<string, number> = {};
+      const addCat = (name: string | undefined, ars: number) => {
+        if (!ars || ars <= 0) return;
+        const key = (name && name.trim()) || 'Sin categoría';
+        categoryBreakdown[key] = (categoryBreakdown[key] || 0) + ars;
+      };
+      for (const r of allPdfRows) addCat(r.categoryName, r.amountARS);
+      for (const it of items.filter((i) => i.amountARS > 0)) addCat(it.categoryName, it.amountARS);
+      for (const e of extrasForNotes) addCat(e.categoryName, e.amountARS);
+
       const settlementNotes = JSON.stringify({
         settlement: true,
         month: settlementMonth,
@@ -694,6 +714,9 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
         totalARS,
         usdPagado: usdAPagar,
         vueltoARS,
+        breakdown,
+        extras: extrasForNotes,
+        categoryBreakdown,
       });
 
       await supabase.from('transactions').insert({
