@@ -88,13 +88,17 @@ export default function Accounts() {
     queryFn: async () => {
       const { data } = await supabase
         .from('account_reconciliations')
-        .select('to_account_id, transfer_amount_usd, transfer_date')
+        .select('to_account_id, transfer_amount_usd, total_spent_usd, transfer_date')
         .eq('status', 'pending');
       const map = new Map<string, { total: number; latest: string | null }>();
       for (const r of data || []) {
         const k = r.to_account_id as string;
         const cur = map.get(k) || { total: 0, latest: null };
-        cur.total += Number(r.transfer_amount_usd) || 0;
+        const remaining = Math.max(
+          0,
+          Number(r.transfer_amount_usd || 0) - Number((r as any).total_spent_usd || 0),
+        );
+        cur.total += remaining;
         const d = r.transfer_date as string;
         if (!cur.latest || d > cur.latest) cur.latest = d;
         map.set(k, cur);
