@@ -14,6 +14,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Progress } from '@/components/ui/progress';
 import {
   AlertTriangle, CheckCircle2, ArrowRight, Upload,
   Clock, TrendingDown, Wallet,
