@@ -122,8 +122,8 @@ export default function DebtsPage() {
   );
 }
 
-function ViejoDebtCard({ importLog, onOpen }: {
-  importLog: any[]; onOpen: () => void;
+function ViejoDebtCard({ importLog, santPreviewARS, onOpen }: {
+  importLog: any[]; santPreviewARS: number; onOpen: () => void;
 }) {
   const currentMonth = format(new Date(), 'yyyy-MM');
   const monthLabel = format(new Date(), 'MMMM yyyy', { locale: es });
@@ -170,6 +170,7 @@ function ViejoDebtCard({ importLog, onOpen }: {
   const lastMonth = lastLiquidacion
     ? format(new Date(lastLiquidacion.date + 'T12:00:00'), 'MMMM yyyy', { locale: es })
     : null;
+  const lastUsd = lastLiquidacion ? Math.abs(Number(lastLiquidacion.amount_usd) || 0) : 0;
 
   return (
     <Card className="rounded-2xl overflow-hidden">
@@ -181,8 +182,8 @@ function ViejoDebtCard({ importLog, onOpen }: {
           <div>
             <p className="text-sm font-semibold text-foreground">Viejo</p>
             <p className="text-xs text-muted-foreground">
-              {lastMonth
-                ? `Último mes liquidado: ${lastMonth}`
+              {lastMonth && lastUsd > 0
+                ? <>Última liquidación: <span className="font-mono">{formatUSD(lastUsd)}</span> · <span className="capitalize">{lastMonth}</span></>
                 : 'Sin liquidaciones anteriores'}
             </p>
           </div>
@@ -217,16 +218,27 @@ function ViejoDebtCard({ importLog, onOpen }: {
                 </p>
               </div>
             </div>
-            <Button variant="outline" className="w-full" size="sm" onClick={onOpen}>
+            <Button variant="outline" size="sm" onClick={onOpen}>
               Reliquidar o ver otro mes →
             </Button>
           </>
         ) : (
           <>
-            <p className="text-xs text-muted-foreground">
-              Subí los resúmenes de BC + Santander y completá los gastos del mes para liquidar.
-            </p>
-            <Button className="w-full" onClick={onOpen}>
+            <div className="rounded-xl bg-muted/40 px-3 py-2.5">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">
+                Estimado {monthLabel}
+              </p>
+              {santPreviewARS > 0 ? (
+                <p className="text-sm font-mono text-foreground">
+                  VISA Sant. <span className="font-semibold">{formatARS(santPreviewARS)}</span>
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Subí los resúmenes para ver el total.
+                </p>
+              )}
+            </div>
+            <Button variant="secondary" size="sm" onClick={onOpen}>
               Liquidar →
             </Button>
           </>
