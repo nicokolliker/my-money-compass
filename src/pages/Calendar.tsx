@@ -18,7 +18,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 export default function CalendarPage({ embedded = false }: { embedded?: boolean } = {}) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [view, setView] = useState<'calendar' | 'timeline'>('timeline');
-  const effectiveView: 'calendar' | 'timeline' = embedded ? 'timeline' : view;
+  const effectiveView = view;
   const monthStart = startOfMonth(currentMonth).toISOString().split('T')[0];
   const monthEnd = endOfMonth(currentMonth).toISOString().split('T')[0];
 
