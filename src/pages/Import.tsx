@@ -523,36 +523,7 @@ export default function ImportPage() {
       });
       qc.invalidateQueries({ queryKey: ['account-reconciliations'] });
 
-      // ── Auto-match pending credits (vuelto from settlements) ────────────
-      try {
-        const { data: pendings } = await supabase
-          .from('pending_credits' as any)
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('status', 'pending')
-          .eq('expected_via_account_id', mpAccount.id);
-        const incomes = (insertedRows || []).filter((r: any) => r.type === 'income');
-        for (const pc of (pendings as any[]) || []) {
-          const target = Number(pc.amount_ars) || 0;
-          if (target <= 0) continue;
-          const tol = target * 0.05;
-          const match = incomes.find((tx: any) => Math.abs(Math.abs(Number(tx.amount)) - target) <= tol);
-          if (match) {
-            await supabase
-              .from('pending_credits' as any)
-              .update({ status: 'matched', matched_transaction_id: match.id } as any)
-              .eq('id', pc.id);
-            const monthLabel = pc.settlement_month || '';
-            toast.success(`Saldo a favor de ${monthLabel} matcheado con transferencia del ${match.date}`);
-            // Remove from local incomes to avoid double matching
-            const idx = incomes.indexOf(match);
-            if (idx >= 0) incomes.splice(idx, 1);
-          }
-        }
-        qc.invalidateQueries({ queryKey: ['pending-credits'] });
-      } catch (matchErr) {
-        console.warn('pending-credits auto-match failed', matchErr);
-      }
+      // Pending credits are now resolved manually from the Debts/Dashboard banner.
       const dups = mpRows.filter((r) => r.duplicate).length;
       setMpResultMsg(`${toImport.length} transacciones importadas, ${dups} duplicados ignorados`);
       toast.success('Importación completa');
