@@ -34,7 +34,7 @@ import { useImportLog } from '@/hooks/useImportLog';
 import { extractPdfText } from '@/lib/pdfReader';
 import { parseAmexTotal } from '@/lib/importers/amexParser';
 import { PendingCreditsBanner } from '@/components/PendingCreditsBanner';
-import { CreditCardDebtCard, PendingInstallmentsCard } from '@/components/debts/CreditCardDebtCard';
+import { CreditCardDebtCard } from '@/components/debts/CreditCardDebtCard';
 import { UnifiedCycleHistory } from '@/components/debts/UnifiedCycleHistory';
 import { usePendingCredits } from '@/hooks/usePendingCredits';
 
