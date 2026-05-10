@@ -56,7 +56,17 @@ function useInvoices() {
 export default function MonotributoPage() {
   const qc = useQueryClient();
   const { data: invoices = [] } = useInvoices();
+  const { data: settings } = useUserSettings();
   const [showForm, setShowForm] = useState(false);
+  const [showConfig, setShowConfig] = useState(false);
+
+  const config: MonotributoConfig = {
+    ...DEFAULT_MONOTRIBUTO,
+    ...(settings?.monotributo_config || {}),
+  };
+  const VIGENCIA = config.vigencia;
+  const CAT_ACTUAL = config.cat_actual;
+  const CUOTA_ACTUAL = config.cuota_actual;
 
   const now = new Date();
   const currentPeriodo = format(now, 'yyyy-MM');
