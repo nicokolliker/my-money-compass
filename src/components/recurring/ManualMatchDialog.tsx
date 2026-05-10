@@ -108,6 +108,7 @@ export default function ManualMatchDialog({ instance, open, onOpenChange }: Prop
             {instance && (
               <>Pick the transaction that paid <span className="font-medium text-foreground">{(instance as any).recurring_expenses?.name}</span> ({formatCurrency(Number(instance.expected_amount), instance.expected_currency)}, expected {format(new Date(instance.expected_date + 'T12:00:00'), 'MMM d')})</>
             )}
+            <span className="block mt-1 text-xs text-muted-foreground">O marcá como pagado si ya lo hiciste por otro medio</span>
           </DialogDescription>
         </DialogHeader>
 
