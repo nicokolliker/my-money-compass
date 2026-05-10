@@ -7,6 +7,10 @@ export interface UserSettings {
   wise_token: string | null;
   wise_last_sync: string | null;
   wise_profile_id: string | null;
+  binance_api_key?: string | null;
+  binance_api_secret?: string | null;
+  binance_last_sync?: string | null;
+  binance_balances?: any[] | null;
 }
 
 export function useUserSettings() {
