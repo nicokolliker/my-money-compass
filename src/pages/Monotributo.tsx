@@ -338,9 +338,18 @@ function InvoiceForm({ open, onClose, onSaved }: { open: boolean; onClose: () =>
         filled.push(`Nº ${nroMatch[1]}`);
       }
 
+      const parseNum = (s: string) => {
+        // Si tiene coma, asumir formato es-AR: '.' miles, ',' decimal
+        if (s.includes(',')) return parseFloat(s.replace(/\./g, '').replace(',', '.'));
+        // Si solo tiene puntos, podría ser miles ('1.396') o decimal ('1396.00')
+        const parts = s.split('.');
+        if (parts.length === 2 && parts[1].length === 2) return parseFloat(s); // decimal
+        return parseFloat(s.replace(/\./g, '')); // miles
+      };
+
       const tcMatch = norm.match(/Tipo\s*de\s*Cambio[^\d]{0,10}([\d.,]+)/i);
       if (tcMatch) {
-        const tc = parseFloat(tcMatch[1].replace(/\./g, '').replace(',', '.'));
+        const tc = parseNum(tcMatch[1]);
         if (!isNaN(tc)) { setTcARS(String(tc)); filled.push(`TC ${tc}`); }
       }
 
