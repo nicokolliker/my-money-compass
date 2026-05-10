@@ -296,6 +296,12 @@ export default function MonotributoPage() {
           setShowForm(false);
         }}
       />
+
+      <MonotributoConfigDialog
+        open={showConfig}
+        onClose={() => setShowConfig(false)}
+        current={config}
+      />
     </div>
   );
 }
