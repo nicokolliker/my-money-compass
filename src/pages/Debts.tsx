@@ -619,7 +619,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
       })();
       const monthLabel = format(new Date(settlementMonth + '-01T00:00:00'), 'MMMM yyyy', { locale: es });
 
-      const tarjetaViejoAcc = accounts.find((a: any) => /viejo|tarjeta.*viejo/i.test(a.name));
+      
       const cashAcc = accounts.find((a: any) => /cash/i.test(a.name) && a.currency === 'USD');
       const mpAcc = accounts.find((a: any) => /mercado.*pago|mercadopago/i.test(a.name));
       if (!cashAcc || !mpAcc) {
