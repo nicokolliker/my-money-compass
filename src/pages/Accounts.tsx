@@ -323,6 +323,22 @@ export default function Accounts() {
                                 )}
                               </p>
                             )}
+                            {/* MP/Galicia reconciliation pending badge */}
+                            {isTrackedDestAccount(a.name) && (() => {
+                              const dp = destPendingMap?.get(a.id);
+                              if (!dp || dp.total <= 0) return null;
+                              return (
+                                <p className="text-[10px] text-amber-600 flex items-center gap-1 mt-0.5 font-medium">
+                                  <AlertTriangle className="h-2.5 w-2.5 shrink-0" />
+                                  ${dp.total.toFixed(0)} sin conciliar
+                                  {dp.latest && (
+                                    <span className="font-normal text-amber-500">
+                                      — desde {dp.latest}
+                                    </span>
+                                  )}
+                                </p>
+                              );
+                            })()}
                           </div>
                           <div className="text-right shrink-0">
                             <p className={`text-sm font-bold tabular-nums ${a.computed_balance < 0 ? 'text-destructive' : 'text-foreground'}`}>
