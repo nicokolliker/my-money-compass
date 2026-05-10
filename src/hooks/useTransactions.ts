@@ -77,9 +77,46 @@ export function useCreateTransfer() {
       if (e2) throw e2;
 
       await supabase.from('transactions').update({ linked_transfer_id: toTx.id }).eq('id', fromTx.id);
+
+      // ── Auto-create pending reconciliation if source = ARQ/DolarApp
+      //    and destination = MercadoPago or Galicia.
+      try {
+        const { data: accs } = await supabase
+          .from('accounts')
+          .select('id, name')
+          .in('id', [params.fromAccountId, params.toAccountId]);
+        const fromAcc = accs?.find(a => a.id === params.fromAccountId);
+        const toAcc = accs?.find(a => a.id === params.toAccountId);
+        const fromName = (fromAcc?.name || '').toLowerCase();
+        const toName = (toAcc?.name || '').toLowerCase();
+        const sourceIsArq = /arq|dolarapp/.test(fromName);
+        const destIsTracked = /mercado|galicia/.test(toName);
+        if (sourceIsArq && destIsTracked) {
+          const amountUsd = Math.abs(Number(toTx.amount_usd) || 0)
+            || (params.toCurrency === 'USD' ? params.toAmount : params.toAmount * params.fxRate);
+          await supabase.from('account_reconciliations').insert({
+            user_id,
+            from_account_id: params.fromAccountId,
+            to_account_id: params.toAccountId,
+            transfer_tx_id: toTx.id,
+            transfer_amount_usd: amountUsd,
+            transfer_date: params.date,
+            transfer_description: params.description || `${fromAcc?.name} → ${toAcc?.name}`,
+            status: 'pending',
+          });
+        }
+      } catch (err) {
+        // Non-fatal — transfer already saved
+        console.warn('Failed to create pending account_reconciliation:', err);
+      }
+
       return { fromTx, toTx };
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['transactions'] }); qc.invalidateQueries({ queryKey: ['account-balances'] }); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['transactions'] });
+      qc.invalidateQueries({ queryKey: ['account-balances'] });
+      qc.invalidateQueries({ queryKey: ['account-reconciliations'] });
+    },
   });
 }
 

@@ -13,6 +13,38 @@ import { parseArqStatements, type ParsedTransaction, type ParsedArqResult } from
 import { useInvalidateArqReconciliations } from '@/hooks/useArqReconciliation';
 import { parseMercadoPago } from '@/lib/importers/mercadoPagoParser';
 import { parseGalicia } from '@/lib/importers/galiciaParser';
+
+/** Close pending account_reconciliations for a destination account covering the imported month. */
+async function closeAccountReconciliations(opts: {
+  userId: string;
+  accountId: string;
+  month: string; // 'YYYY-MM'
+  spentUsd: number;
+}) {
+  if (!opts.month) return;
+  const [y, m] = opts.month.split('-').map(Number);
+  if (!y || !m) return;
+  const periodStart = `${opts.month}-01`;
+  const periodEnd = new Date(y, m, 0).toISOString().split('T')[0];
+  const { data: pending } = await supabase
+    .from('account_reconciliations')
+    .select('id')
+    .eq('user_id', opts.userId)
+    .eq('to_account_id', opts.accountId)
+    .eq('status', 'pending')
+    .gte('transfer_date', periodStart)
+    .lte('transfer_date', periodEnd);
+  if (!pending || pending.length === 0) return;
+  await supabase
+    .from('account_reconciliations')
+    .update({
+      status: 'reconciled',
+      reconciled_at: new Date().toISOString(),
+      period: opts.month,
+      total_spent_usd: +opts.spentUsd.toFixed(2),
+    })
+    .in('id', pending.map((r: any) => r.id));
+}
 import { useImportLog } from '@/hooks/useImportLog';
 import { MerchantLogo } from '@/components/MerchantLogo';
 import { AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -494,6 +526,15 @@ export default function ImportPage() {
         );
         qc.invalidateQueries({ queryKey: ['import-log'] });
       }
+      await closeAccountReconciliations({
+        userId: user.id,
+        accountId: mpAccount.id,
+        month: mpMonth,
+        spentUsd: toImport
+          .filter(r => r.type !== 'income' && r.type !== 'transfer')
+          .reduce((s, r) => s + (r.amountUSD || 0), 0),
+      });
+      qc.invalidateQueries({ queryKey: ['account-reconciliations'] });
       const dups = mpRows.filter((r) => r.duplicate).length;
       setMpResultMsg(`${toImport.length} transacciones importadas, ${dups} duplicados ignorados`);
       toast.success('Importación completa');
@@ -603,6 +644,15 @@ export default function ImportPage() {
         );
         qc.invalidateQueries({ queryKey: ['import-log'] });
       }
+      await closeAccountReconciliations({
+        userId: user.id,
+        accountId: galiciaAccount.id,
+        month: galiciaMonth,
+        spentUsd: toImport
+          .filter(r => r.type !== 'income' && r.type !== 'transfer')
+          .reduce((s, r) => s + (r.amountUSD || 0), 0),
+      });
+      qc.invalidateQueries({ queryKey: ['account-reconciliations'] });
       const dups = galiciaRows.filter((r) => r.duplicate).length;
       setGaliciaResultMsg(`${toImport.length} transacciones importadas, ${dups} duplicados ignorados`);
       toast.success('Importación completa');

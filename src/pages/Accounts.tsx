@@ -25,6 +25,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useImportLog } from '@/hooks/useImportLog';
 import { useArqPendingReconciliations } from '@/hooks/useArqReconciliation';
 import { ArqReconciliationSheet } from '@/components/accounts/ArqReconciliationSheet';
+import { AccountReconciliationSheet } from '@/components/accounts/AccountReconciliationSheet';
+import { useQuery } from '@tanstack/react-query';
+import { useUserId } from '@/hooks/useAuthUser';
 import { useUserSettings } from '@/hooks/useUserSettings';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -53,6 +56,7 @@ export default function Accounts() {
   /** Most recent pending deposit date, for the badge subtitle */
   const arqPendingLatestDate = arqPending?.[0]?.wise_date ?? null;
   const isArqAccount = (name: string) => /arq|dolarapp/i.test(name.toLowerCase());
+  const isTrackedDestAccount = (name: string) => /mercado|galicia/i.test(name.toLowerCase());
   const { data: groups } = useAccountGroups();
   const createAccount = useCreateAccount();
   const updateAccount = useUpdateAccount();
@@ -74,6 +78,30 @@ export default function Accounts() {
   const [showAddChoice, setShowAddChoice] = useState(false);
   const [showPostCreate, setShowPostCreate] = useState(false);
   const [arqSheetAccount, setArqSheetAccount] = useState<any>(null);
+  const [destSheetAccount, setDestSheetAccount] = useState<any>(null);
+
+  // Pending counts per destination account (MP/Galicia) for badges
+  const userId = useUserId();
+  const { data: destPendingMap } = useQuery({
+    queryKey: ['account-reconciliations-pending-map', userId],
+    enabled: !!userId,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('account_reconciliations')
+        .select('to_account_id, transfer_amount_usd, transfer_date')
+        .eq('status', 'pending');
+      const map = new Map<string, { total: number; latest: string | null }>();
+      for (const r of data || []) {
+        const k = r.to_account_id as string;
+        const cur = map.get(k) || { total: 0, latest: null };
+        cur.total += Number(r.transfer_amount_usd) || 0;
+        const d = r.transfer_date as string;
+        if (!cur.latest || d > cur.latest) cur.latest = d;
+        map.set(k, cur);
+      }
+      return map;
+    },
+  });
 
 
 
@@ -255,6 +283,15 @@ export default function Accounts() {
                             <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
                           </button>
                         )}
+                        {isTrackedDestAccount(a.name) && (
+                          <button
+                            onClick={() => setDestSheetAccount(a)}
+                            className="p-1.5 rounded-lg hover:bg-accent/50 transition-colors shrink-0"
+                            title="Ver conciliaciones"
+                          >
+                            <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
+                          </button>
+                        )}
                         <button onClick={() => openEdit(a)} className="flex items-center gap-3 flex-1 min-w-0 py-3 text-left hover:bg-accent/50 active:bg-accent rounded-lg px-2 -mx-2 transition-colors">
                           <AccountLogo name={a.name} institution={(a as any).institution} />
                           <div className="flex-1 min-w-0">
@@ -286,6 +323,22 @@ export default function Accounts() {
                                 )}
                               </p>
                             )}
+                            {/* MP/Galicia reconciliation pending badge */}
+                            {isTrackedDestAccount(a.name) && (() => {
+                              const dp = destPendingMap?.get(a.id);
+                              if (!dp || dp.total <= 0) return null;
+                              return (
+                                <p className="text-[10px] text-amber-600 flex items-center gap-1 mt-0.5 font-medium">
+                                  <AlertTriangle className="h-2.5 w-2.5 shrink-0" />
+                                  ${dp.total.toFixed(0)} sin conciliar
+                                  {dp.latest && (
+                                    <span className="font-normal text-amber-500">
+                                      — desde {dp.latest}
+                                    </span>
+                                  )}
+                                </p>
+                              );
+                            })()}
                           </div>
                           <div className="text-right shrink-0">
                             <p className={`text-sm font-bold tabular-nums ${a.computed_balance < 0 ? 'text-destructive' : 'text-foreground'}`}>
@@ -527,6 +580,17 @@ export default function Accounts() {
           onClose={() => setArqSheetAccount(null)}
           accountName={arqSheetAccount.name}
           balanceUsd={arqSheetAccount.computed_balance_usd}
+        />
+      )}
+      {/* MP/Galicia Reconciliation Sheet */}
+      {destSheetAccount && (
+        <AccountReconciliationSheet
+          open={!!destSheetAccount}
+          onClose={() => setDestSheetAccount(null)}
+          accountId={destSheetAccount.id}
+          accountName={destSheetAccount.name}
+          accountInstitution={(destSheetAccount as any).institution}
+          balanceUsd={destSheetAccount.computed_balance_usd}
         />
       )}
     </div>
