@@ -120,61 +120,69 @@ export default function CalendarPage({ embedded = false }: { embedded?: boolean 
       </div>
 
       {view === 'timeline' ? (
-        <div className="space-y-2">
-          {items.length === 0 && (
+        <div className="space-y-3">
+          {Object.keys(dayEvents).length === 0 && (
             <div className="text-center py-12 text-muted-foreground">
               <CalendarDays className="h-10 w-10 mx-auto mb-3 opacity-40" />
               <p>No expected payments this month</p>
               <Button variant="outline" size="sm" className="mt-3" onClick={handleRefresh}>Generate instances</Button>
             </div>
           )}
-          {items.map(item => {
-            const r = (item as any).recurring_expenses;
-            const name = r?.name || 'Recurring';
-            const cat = r?.categories;
-            const acc = r?.accounts;
-            const pm = r?.payment_methods;
-            const usd = toUSD(Number(item.expected_amount), item.expected_currency, fxRates as FxRateRow[] | undefined);
-            const daysUntil = Math.ceil((item.dueDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+          {Object.keys(dayEvents).sort().map(dateKey => {
+            const events = dayEvents[dateKey];
+            const dayDate = new Date(dateKey + 'T12:00:00');
+            const dayTotalUsd = events.reduce(
+              (s, e) => s + toUSD(Number(e.expected_amount), e.expected_currency, fxRates as FxRateRow[] | undefined),
+              0,
+            );
+            const allPaid = events.every(e => e.isPaid);
+            const dayLabel = format(dayDate, "d 'de' MMMM", { locale: undefined as any })
+              .replace(/^(\d+) de (\w+)/, (_m, d, mo) => `${d} ${mo}`);
+            // Manual Spanish month names (avoid extra locale import)
+            const monthsEs = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+            const headerLabel = `${dayDate.getDate()} ${monthsEs[dayDate.getMonth()]}`;
 
             return (
-              <Card key={item.id} className={
-                item.isPaid ? 'border-success/30 opacity-90' :
-                item.isMissing ? 'border-destructive/30' :
-                item.isNeedsReview ? 'border-amber-500/30' : ''
-              }>
-                <CardContent className="flex items-center gap-3 py-3.5">
-                  <div className="text-center shrink-0 w-12">
-                    <p className="text-[10px] text-muted-foreground uppercase">{format(item.dueDate, 'MMM')}</p>
-                    <p className="text-xl font-bold text-foreground">{format(item.dueDate, 'd')}</p>
+              <Card key={dateKey} className={allPaid ? 'opacity-60' : ''}>
+                <CardHeader className="py-3 px-4 flex flex-row items-center justify-between border-b">
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl font-bold text-foreground tabular-nums">{dayDate.getDate()}</span>
+                    <span className="text-sm text-muted-foreground capitalize">{monthsEs[dayDate.getMonth()]}</span>
+                    {isToday(dayDate) && <span className="text-[10px] text-primary font-medium">hoy</span>}
                   </div>
-                  <div className="w-px h-10 bg-border" />
-                  <MerchantLogo name={name} size={36} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-foreground truncate">{name}</p>
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground flex-wrap">
-                      {cat && <span>{cat.icon} {cat.name}</span>}
-                      {pm && <><span>·</span><span className="flex items-center gap-0.5"><CreditCard className="h-3 w-3" />{pm.name}</span></>}
-                      {acc && <><span>·</span><span className="flex items-center gap-0.5"><Wallet className="h-3 w-3" />{acc.name}</span></>}
-                    </div>
-                  </div>
-                  <div className="text-right shrink-0 space-y-0.5">
-                    <p className="text-sm font-bold text-foreground tabular-nums">{formatCurrency(Number(item.expected_amount), item.expected_currency)}</p>
-                    {item.expected_currency !== 'USD' && <p className="text-[10px] text-muted-foreground tabular-nums">~{formatUSD(usd)}</p>}
-                    <RecurringStatusBadge state={item.derived} />
-                    {!item.isPaid && !item.isMissing && (
-                      <p className="text-[10px] text-muted-foreground">{daysUntil > 0 ? `${daysUntil}d away` : daysUntil === 0 ? 'Today' : `${Math.abs(daysUntil)}d overdue`}</p>
-                    )}
-                  </div>
+                  <span className="text-sm font-bold text-foreground tabular-nums">{formatUSD(dayTotalUsd)}</span>
+                </CardHeader>
+                <CardContent className="p-0 divide-y divide-border/60">
+                  {events.map(item => {
+                    const r = (item as any).recurring_expenses;
+                    const name = r?.name || 'Recurring';
+                    const cat = r?.categories;
+                    return (
+                      <div key={item.id} className={`flex items-center gap-3 px-4 py-2.5 ${item.isPaid ? 'opacity-70' : ''}`}>
+                        <MerchantLogo name={name} size={32} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-foreground truncate">{name}</p>
+                          {cat && <p className="text-[11px] text-muted-foreground">{cat.icon} {cat.name}</p>}
+                        </div>
+                        <div className="text-right shrink-0 space-y-0.5">
+                          <p className="text-sm font-semibold text-foreground tabular-nums">
+                            {formatCurrency(Number(item.expected_amount), item.expected_currency)}
+                          </p>
+                          <RecurringStatusBadge state={item.derived} />
+                        </div>
+                        {!item.isPaid && (
+                          <Button
+                            size="sm" variant="ghost" className="h-7 w-7 p-0 shrink-0"
+                            onClick={() => markPaid.mutateAsync(item.id).then(() => toast.success('Marked paid'))}
+                            title="Mark paid"
+                          >
+                            <CheckCircle2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    );
+                  })}
                 </CardContent>
-                {!item.isPaid && (
-                  <div className="px-4 pb-3">
-                    <Button size="sm" variant="outline" className="h-7 text-xs"
-                      onClick={() => markPaid.mutateAsync(item.id).then(() => toast.success('Marked paid'))}>
-                      <CheckCircle2 className="h-3 w-3 mr-1" /> Mark paid
-                    </Button>
-                  </div>
-                )}
               </Card>
             );
           })}
