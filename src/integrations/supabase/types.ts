@@ -281,6 +281,51 @@ export type Database = {
           },
         ]
       }
+      invoices: {
+        Row: {
+          cliente: string
+          created_at: string
+          estado: string
+          fecha: string | null
+          id: string
+          monto_ars: number | null
+          monto_usd: number
+          notas: string | null
+          numero_factura: string | null
+          periodo: string
+          tc_ars: number
+          user_id: string
+        }
+        Insert: {
+          cliente?: string
+          created_at?: string
+          estado?: string
+          fecha?: string | null
+          id?: string
+          monto_ars?: number | null
+          monto_usd: number
+          notas?: string | null
+          numero_factura?: string | null
+          periodo: string
+          tc_ars: number
+          user_id: string
+        }
+        Update: {
+          cliente?: string
+          created_at?: string
+          estado?: string
+          fecha?: string | null
+          id?: string
+          monto_ars?: number | null
+          monto_usd?: number
+          notas?: string | null
+          numero_factura?: string | null
+          periodo?: string
+          tc_ars?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       merchants: {
         Row: {
           created_at: string
