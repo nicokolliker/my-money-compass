@@ -753,8 +753,8 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
               <p className="text-xs text-muted-foreground">
                 Subí los PDFs disponibles. Los faltantes podés cargarlos manualmente en el siguiente paso.
               </p>
-              <FileSlot label="BC IEBRA (1689)" file={iebraFile} onChange={setIebraFile} />
-              <FileSlot label="BC KOLLIKER (8157)" file={kollikerFile} onChange={setKollikerFile} />
+              <FileSlot label="BC mamá (resumen)" file={iebraFile} onChange={setIebraFile} />
+              <FileSlot label="BC papá (resumen)" file={kollikerFile} onChange={setKollikerFile} />
               <FileSlot label="Santander VISA" file={santFile} onChange={setSantFile} />
             </div>
             <DialogFooter className="border-t pt-4 mt-4 min-w-0">
