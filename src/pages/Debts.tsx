@@ -533,7 +533,8 @@ function ViejoSettlementWizard({ open, onOpenChange, onSantTotalDetected }: { op
   const totalARS = items.reduce((s, i) => s + (i.amountARS || 0), 0) + extraItems.reduce((s, i) => s + (i.amountARS || 0), 0);
   const usdExacto = tcBlue > 0 ? totalARS / tcBlue : 0;
   useEffect(() => { setUsdAPagar(Math.round(usdExacto / 100) * 100); }, [usdExacto]);
-  const vueltoARS = Math.max(0, usdAPagar * tcBlue - totalARS);
+  const diferencia = usdAPagar * tcBlue - totalARS;
+  const vueltoARS = Math.max(0, diferencia);
 
   function updateItem(key: string, patch: Partial<SettlementItem>) {
     setItems((rows) => rows.map((r) => (r.key === key ? { ...r, ...patch } : r)));
@@ -787,7 +788,9 @@ function ViejoSettlementWizard({ open, onOpenChange, onSantTotalDetected }: { op
         tcBlue,
         totalARS,
         usdPagado: usdAPagar,
-        vueltoARS,
+        vueltoARS: Math.max(0, diferencia),
+        diferencia,
+        carry_over_ars: diferencia < 0 ? Math.abs(diferencia) : 0,
         breakdown,
         extras: extrasForNotes,
         categoryBreakdown,
@@ -815,11 +818,11 @@ function ViejoSettlementWizard({ open, onOpenChange, onSantTotalDetected }: { op
         .eq('source', 'viejo_settlement')
         .eq('settlement_month', settlementMonth);
 
-      if (vueltoARS > 0) {
+      if (diferencia > 0) {
         await supabase.from('pending_credits' as any).insert({
           user_id: user.id,
-          amount_ars: vueltoARS,
-          amount_usd: vueltoARS * fxArsUsd,
+          amount_ars: diferencia,
+          amount_usd: diferencia * fxArsUsd,
           source: 'viejo_settlement',
           expected_via_account_id: mpAcc.id,
           settlement_month: settlementMonth,
@@ -1115,7 +1118,19 @@ function ViejoSettlementWizard({ open, onOpenChange, onSantTotalDetected }: { op
               <div className="flex items-center justify-between gap-3"><span className="text-muted-foreground">USD a pagar:</span>
                 <Input type="number" value={usdAPagar} onChange={(e) => setUsdAPagar(parseFloat(e.target.value) || 0)} className={cn('h-7 text-xs text-right font-mono w-32', NUMERIC_INPUT_CLS)} />
               </div>
-              <div className="border-t pt-2 flex items-center justify-between text-success"><span>Vuelto ARS:</span><span className="font-mono">+{formatARS(vueltoARS)}</span></div>
+              {diferencia > 0 ? (
+                <div className="border-t pt-2 space-y-0.5">
+                  <div className="flex items-center justify-between text-success"><span>Vuelto ARS:</span><span className="font-mono">+{formatARS(diferencia)}</span></div>
+                  <p className="text-[11px] text-muted-foreground">Tu viejo te devuelve esta diferencia por MercadoPago</p>
+                </div>
+              ) : diferencia < 0 ? (
+                <div className="border-t pt-2 space-y-0.5">
+                  <div className="flex items-center justify-between text-amber-600 dark:text-amber-500"><span>Diferencia pendiente:</span><span className="font-mono">{formatARS(diferencia)}</span></div>
+                  <p className="text-[11px] text-muted-foreground">Quedás debiendo este monto — se puede acumular al próximo mes</p>
+                </div>
+              ) : (
+                <div className="border-t pt-2 flex items-center justify-between text-success"><span>Exacto ✓</span><span /></div>
+              )}
             </div>
             <div className="flex justify-between">
               <Button variant="outline" onClick={() => setStep(1)}>← Atrás</Button>
@@ -1139,10 +1154,16 @@ function ViejoSettlementWizard({ open, onOpenChange, onSantTotalDetected }: { op
               <p className="font-medium mb-1">💸 Pago al viejo:</p>
               <p className="text-xs text-muted-foreground">• Cash USD −${usdAPagar.toLocaleString()}</p>
             </div>
-            {vueltoARS > 0 && (
+            {diferencia > 0 && (
               <div>
                 <p className="font-medium mb-1">💰 Vuelto esperado:</p>
-                <p className="text-xs text-muted-foreground">• Mercado Pago +{formatARS(vueltoARS)} ARS</p>
+                <p className="text-xs text-muted-foreground">• Mercado Pago +{formatARS(diferencia)} ARS</p>
+              </div>
+            )}
+            {diferencia < 0 && (
+              <div>
+                <p className="font-medium mb-1">⚠️ Diferencia pendiente:</p>
+                <p className="text-xs text-muted-foreground">• Quedás debiendo {formatARS(diferencia)} ARS — se acumulará al próximo mes</p>
               </div>
             )}
             <div className="flex justify-between pt-2">
