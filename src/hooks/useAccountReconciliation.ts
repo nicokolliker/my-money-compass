@@ -24,6 +24,7 @@ export interface AccountReconciliation {
   total_spent_usd: number | null;
   balance_after_usd: number | null;
   reconciled_at: string | null;
+  last_import_date: string | null;
   created_at: string;
   updated_at: string;
 }
