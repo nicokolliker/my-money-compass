@@ -1719,8 +1719,6 @@ function ViejoCycleHistory({ importLog }: { importLog: any[] }) {
                   size="sm"
                   onClick={() => selectedMonth && downloadPdfFor(selectedMonth, selected.parsed, selected.tx)}
                 >
-                  }}
-                >
                   <Download className="h-4 w-4 mr-1.5" /> Descargar PDF
                 </Button>
               </div>
