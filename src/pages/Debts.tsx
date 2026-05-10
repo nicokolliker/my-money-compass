@@ -484,7 +484,10 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
       setIebraFile(null); setKollikerFile(null); setSantFile(null);
       setBcTotalARS(0); setSantTotalARS(0); setVisaCiudadMamaARS(0); setVisaCiudadPapaARS(0);
       setExtraItems([]);
+      setItems([]);
       setIebraRows([]); setKollikerRows([]); setSantRows([]);
+      setUsdAPagar(0);
+      setResultUsd(0); setResultVuelto(0);
     }
   }, [open]);
 
