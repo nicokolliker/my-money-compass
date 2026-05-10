@@ -2,7 +2,7 @@ import { ReactNode, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Wallet, ArrowLeftRight, BarChart3, Repeat, BookOpen, Plus,
-  CalendarDays, Target, LogOut, Upload, ChevronDown, ChevronRight, Tag, Store, DollarSign, Plug, LayoutGrid, CreditCard,
+  CalendarDays, Target, LogOut, Upload, ChevronDown, ChevronRight, Tag, Store, DollarSign, Plug, LayoutGrid, CreditCard, Receipt,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
