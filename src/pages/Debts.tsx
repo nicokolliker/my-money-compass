@@ -439,7 +439,13 @@ function ViejoSettlementWizard({ open, onOpenChange, onSantTotalDetected }: { op
   const defaultBlueRate = blueRate?.blue_avg ? Math.round(blueRate.blue_avg) : (arsToUsd > 0 ? Math.round(1 / arsToUsd) : 1390);
 
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
-  const [settlementMonth, setSettlementMonth] = useState<string>(format(new Date(), 'yyyy-MM'));
+  const [settlementMonth, setSettlementMonth] = useState<string>(() => {
+    const today = new Date();
+    const day = today.getDate();
+    const d = new Date(today.getFullYear(), today.getMonth(), 1);
+    if (day < 20) d.setMonth(d.getMonth() - 1);
+    return format(d, 'yyyy-MM');
+  });
   const [iebraFile, setIebraFile] = useState<File | null>(null);
   const [kollikerFile, setKollikerFile] = useState<File | null>(null);
   const [santFile, setSantFile] = useState<File | null>(null);
@@ -466,13 +472,12 @@ function ViejoSettlementWizard({ open, onOpenChange, onSantTotalDetected }: { op
 
   const monthOptions = useMemo(() => {
     const arr: { ym: string; label: string }[] = [];
-    const d = new Date();
-    d.setDate(1);
-    // 2 future months + current + 11 past
-    d.setMonth(d.getMonth() + 2);
-    for (let i = 0; i < 14; i++) {
+    const today = new Date();
+    const start = new Date(today.getFullYear(), today.getMonth(), 1);
+    if (today.getDate() < 20) start.setMonth(start.getMonth() - 1);
+    for (let i = 0; i < 12; i++) {
+      const d = new Date(start.getFullYear(), start.getMonth() - i, 1);
       arr.push({ ym: format(d, 'yyyy-MM'), label: format(d, 'MMMM yyyy', { locale: es }) });
-      d.setMonth(d.getMonth() - 1);
     }
     return arr;
   }, []);
@@ -480,7 +485,12 @@ function ViejoSettlementWizard({ open, onOpenChange, onSantTotalDetected }: { op
   useEffect(() => {
     if (!open) {
       setStep(1);
-      setSettlementMonth(format(new Date(), 'yyyy-MM'));
+      setSettlementMonth((() => {
+        const today = new Date();
+        const d = new Date(today.getFullYear(), today.getMonth(), 1);
+        if (today.getDate() < 20) d.setMonth(d.getMonth() - 1);
+        return format(d, 'yyyy-MM');
+      })());
       setIebraFile(null); setKollikerFile(null); setSantFile(null); setAmexFile(null); setAmexARS(0);
       setBcTotalARS(0); setSantTotalARS(0); setVisaCiudadMamaARS(0); setVisaCiudadPapaARS(0);
       setExtraItems([]);
