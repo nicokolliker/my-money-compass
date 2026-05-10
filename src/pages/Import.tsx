@@ -12,6 +12,7 @@ import { useLatestFxRate } from '@/hooks/useFxRates';
 import { parseArqStatements, type ParsedTransaction, type ParsedArqResult } from '@/lib/importers/arqParser';
 import { useInvalidateArqReconciliations } from '@/hooks/useArqReconciliation';
 import { parseMercadoPago } from '@/lib/importers/mercadoPagoParser';
+import { parseGalicia } from '@/lib/importers/galiciaParser';
 import { useImportLog } from '@/hooks/useImportLog';
 import { MerchantLogo } from '@/components/MerchantLogo';
 import { AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -509,6 +510,115 @@ export default function ImportPage() {
   const mpSelectedCount = mpRows.filter((r) => r.selected && !r.duplicate).length;
   const mpDupCount = mpRows.filter((r) => r.duplicate).length;
 
+  // ---- Galicia state ----
+  const [galiciaFile, setGaliciaFile] = useState<File | null>(null);
+  const [galiciaProcessing, setGaliciaProcessing] = useState(false);
+  const [galiciaRows, setGaliciaRows] = useState<PreviewRow[]>([]);
+  const [galiciaImporting, setGaliciaImporting] = useState(false);
+  const [galiciaResultMsg, setGaliciaResultMsg] = useState<string | null>(null);
+  const [galiciaMonth, setGaliciaMonth] = useState<string>('');
+
+  const galiciaAccount = useMemo(
+    () => accounts?.find((a) => /galicia/i.test(a.name)) || null,
+    [accounts],
+  );
+
+  async function handleGaliciaProcess() {
+    if (!galiciaFile) return;
+    setGaliciaProcessing(true);
+    setGaliciaResultMsg(null);
+    try {
+      const buf = await galiciaFile.arrayBuffer();
+      const parsed = parseGalicia(buf);
+      if (parsed.length === 0) {
+        toast.error('No se encontraron transacciones');
+        setGaliciaRows([]);
+        return;
+      }
+      const ids = parsed.map((p) => p.external_id);
+      const { data: existing } = await supabase
+        .from('transactions')
+        .select('external_id')
+        .in('external_id', ids);
+      const dupSet = new Set((existing || []).map((r: any) => r.external_id));
+      setGaliciaRows(
+        parsed.map((p) => ({
+          ...p,
+          duplicate: dupSet.has(p.external_id),
+          selected: !dupSet.has(p.external_id) && p.type !== 'transfer',
+        })),
+      );
+      setGaliciaMonth(detectPredominantMonth(parsed));
+      toast.success(`${parsed.length} transacciones detectadas`);
+    } catch (e: any) {
+      toast.error(e.message || 'Error al procesar archivo');
+    } finally {
+      setGaliciaProcessing(false);
+    }
+  }
+
+  async function handleGaliciaImport() {
+    if (!galiciaAccount) {
+      toast.error('No se encontró cuenta Galicia');
+      return;
+    }
+    const toImport = galiciaRows.filter((r) => r.selected && !r.duplicate);
+    if (toImport.length === 0) return;
+    setGaliciaImporting(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+      const fxRate = arsToUsd || 0;
+      const payload = toImport.map((r) => {
+        const isIncome = r.type === 'income';
+        const isTransfer = r.type === 'transfer';
+        const sign = isIncome || isTransfer ? 1 : -1;
+        return {
+          user_id: user.id,
+          account_id: galiciaAccount.id,
+          date: r.date,
+          description: r.description,
+          merchant: r.description,
+          amount: sign * r.amountARS,
+          currency: 'ARS',
+          fx_rate: fxRate,
+          amount_usd: fxRate > 0 ? +(sign * r.amountARS * fxRate).toFixed(2) : 0,
+          type: (isIncome ? 'income' : isTransfer ? 'transfer' : 'expense') as any,
+          external_id: r.external_id,
+          raw_imported_description: r.description,
+        };
+      });
+      const { error } = await supabase.from('transactions').insert(payload);
+      if (error) throw error;
+      if (galiciaMonth) {
+        await supabase.from('import_log').upsert(
+          {
+            user_id: user.id,
+            source: 'galicia',
+            month: galiciaMonth,
+            transaction_count: toImport.length,
+            imported_at: new Date().toISOString(),
+          },
+          { onConflict: 'user_id,source,month' },
+        );
+        qc.invalidateQueries({ queryKey: ['import-log'] });
+      }
+      const dups = galiciaRows.filter((r) => r.duplicate).length;
+      setGaliciaResultMsg(`${toImport.length} transacciones importadas, ${dups} duplicados ignorados`);
+      toast.success('Importación completa');
+      setGaliciaRows([]);
+      setGaliciaMonth('');
+      setGaliciaFile(null);
+    } catch (e: any) {
+      toast.error(e.message || 'Error al importar');
+    } finally {
+      setGaliciaImporting(false);
+    }
+  }
+
+  const galiciaSelectedCount = galiciaRows.filter((r) => r.selected && !r.duplicate).length;
+  const galiciaDupCount = galiciaRows.filter((r) => r.duplicate).length;
+
 
 
   // ---- Wise CSV state ----
@@ -844,9 +954,65 @@ export default function ImportPage() {
         </CardContent>
       </Card>
 
+      {/* Banco Galicia */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base flex items-center gap-2">
+            <MerchantLogo name="Banco Galicia" domain="galicia.com.ar" size={28} />
+            Banco Galicia
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <FileDropzone
+              label="Extracto (.xlsx)"
+              file={galiciaFile}
+              onFile={setGaliciaFile}
+              accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              acceptLabel="XLSX"
+            />
+          </div>
+          <div className="flex items-center gap-3">
+            <Button onClick={handleGaliciaProcess} disabled={!galiciaFile || galiciaProcessing}>
+              <Upload className="h-4 w-4 mr-2" />
+              {galiciaProcessing ? 'Procesando...' : 'Procesar'}
+            </Button>
+            {!galiciaAccount && (
+              <Badge variant="outline" className="text-amber-600">
+                No se encontró cuenta Galicia
+              </Badge>
+            )}
+          </div>
+
+          {galiciaResultMsg && (
+            <div className="flex items-center gap-2 text-sm text-success">
+              <CheckCircle2 className="h-4 w-4" /> {galiciaResultMsg}
+            </div>
+          )}
+
+          {galiciaRows.length > 0 && (
+            <div className="space-y-3">
+              <MonthConfirm month={galiciaMonth} onChange={setGaliciaMonth} count={galiciaRows.length} />
+              <div className="flex gap-2 flex-wrap">
+                <Badge>{galiciaSelectedCount} seleccionadas</Badge>
+                {galiciaDupCount > 0 && <Badge variant="secondary">{galiciaDupCount} duplicadas</Badge>}
+              </div>
+              {renderPreviewTable(galiciaRows, (i) =>
+                setGaliciaRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, selected: !r.selected } : r))),
+              )}
+              <Button
+                onClick={handleGaliciaImport}
+                disabled={galiciaImporting || galiciaSelectedCount === 0 || !galiciaAccount || !galiciaMonth}
+                className="w-full"
+              >
+                {galiciaImporting ? 'Importando...' : `Importar ${galiciaSelectedCount} seleccionadas`}
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
 
-      {/* Wise CSV (manual) */}
       <div ref={wiseSectionRef}>
         <Card>
           <CardHeader className="pb-2">
@@ -911,9 +1077,10 @@ export default function ImportPage() {
   );
 }
 
-const SOURCES: { key: 'arq' | 'mercadopago' | 'wise'; label: string }[] = [
+const SOURCES: { key: 'arq' | 'mercadopago' | 'galicia' | 'wise'; label: string }[] = [
   { key: 'arq', label: 'ARQ ARS' },
   { key: 'mercadopago', label: 'MercadoPago' },
+  { key: 'galicia', label: 'Banco Galicia' },
   { key: 'wise', label: 'Wise (manual)' },
 ];
 
