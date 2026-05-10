@@ -22,6 +22,7 @@ export interface ParsedTransaction {
   external_id: string;       // stable dedup key
   matched: boolean;          // true if USD twin was found for ARS row
   isWiseDeposit?: boolean;   // true for "WISE US INC" Compra USDc rows
+  isIncomingTransfer?: boolean; // true for own-account transfers (e.g. ARQ → MP from "NICOLAS")
 }
 
 /** Return value of parseArqStatements */
