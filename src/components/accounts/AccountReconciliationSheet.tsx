@@ -45,7 +45,10 @@ export function AccountReconciliationSheet({
   const { data: history = [] } = useReconciliationHistory(accountId);
 
   const reconciled = history.filter(r => r.status === 'reconciled').slice(0, 6);
-  const totalPending = pending.reduce((s, r) => s + Number(r.transfer_amount_usd), 0);
+  const totalPending = pending.reduce(
+    (s, r) => s + Math.max(0, Number(r.transfer_amount_usd) - Number(r.total_spent_usd ?? 0)),
+    0,
+  );
 
   const goToImport = () => {
     onClose();
