@@ -223,7 +223,7 @@ function ViejoDebtCard({ importLog, onOpen }: {
               </div>
             </div>
             <Button variant="outline" className="w-full" size="sm" onClick={onOpen}>
-              Ver detalle / Reliquidar →
+              Reliquidar o ver otro mes →
             </Button>
           </>
         ) : (
@@ -232,7 +232,7 @@ function ViejoDebtCard({ importLog, onOpen }: {
               Subí los resúmenes de BC + Santander y completá los gastos del mes para liquidar.
             </p>
             <Button className="w-full" onClick={onOpen}>
-              Liquidar {monthLabel} →
+              Liquidar →
             </Button>
           </>
         )}
@@ -245,106 +245,67 @@ function SplitwiseDebtCard({ account, importLog, onOpen }: {
   account: any; importLog: any[]; onOpen: () => void;
 }) {
   const currentMonth = format(new Date(), 'yyyy-MM');
-  const balance = Number(account.computed_balance_usd || 0);
-  const teDebenAVos = balance > 0.5;
-  const vosDebes = balance < -0.5;
 
   const swImports = (importLog || [])
-    .filter(l => l.source === 'splitwise')
-    .sort((a, b) => b.month.localeCompare(a.month));
+    .filter((l: any) => l.source === 'splitwise')
+    .sort((a: any, b: any) => b.month.localeCompare(a.month));
   const lastImport = swImports[0];
   const importadoEsteMes = lastImport?.month === currentMonth;
 
-  const steps = [
-    {
-      n: 1,
-      label: 'Cargar CSV del mes',
-      sublabel: 'splitwise.com → Tu grupo → Exportar',
-      done: importadoEsteMes,
-      status: importadoEsteMes
-        ? 'Importado este mes'
-        : lastImport
-          ? `Último: ${lastImport.month}`
-          : 'Sin datos aún',
-    },
-    {
-      n: 2,
-      label: 'Revisar gastos y categorías',
-      sublabel: 'Confirmá en qué se gastó y quién pagó',
-      done: importadoEsteMes,
-      status: importadoEsteMes ? 'Revisado' : 'Pendiente',
-    },
-    {
-      n: 3,
-      label: 'Saldar deuda',
-      sublabel: 'Transferencia desde tu cuenta ARS',
-      done: !vosDebes,
-      status: vosDebes
-        ? `Debés ${formatUSD(Math.abs(balance))}`
-        : teDebenAVos
-          ? `Te deben ${formatUSD(balance)}`
-          : 'Al día ✓',
-    },
-  ];
+  const balance = Number(account?.computed_balance_usd || 0);
+  const teDebenAVos = balance > 0.5;
+  const vosDebes = balance < -0.5;
 
   return (
-    <Card>
-      <CardContent className="p-5 space-y-4">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-center gap-3 min-w-0">
-            <MerchantLogo name="Splitwise" domain="splitwise.com" size={40} />
-            <div className="min-w-0">
-              <p className="font-semibold text-base">Splitwise</p>
+    <Card className="rounded-2xl overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-4 border-b border-border/50">
+        <div className="flex items-center gap-3">
+          <MerchantLogo name="Splitwise" domain="splitwise.com" size={36} />
+          <div>
+            <p className="text-sm font-semibold text-foreground">Splitwise</p>
+            <p className="text-xs text-muted-foreground">
+              {lastImport
+                ? `Última actualización: ${lastImport.month}`
+                : 'Sin datos aún'}
+            </p>
+          </div>
+        </div>
+        {importadoEsteMes && (
+          <Badge variant="secondary" className="text-[10px]">
+            ✓ {format(new Date(), 'MMMM', { locale: es })}
+          </Badge>
+        )}
+      </div>
+
+      <div className="px-5 py-4 space-y-3">
+        {(teDebenAVos || vosDebes) && (
+          <div className="grid grid-cols-1 gap-2">
+            <div className="rounded-xl bg-muted/50 px-3 py-2.5 flex items-center justify-between">
               <p className="text-xs text-muted-foreground">
-                {lastImport
-                  ? `Última actualización: ${lastImport.month}`
-                  : 'Sin datos aún'}
+                {teDebenAVos ? 'Te deben' : 'Debés'}
+              </p>
+              <p className={cn(
+                'text-sm font-mono font-bold',
+                teDebenAVos ? 'text-success' : 'text-destructive'
+              )}>
+                {teDebenAVos ? '+' : '-'}${Math.abs(balance).toFixed(2)}
               </p>
             </div>
           </div>
-          <div className="text-right shrink-0">
-            {!teDebenAVos && !vosDebes && (
-              <Badge variant="secondary">Al día ✓</Badge>
-            )}
-            {teDebenAVos && (
-              <>
-                <p className="text-xl font-bold font-mono text-success">+{formatUSD(balance)}</p>
-                <p className="text-[10px] text-muted-foreground">te deben</p>
-              </>
-            )}
-            {vosDebes && (
-              <>
-                <p className="text-xl font-bold font-mono text-destructive">-{formatUSD(Math.abs(balance))}</p>
-                <p className="text-[10px] text-muted-foreground">debés</p>
-              </>
-            )}
-          </div>
-        </div>
+        )}
 
-        <div className="divide-y divide-border border-y">
-          {steps.map(step => (
-            <div key={step.n} className="flex items-center gap-3 py-3">
-              <div className={cn(
-                'shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold',
-                step.done ? 'bg-success/20 text-success' : 'bg-muted text-muted-foreground'
-              )}>
-                {step.done ? '✓' : step.n}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground">{step.label}</p>
-                <p className="text-xs text-muted-foreground">{step.sublabel}</p>
-              </div>
-              <Badge variant={step.done ? 'secondary' : 'outline'} className="text-[10px] shrink-0">
-                {step.status}
-              </Badge>
-            </div>
-          ))}
-        </div>
+        <p className="text-xs text-muted-foreground">
+          Cargá el CSV mensual para ver el detalle de gastos del grupo y saldar si corresponde.
+        </p>
 
-        <Button onClick={onOpen} className="w-full">
-          {importadoEsteMes ? 'Actualizar / saldar →' : 'Cargar CSV de este mes →'}
+        <Button
+          variant={importadoEsteMes ? 'outline' : 'default'}
+          className="w-full"
+          onClick={onOpen}
+        >
+          {importadoEsteMes ? 'Actualizar / saldar →' : 'Cargar CSV →'}
         </Button>
-      </CardContent>
+      </div>
     </Card>
   );
 }
