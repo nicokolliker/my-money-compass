@@ -1077,9 +1077,10 @@ export default function ImportPage() {
   );
 }
 
-const SOURCES: { key: 'arq' | 'mercadopago' | 'wise'; label: string }[] = [
+const SOURCES: { key: 'arq' | 'mercadopago' | 'galicia' | 'wise'; label: string }[] = [
   { key: 'arq', label: 'ARQ ARS' },
   { key: 'mercadopago', label: 'MercadoPago' },
+  { key: 'galicia', label: 'Banco Galicia' },
   { key: 'wise', label: 'Wise (manual)' },
 ];
 
