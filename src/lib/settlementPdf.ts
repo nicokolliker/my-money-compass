@@ -70,14 +70,104 @@ function rgb(doc: jsPDF, fn: 'setFillColor' | 'setTextColor' | 'setDrawColor', c
   doc[fn](c[0], c[1], c[2]);
 }
 
-// ---------- Poppins font loader ----------
+// ---------- Category emoji mapping ----------
+const CATEGORY_EMOJI: Record<string, string> = {
+  // Comida
+  'Comida': '🍽️', 'Comida fuera': '🍽️', 'Food': '🍽️', 'Food & Drink': '🍽️', 'Food & Drinks': '🍽️',
+  'Restaurantes': '🍽️', 'Restaurants': '🍽️', 'Delivery': '🛵',
+  'Supermercado': '🛒', 'Groceries': '🛒', 'Mercado': '🛒',
+  // Transporte
+  'Transporte': '🚗', 'Transport': '🚗', 'Transportation': '🚗',
+  'Auto': '🚙', 'Nafta': '⛽', 'Combustible': '⛽', 'Fuel': '⛽',
+  'Taxi': '🚕', 'Uber': '🚕',
+  // Casa / Servicios
+  'Casa': '🏠', 'Hogar': '🏠', 'Housing': '🏠', 'Rent': '🏠', 'Alquiler': '🏠',
+  'Expensas': '🏢',
+  'Servicios': '💡', 'Utilities': '💡', 'Luz': '💡', 'Gas': '🔥', 'Agua': '💧',
+  'Internet': '🌐',
+  // Salud
+  'Salud': '💊', 'Health': '💊', 'Healthcare': '💊', 'Farmacia': '💊', 'Médico': '🏥',
+  'Obra Social': '🏥',
+  // Digital / Suscripciones
+  'Digital': '💻', 'Suscripciones': '💳', 'Subscriptions': '💳', 'Software': '🧰',
+  'IA': '🤖', 'AI': '🤖', 'Creatividad': '🎨', 'Productividad': '⚡',
+  'Entretenimiento': '🎬', 'Entertainment': '🎬', 'Streaming': '📺',
+  // Shopping
+  'Shopping': '🛍️', 'Compras': '🛍️', 'Ropa': '👕', 'Clothing': '👕',
+  // Educación / Viajes
+  'Educación': '📚', 'Education': '📚', 'Cursos': '📚',
+  'Viajes': '✈️', 'Travel': '✈️',
+  // Personal / Otros
+  'Personal': '🧖', 'Gimnasio': '🏋️', 'Gym': '🏋️',
+  'Regalos': '🎁', 'Gifts': '🎁',
+  'Mascotas': '🐶', 'Pets': '🐶',
+  'Seguros': '🛡️', 'Insurance': '🛡️',
+  'Préstamo': '💵', 'Prestamo': '💵', 'Loan': '💵',
+  'Impuestos': '🧾', 'Taxes': '🧾',
+  'Trabajo': '💼', 'Work': '💼',
+  'Otros': '📦', 'Other': '📦', 'Uncategorized': '📦',
+};
+
+function getCategoryEmoji(name?: string): string {
+  if (!name) return '📦';
+  if (CATEGORY_EMOJI[name]) return CATEGORY_EMOJI[name];
+  // case-insensitive fallback
+  const lower = name.toLowerCase();
+  for (const k of Object.keys(CATEGORY_EMOJI)) {
+    if (k.toLowerCase() === lower) return CATEGORY_EMOJI[k];
+  }
+  // partial match
+  for (const k of Object.keys(CATEGORY_EMOJI)) {
+    if (lower.includes(k.toLowerCase()) || k.toLowerCase().includes(lower)) return CATEGORY_EMOJI[k];
+  }
+  return '📦';
+}
+
+// ---------- Shared table column widths (consistent across all tables) ----------
+const COL = {
+  date: 58,
+  category: 110,
+  amount: 92,
+};
+
+// ---------- Font loaders (Poppins + Noto Emoji) ----------
 const POPPINS_URLS = {
   regular: 'https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/poppins/Poppins-Regular.ttf',
   bold:    'https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/poppins/Poppins-Bold.ttf',
 };
+const NOTO_EMOJI_URL = 'https://cdn.jsdelivr.net/gh/googlefonts/noto-emoji@main/fonts/NotoEmoji-Regular.ttf';
 
 let poppinsCache: { regular: string; bold: string } | null = null;
 let poppinsLoading: Promise<{ regular: string; bold: string } | null> | null = null;
+let emojiCache: string | null = null;
+let emojiLoading: Promise<string | null> | null = null;
+
+async function fetchNotoEmoji(): Promise<string | null> {
+  if (emojiCache) return emojiCache;
+  if (emojiLoading) return emojiLoading;
+  emojiLoading = (async () => {
+    try {
+      const buf = await fetch(NOTO_EMOJI_URL).then((r) => r.arrayBuffer());
+      emojiCache = arrayBufferToBase64(buf);
+      return emojiCache;
+    } catch (e) {
+      console.warn('Noto Emoji load failed', e);
+      return null;
+    }
+  })();
+  return emojiLoading;
+}
+
+function registerNotoEmoji(doc: jsPDF, base64: string): string {
+  try {
+    doc.addFileToVFS('NotoEmoji-Regular.ttf', base64);
+    doc.addFont('NotoEmoji-Regular.ttf', 'NotoEmoji', 'normal');
+    return 'NotoEmoji';
+  } catch (e) {
+    console.warn('Failed to register NotoEmoji', e);
+    return '';
+  }
+}
 
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
   let binary = '';
