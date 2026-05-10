@@ -45,7 +45,10 @@ export function ArqReconciliationSheet({ open, onClose, accountName, balanceUsd 
   const { data: history  = [] } = useArqReconciliationHistory();
 
   const reconciled = history.filter(r => r.status === 'reconciled').slice(0, 6);
-  const totalPending = pending.reduce((s, r) => s + Number(r.wise_amount_usd), 0);
+  const totalPending = pending.reduce(
+    (s, r) => s + Math.max(0, Number(r.wise_amount_usd) - Number(r.total_spent_usd ?? 0)),
+    0,
+  );
 
   const goToImport = () => {
     onClose();
