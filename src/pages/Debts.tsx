@@ -457,6 +457,10 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
   const [obSocARS, setObSocARS] = useState(0);
   const [processing, setProcessing] = useState(false);
 
+  const [iebraRows, setIebraRows] = useState<(ParsedTransaction & { categoryName: string; selected: boolean })[]>([]);
+  const [kollikerRows, setKollikerRows] = useState<(ParsedTransaction & { categoryName: string; selected: boolean })[]>([]);
+  const [santRows, setSantRows] = useState<(ParsedTransaction & { categoryName: string; selected: boolean })[]>([]);
+
   const [items, setItems] = useState<SettlementItem[]>([]);
   const [extraItems, setExtraItems] = useState<ExtraItem[]>([]);
   const [tcBlue, setTcBlue] = useState(defaultBlueRate);
