@@ -801,6 +801,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
               <FileSlot label="BC mamá (resumen)" file={iebraFile} onChange={setIebraFile} />
               <FileSlot label="BC papá (resumen)" file={kollikerFile} onChange={setKollikerFile} />
               <FileSlot label="Santander VISA" file={santFile} onChange={setSantFile} />
+              <FileSlot label="AMEX Santander" file={amexFile} onChange={setAmexFile} />
             </div>
             <DialogFooter className="border-t pt-4 mt-4 min-w-0">
               <Button onClick={handleProcessFiles} disabled={processing}>
