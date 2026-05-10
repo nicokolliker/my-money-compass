@@ -532,7 +532,7 @@ function ViejoSettlementWizard({ open, onOpenChange, onSantTotalDetected }: { op
 
   const totalARS = items.reduce((s, i) => s + (i.amountARS || 0), 0) + extraItems.reduce((s, i) => s + (i.amountARS || 0), 0);
   const usdExacto = tcBlue > 0 ? totalARS / tcBlue : 0;
-  useEffect(() => { setUsdAPagar(Math.round(usdExacto / 100) * 100); }, [usdExacto]);
+  useEffect(() => { setUsdAPagar(Math.ceil(usdExacto / 100) * 100); }, [usdExacto, tcBlue]);
   const diferencia = usdAPagar * tcBlue - totalARS;
   const vueltoARS = Math.max(0, diferencia);
 
@@ -788,9 +788,9 @@ function ViejoSettlementWizard({ open, onOpenChange, onSantTotalDetected }: { op
         tcBlue,
         totalARS,
         usdPagado: usdAPagar,
-        vueltoARS: Math.max(0, diferencia),
+        vueltoARS: diferencia,
         diferencia,
-        carry_over_ars: diferencia < 0 ? Math.abs(diferencia) : 0,
+        carry_over_ars: 0,
         breakdown,
         extras: extrasForNotes,
         categoryBreakdown,
@@ -1123,11 +1123,6 @@ function ViejoSettlementWizard({ open, onOpenChange, onSantTotalDetected }: { op
                   <div className="flex items-center justify-between text-success"><span>Vuelto ARS:</span><span className="font-mono">+{formatARS(diferencia)}</span></div>
                   <p className="text-[11px] text-muted-foreground">Tu viejo te devuelve esta diferencia por MercadoPago</p>
                 </div>
-              ) : diferencia < 0 ? (
-                <div className="border-t pt-2 space-y-0.5">
-                  <div className="flex items-center justify-between text-amber-600 dark:text-amber-500"><span>Diferencia pendiente:</span><span className="font-mono">{formatARS(diferencia)}</span></div>
-                  <p className="text-[11px] text-muted-foreground">Quedás debiendo este monto — se puede acumular al próximo mes</p>
-                </div>
               ) : (
                 <div className="border-t pt-2 flex items-center justify-between text-success"><span>Exacto ✓</span><span /></div>
               )}
@@ -1158,12 +1153,6 @@ function ViejoSettlementWizard({ open, onOpenChange, onSantTotalDetected }: { op
               <div>
                 <p className="font-medium mb-1">💰 Vuelto esperado:</p>
                 <p className="text-xs text-muted-foreground">• Mercado Pago +{formatARS(diferencia)} ARS</p>
-              </div>
-            )}
-            {diferencia < 0 && (
-              <div>
-                <p className="font-medium mb-1">⚠️ Diferencia pendiente:</p>
-                <p className="text-xs text-muted-foreground">• Quedás debiendo {formatARS(diferencia)} ARS — se acumulará al próximo mes</p>
               </div>
             )}
             <div className="flex justify-between pt-2">
