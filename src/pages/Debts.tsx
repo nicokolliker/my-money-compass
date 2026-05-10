@@ -223,7 +223,7 @@ function ViejoDebtCard({ importLog, onOpen }: {
               </div>
             </div>
             <Button variant="outline" className="w-full" size="sm" onClick={onOpen}>
-              Ver detalle / Reliquidar →
+              Reliquidar o ver otro mes →
             </Button>
           </>
         ) : (
