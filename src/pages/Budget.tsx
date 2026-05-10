@@ -401,6 +401,7 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                     </tr>
 
                     {variableExpanded && tree.map(cat => (
+                      <React.Fragment key={`v-frag-${cat.id}`}>
                       <tr key={`v-${cat.id}`} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
                         <td className="px-4 py-2 pl-9 sticky left-0 z-10 bg-card"
                           style={{ boxShadow: '2px 0 4px -2px rgba(0,0,0,0.06)' }}>
@@ -440,6 +441,40 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                           {fmt(MONTHS.reduce((s, _, i) => s + (isPast(i) ? getActualSpending(cat.id, i) : getBudgetAmount(cat.id, i)), 0))}
                         </td>
                       </tr>
+                      {cat.isDigital && digitalExpanded && cat.children.map(child => (
+                        <tr key={`dig-${child.id}`} className="border-b border-border/30 hover:bg-muted/10 transition-colors bg-muted/20">
+                          <td className="px-4 py-1.5 pl-14 sticky left-0 z-10 bg-muted/20"
+                            style={{ boxShadow: '2px 0 4px -2px rgba(0,0,0,0.06)' }}>
+                            <span className="text-xs text-muted-foreground">↳ {child.name}</span>
+                          </td>
+                          {MONTHS.map((_, i) => {
+                            const actual = getActualSpending(child.id, i);
+                            const budgeted = getBudgetAmount(child.id, i);
+                            return (
+                              <td key={i} className={cn('px-1.5 py-1.5 text-center', isCurrent(i) && 'bg-primary/5')}>
+                                {isPast(i) ? (
+                                  <span className={actual > 0 ? 'text-xs text-foreground tabular-nums' : 'text-xs text-muted-foreground'}>
+                                    {actual > 0 ? fmt(actual) : '—'}
+                                  </span>
+                                ) : (
+                                  <Input
+                                    key={`${child.id}-${selectedYear}-${i}-${budgeted}`}
+                                    type="number"
+                                    defaultValue={budgeted || ''}
+                                    placeholder="0"
+                                    className={cn('h-7 text-xs text-center px-1 tabular-nums border-border/50 rounded-lg', noSpinClass)}
+                                    onBlur={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) saveBudget(child.id, i, v); }}
+                                  />
+                                )}
+                              </td>
+                            );
+                          })}
+                          <td className="px-4 py-1.5 text-right tabular-nums text-xs text-muted-foreground">
+                            {fmt(MONTHS.reduce((s, _, i) => s + (isPast(i) ? getActualSpending(child.id, i) : getBudgetAmount(child.id, i)), 0))}
+                          </td>
+                        </tr>
+                      ))}
+                      </React.Fragment>
                     ))}
                   </>
                 )}
