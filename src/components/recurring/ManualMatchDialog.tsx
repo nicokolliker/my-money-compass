@@ -4,10 +4,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
-import { useLinkInstanceToTransaction, type RecurringInstance } from '@/hooks/useRecurringInstances';
+import { useLinkInstanceToTransaction, useMarkInstancePaid, type RecurringInstance } from '@/hooks/useRecurringInstances';
 import { formatCurrency } from '@/lib/constants';
 import { format } from 'date-fns';
-import { Link2, Search } from 'lucide-react';
+import { Link2, Search, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Props {
@@ -25,6 +25,7 @@ interface Props {
  */
 export default function ManualMatchDialog({ instance, open, onOpenChange }: Props) {
   const link = useLinkInstanceToTransaction();
+  const markPaid = useMarkInstancePaid();
 
   const { data: candidates, isLoading } = useQuery({
     enabled: open && !!instance,
@@ -58,16 +59,36 @@ export default function ManualMatchDialog({ instance, open, onOpenChange }: Prop
 
       const expectedAmt = Number(instance.expected_amount);
       const expectedTime = expected.getTime();
+      const recName = ((instance as any).recurring_expenses?.name || '').toLowerCase().trim();
+      const recTokens = recName.split(/\s+/).filter((t: string) => t.length >= 3);
+      const nameScore = (txStr: string): number => {
+        const s = (txStr || '').toLowerCase();
+        if (!recName) return 0;
+        if (s.includes(recName)) return 100;
+        let hits = 0;
+        for (const t of recTokens) if (s.includes(t)) hits++;
+        return hits * 25;
+      };
       return (data || [])
         .filter((t: any) => !linkedIds.has(t.id))
         .map((t: any) => ({
           ...t,
           _dateDiff: Math.abs(new Date(t.date + 'T12:00:00').getTime() - expectedTime),
           _amtDiff: Math.abs(Math.abs(Number(t.amount)) - expectedAmt),
+          _nameScore: Math.max(nameScore(t.merchant), nameScore(t.description)),
         }))
-        .sort((a: any, b: any) => a._dateDiff - b._dateDiff || a._amtDiff - b._amtDiff);
+        .sort((a: any, b: any) => (b._nameScore - a._nameScore) || (a._dateDiff - b._dateDiff) || (a._amtDiff - b._amtDiff));
     },
   });
+
+  const handleMarkPaidUnlinked = async () => {
+    if (!instance) return;
+    try {
+      await markPaid.mutateAsync(instance.id);
+      toast.success('Marcado como pagado');
+      onOpenChange(false);
+    } catch (e: any) { toast.error(e.message); }
+  };
 
   const handleLink = async (txId: string) => {
     if (!instance) return;
@@ -87,6 +108,7 @@ export default function ManualMatchDialog({ instance, open, onOpenChange }: Prop
             {instance && (
               <>Pick the transaction that paid <span className="font-medium text-foreground">{(instance as any).recurring_expenses?.name}</span> ({formatCurrency(Number(instance.expected_amount), instance.expected_currency)}, expected {format(new Date(instance.expected_date + 'T12:00:00'), 'MMM d')})</>
             )}
+            <span className="block mt-1 text-xs text-muted-foreground">O marcá como pagado si ya lo hiciste por otro medio</span>
           </DialogDescription>
         </DialogHeader>
 
@@ -131,8 +153,19 @@ export default function ManualMatchDialog({ instance, open, onOpenChange }: Prop
           })}
         </div>
 
-        <div className="flex justify-end pt-2">
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+        <div className="pt-3 border-t space-y-2">
+          <Button
+            variant="outline"
+            className="w-full justify-center"
+            disabled={markPaid.isPending || !instance}
+            onClick={handleMarkPaidUnlinked}
+          >
+            <CheckCircle2 className="h-4 w-4 mr-2" />
+            Marcar como pagado sin vincular →
+          </Button>
+          <div className="flex justify-end">
+            <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>Cancel</Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

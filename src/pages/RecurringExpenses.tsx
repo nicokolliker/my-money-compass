@@ -16,6 +16,8 @@ import { useCategoryTree } from '@/hooks/useCategoryTree';
 import { formatUSD } from '@/lib/constants';
 import { toMonthlyAmount, isDerivedPaid, toUSD, type FxRateRow, type DerivedInstanceState } from '@/lib/money';
 import { Plus, Trash2, Pencil, Repeat, ChevronDown } from 'lucide-react';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RTooltip } from 'recharts';
+import { getCategoryHex } from '@/lib/categoryColors';
 import { toast } from 'sonner';
 import { format, addMonths, addYears, addWeeks } from 'date-fns';
 import { DemoDataBanner } from '@/components/DemoDataBanner';
@@ -392,7 +394,57 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
             <MetricCard label="Disponible" value={formatUSD(disponibleUsd)} hint={monthIncome > 0 ? `income ${formatUSD(monthIncome)}` : 'no income tracked'} valueColor={disponibleUsd < 0 ? '#A32D2D' : undefined} />
           </div>
 
-          {/* Category cards */}
+          {/* Donut breakdown */}
+          {(() => {
+            const slices = tree
+              .map(c => ({ id: c.id, name: c.name, value: breakdown[c.id] || 0, color: getCategoryHex(c.name, c.color) }))
+              .filter(s => s.value > 0.01);
+            if (slices.length === 0) return null;
+            return (
+              <Card>
+                <CardContent className="pt-4 pb-4">
+                  <div className="relative">
+                    <ResponsiveContainer width="100%" height={200}>
+                      <PieChart>
+                        <Pie
+                          data={slices}
+                          dataKey="value"
+                          nameKey="name"
+                          innerRadius={55}
+                          outerRadius={85}
+                          paddingAngle={2}
+                          stroke="none"
+                        >
+                          {slices.map((s, i) => <Cell key={i} fill={s.color} />)}
+                        </Pie>
+                        <RTooltip
+                          formatter={(v: any) => formatUSD(Number(v))}
+                          contentStyle={{ borderRadius: 8, fontSize: 12 }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                      <p className="text-[10px] text-muted-foreground">Total fijos</p>
+                      <p className="text-lg font-bold tabular-nums">{formatUSD(totalFijosUsd)}</p>
+                      <p className="text-[10px] text-muted-foreground">/mes</p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 justify-center mt-3">
+                    {slices.map(s => {
+                      const pct = totalFijosUsd > 0 ? (s.value / totalFijosUsd) * 100 : 0;
+                      return (
+                        <div key={s.id} className="flex items-center gap-1.5 text-[11px]">
+                          <span className="w-2 h-2 rounded-full" style={{ background: s.color }} />
+                          <span className="text-foreground">{s.name}</span>
+                          <span className="text-muted-foreground tabular-nums">{pct.toFixed(0)}%</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })()}
           <div className="space-y-3">
             {tree.map(c => {
               const group = grouped[c.id];
