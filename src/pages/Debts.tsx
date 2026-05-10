@@ -44,6 +44,7 @@ export default function DebtsPage() {
   const { data: pendingCredits } = usePendingCredits();
   const [openViejo, setOpenViejo] = useState(false);
   const [openSw, setOpenSw] = useState(false);
+  const [detail, setDetail] = useState<{ parsed: any; monthLabel: string; tx: any } | null>(null);
   const [santPreviewARS, setSantPreviewARS] = useState<number>(() => {
     const v = Number(sessionStorage.getItem('viejo_santTotalARS') || 0);
     return Number.isFinite(v) ? v : 0;
@@ -59,6 +60,34 @@ export default function DebtsPage() {
   };
 
   const hasPendingCredits = (pendingCredits || []).some((c: any) => c.status !== 'matched');
+
+  function downloadDetailPdf() {
+    if (!detail?.parsed) return;
+    const p = detail.parsed;
+    const ym: string = p.month || (detail.tx?.date || '').slice(0, 7);
+    const breakdown: Record<string, number> = p.breakdown || {};
+    const manualItems: any[] = Object.entries(breakdown)
+      .filter(([k, v]) => !CARD_KEYS.includes(k) && Number(v) > 0)
+      .map(([k, v]) => ({ label: ITEM_META[k]?.label || k, amountARS: Number(v) }));
+    if (Array.isArray(p.extras)) {
+      for (const e of p.extras) manualItems.push({ label: e.label, amountARS: e.amountARS, categoryName: e.categoryName });
+    }
+    const sumBreakdown = Object.values(breakdown).reduce((s: number, v) => s + Number(v || 0), 0);
+    const sumExtras = (p.extras || []).reduce((s: number, e: any) => s + Number(e.amountARS || 0), 0);
+    const totalARS = Number(p.totalARS) > 0 ? Number(p.totalARS) : (sumBreakdown + sumExtras);
+    void downloadSettlementPdf({
+      monthLabel: detail.monthLabel,
+      mamaRows: p.mamaRows || [],
+      papaRows: p.papaRows || [],
+      santRows: p.santRows || [],
+      manualItems,
+      categoryBreakdown: p.categoryBreakdown || undefined,
+      totalARS,
+      tcBlue: Number(p.tcBlue) || 0,
+      usdAPagar: Number(p.usdPagado) || Math.abs(Number(detail.tx?.amount_usd) || 0),
+      vueltoARS: Number(p.vueltoARS) || 0,
+    }, `liquidacion-${ym}.pdf`);
+  }
 
   return (
     <div className="space-y-8">
@@ -96,7 +125,6 @@ export default function DebtsPage() {
         )}
 
         <CreditCardDebtCard />
-        <PendingInstallmentsCard />
       </section>
 
       {/* SECTION 3 — Historial */}
@@ -104,11 +132,25 @@ export default function DebtsPage() {
         <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           Historial
         </h2>
-        <UnifiedCycleHistory />
+        <UnifiedCycleHistory onRowClick={(r) => setDetail(r)} />
       </section>
 
       <ViejoSettlementWizard open={openViejo} onOpenChange={setOpenViejo} onSantTotalDetected={handleSantDetected} />
       <SplitwiseSettlementWizard open={openSw} onOpenChange={setOpenSw} />
+
+      <Dialog open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="capitalize">Liquidación — {detail?.monthLabel}</DialogTitle>
+          </DialogHeader>
+          {detail?.parsed && <SettlementDetail parsed={detail.parsed} />}
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={downloadDetailPdf}>
+              <Download className="h-3.5 w-3.5 mr-1.5" /> Descargar PDF
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
