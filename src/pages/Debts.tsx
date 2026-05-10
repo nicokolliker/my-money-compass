@@ -539,6 +539,11 @@ function ViejoSettlementWizard({ open, onOpenChange, onSantTotalDetected }: { op
       const allPapa: ParsedTransaction[] = [];
       for (const f of bcFiles) {
         const text = await extractPdfText(f);
+        // Accumulate per-card subtotals from THIS PDF
+        const bcSubs = extractAllCardSubtotals(text);
+        for (const [k, v] of Object.entries(bcSubs)) {
+          subtotals[k] = (subtotals[k] || 0) + v;
+        }
         // Card 1689 (mamá) — todos los gastos
         const mamaRows = parseBancoCiudad(text, fxFallback, '1689');
         if (mamaRows.length > 0) {
