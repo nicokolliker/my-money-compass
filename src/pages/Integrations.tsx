@@ -25,6 +25,70 @@ export default function IntegrationsPage() {
   const [connecting, setConnecting] = useState(false);
   const [syncing, setSyncing] = useState(false);
 
+  const [binanceKey, setBinanceKey] = useState('');
+  const [binanceSecret, setBinanceSecret] = useState('');
+  const [showSecret, setShowSecret] = useState(false);
+  const [connectingBinance, setConnectingBinance] = useState(false);
+  const [syncingBinance, setSyncingBinance] = useState(false);
+
+  const isBinanceConnected = !!(settings as any)?.binance_api_key;
+  const binanceLastSync = (settings as any)?.binance_last_sync as string | null | undefined;
+  const binanceBalances: any[] = (settings as any)?.binance_balances || [];
+  const binanceTotalUsd = binanceBalances.reduce((s: number, b: any) => s + (b.value_usd || 0), 0);
+
+  async function handleConnectBinance() {
+    if (!binanceKey.trim() || !binanceSecret.trim()) {
+      toast.error('Ingresá API Key y Secret');
+      return;
+    }
+    setConnectingBinance(true);
+    try {
+      await upsert.mutateAsync({
+        binance_api_key: binanceKey.trim(),
+        binance_api_secret: binanceSecret.trim(),
+      } as any);
+      const { data: { session } } = await supabase.auth.getSession();
+      const { error } = await supabase.functions.invoke('sync-binance', {
+        headers: { Authorization: `Bearer ${session?.access_token}` },
+      });
+      if (error) throw error;
+      qc.invalidateQueries({ queryKey: ['user-settings'] });
+      toast.success('Binance conectado y sincronizado');
+      setBinanceKey(''); setBinanceSecret('');
+    } catch (e: any) {
+      toast.error(e.message || 'Error al conectar');
+    } finally {
+      setConnectingBinance(false);
+    }
+  }
+
+  async function handleSyncBinance() {
+    setSyncingBinance(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const { error } = await supabase.functions.invoke('sync-binance', {
+        headers: { Authorization: `Bearer ${session?.access_token}` },
+      });
+      if (error) throw error;
+      qc.invalidateQueries({ queryKey: ['user-settings'] });
+      toast.success('Binance sincronizado');
+    } catch (e: any) {
+      toast.error(e.message || 'Error al sincronizar');
+    } finally {
+      setSyncingBinance(false);
+    }
+  }
+
+  async function handleDisconnectBinance() {
+    await upsert.mutateAsync({
+      binance_api_key: null,
+      binance_api_secret: null,
+      binance_last_sync: null,
+      binance_balances: null,
+    } as any);
+    toast.success('Binance desconectado');
+  }
+
   const isConnected = !!settings?.wise_token && !!settings?.wise_profile_id;
   const wiseAccounts = (accounts || []).filter(a => /wise/i.test(a.name));
   const brand = getBrandLogo('Wise');
