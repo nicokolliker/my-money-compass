@@ -523,6 +523,34 @@ export default function Accounts() {
               />
             </div>
             <div><Label>Notes</Label><Input value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} className="mt-1 rounded-xl" /></div>
+            {form.type === 'credit_card' && (
+              <>
+                <div>
+                  <Label>Mi tarjeta (últimos 4 dígitos)</Label>
+                  <Input
+                    inputMode="numeric"
+                    maxLength={4}
+                    placeholder="1689"
+                    value={form.my_card_suffix}
+                    onChange={e => setForm(f => ({ ...f, my_card_suffix: e.target.value.replace(/\D/g, '').slice(0, 4) }))}
+                    className="mt-1 rounded-xl"
+                  />
+                  <p className="text-[11px] text-muted-foreground mt-1">Ej: 1689 — para identificar tus cargos en el resumen</p>
+                </div>
+                {form.my_card_suffix.length === 4 && (
+                  <div className="flex items-center justify-between rounded-xl border border-border px-3 py-2.5">
+                    <div>
+                      <Label className="text-sm cursor-pointer">Es tarjeta propia</Label>
+                      <p className="text-[11px] text-muted-foreground">Si toda la cuenta refleja sólo tus gastos</p>
+                    </div>
+                    <Switch
+                      checked={form.is_own_card}
+                      onCheckedChange={v => setForm(f => ({ ...f, is_own_card: v }))}
+                    />
+                  </div>
+                )}
+              </>
+            )}
             <Button className="w-full h-12 rounded-xl" onClick={handleSave} disabled={createAccount.isPending || updateAccount.isPending}>Save</Button>
           </div>
         </DialogContent>
