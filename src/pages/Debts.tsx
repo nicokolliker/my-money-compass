@@ -637,19 +637,15 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
         const cat = categories.find((c: any) => c.name === row.categoryName);
         const isCuota = /cuota/i.test(row.description);
         const txDate = isCuota ? settlementDate : (row.date || settlementDate);
-        const isUsdCharge = row.matched && row.amountUSD > 0 && row.amountARS === 0;
-
         await supabase.from('transactions').insert({
           user_id: user.id,
           account_id: tarjetaViejoAcc.id,
           date: txDate,
           description: row.description,
-          amount: isUsdCharge ? -row.amountUSD : -row.amountARS,
-          currency: isUsdCharge ? 'USD' : 'ARS',
-          fx_rate: isUsdCharge ? 1 : fxArsUsd,
-          amount_usd: isUsdCharge
-            ? -row.amountUSD
-            : -(row.amountARS * fxArsUsd),
+          amount: -row.amountARS,
+          currency: 'ARS',
+          fx_rate: fxArsUsd,
+          amount_usd: -(row.amountARS * fxArsUsd),
           type: 'expense' as const,
           category_id: cat?.id || null,
           external_id: row.external_id
