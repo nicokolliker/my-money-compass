@@ -104,9 +104,6 @@ export function FundFlowDiagram() {
         <CardContent className="pt-0 space-y-6">
           {/* ── Diagrama 1: Movimiento de fondos ── */}
           <div>
-            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-              Movimiento de fondos
-            </h4>
             <svg width="100%" viewBox="0 0 700 430" xmlns="http://www.w3.org/2000/svg">
               <defs>
                 <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
