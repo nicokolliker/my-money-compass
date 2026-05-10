@@ -708,19 +708,16 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg w-full max-h-[90vh] flex flex-col overflow-hidden p-0 gap-0">
-        <div className="px-6 pt-6 pb-2 shrink-0">
-          <DialogHeader>
-            <DialogTitle className="capitalize">
-              {step === 1 && 'Liquidar con el viejo — Subir PDFs'}
-              {step === 2 && `Liquidar ${format(new Date(settlementMonth + '-01T00:00:00'), 'MMMM yyyy', { locale: es })} — Completar ítems`}
-              {step === 3 && `Liquidar ${format(new Date(settlementMonth + '-01T00:00:00'), 'MMMM yyyy', { locale: es })} — Confirmar`}
-              {step === 4 && 'Liquidación registrada'}
-            </DialogTitle>
-          </DialogHeader>
-        </div>
-        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-6 pb-6">
-          <DialogContentInner />
+      <DialogContent className="sm:max-w-lg w-full max-h-[90vh] flex flex-col overflow-hidden">
+        <DialogHeader className="shrink-0">
+          <DialogTitle className="capitalize">
+            {step === 1 && 'Liquidar con el viejo — Subir PDFs'}
+            {step === 2 && `Liquidar ${format(new Date(settlementMonth + '-01T00:00:00'), 'MMMM yyyy', { locale: es })} — Completar ítems`}
+            {step === 3 && `Liquidar ${format(new Date(settlementMonth + '-01T00:00:00'), 'MMMM yyyy', { locale: es })} — Confirmar`}
+            {step === 4 && 'Liquidación registrada'}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden -mx-6 px-6">
         <DialogHeader>
           <DialogTitle className="capitalize">
             {step === 1 && 'Liquidar con el viejo — Subir PDFs'}
