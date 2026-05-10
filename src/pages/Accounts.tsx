@@ -371,6 +371,7 @@ export default function Accounts() {
                         >
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
+                        <AlertDialog>
                           <AlertDialogTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive">
                               <Trash2 className="h-3.5 w-3.5" />
