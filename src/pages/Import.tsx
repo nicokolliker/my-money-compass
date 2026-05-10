@@ -10,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAccounts } from '@/hooks/useAccounts';
 import { useLatestFxRate } from '@/hooks/useFxRates';
 import { parseArqStatements, type ParsedTransaction, type ParsedArqResult } from '@/lib/importers/arqParser';
+import { useInvalidateArqReconciliations } from '@/hooks/useArqReconciliation';
 import { parseMercadoPago } from '@/lib/importers/mercadoPagoParser';
 import { useImportLog } from '@/hooks/useImportLog';
 import { MerchantLogo } from '@/components/MerchantLogo';
@@ -205,7 +206,14 @@ export default function ImportPage() {
   const [arqMonth, setArqMonth] = useState<string>('');
   /** Balance final USD del extracto — actualiza official_balance al importar */
   const [arqBalanceFinal, setArqBalanceFinal] = useState<number | null>(null);
+  /** Period from the statement — used to find pending reconciliations to close */
+  const [arqPeriod, setArqPeriod] = useState<{ start: string | null; end: string | null }>({ start: null, end: null });
+  /** Summary shown after reconciliation is closed */
+  const [arqReconcileResult, setArqReconcileResult] = useState<{
+    count: number; deposited: number; spent: number; balance: number;
+  } | null>(null);
   const qc = useQueryClient();
+  const invalidateArqRecons = useInvalidateArqReconciliations();
 
   async function handleProcess() {
     if (!arsFile) {
@@ -223,6 +231,8 @@ export default function ImportPage() {
       const result: ParsedArqResult = parseArqStatements(usdText, arsText, arsToUsd || 0);
       const parsed = result.transactions;
       setArqBalanceFinal(result.balanceFinalUsd);
+      setArqPeriod({ start: result.periodStart, end: result.periodEnd });
+      setArqReconcileResult(null);
 
       if (parsed.length === 0) {
         toast.error('No se encontraron transacciones en el PDF');
@@ -314,6 +324,50 @@ export default function ImportPage() {
           })
           .eq('id', arqAccount.id);
         qc.invalidateQueries({ queryKey: ['account-balances'] });
+      }
+
+      // ── Close pending ARQ reconciliations covered by this statement ──────
+      // Derive period bounds: prefer parsed dates, fall back to arqMonth.
+      const periodStart = arqPeriod.start || `${arqMonth}-01`;
+      const periodEnd = arqPeriod.end || (() => {
+        const [y, m] = arqMonth.split('-').map(Number);
+        return new Date(y, m, 0).toISOString().split('T')[0];
+      })();
+
+      const { data: pendingRecons } = await supabase
+        .from('arq_reconciliations')
+        .select('*')
+        .eq('status', 'pending')
+        .gte('wise_date', periodStart)
+        .lte('wise_date', periodEnd);
+
+      if (pendingRecons && pendingRecons.length > 0) {
+        const totalDeposited = (pendingRecons as any[]).reduce(
+          (s: number, r: any) => s + Number(r.wise_amount_usd), 0
+        );
+        // Total USD spent = all imported non-income rows
+        const totalSpentUsd = toImport
+          .filter(r => r.type !== 'income')
+          .reduce((s, r) => s + r.amountUSD, 0);
+
+        await supabase
+          .from('arq_reconciliations')
+          .update({
+            status: 'reconciled',
+            reconciled_at: new Date().toISOString(),
+            period: arqMonth,
+            total_spent_usd: +totalSpentUsd.toFixed(2),
+            balance_after_usd: arqBalanceFinal,
+          })
+          .in('id', (pendingRecons as any[]).map((r: any) => r.id));
+
+        setArqReconcileResult({
+          count: pendingRecons.length,
+          deposited: totalDeposited,
+          spent: totalSpentUsd,
+          balance: arqBalanceFinal ?? 0,
+        });
+        invalidateArqRecons();
       }
 
       if (arqMonth) {
@@ -683,6 +737,32 @@ export default function ImportPage() {
           {resultMsg && (
             <div className="flex items-center gap-2 text-sm text-success">
               <CheckCircle2 className="h-4 w-4" /> {resultMsg}
+            </div>
+          )}
+
+          {/* Reconciliation summary — shown when a pending Wise deposit was closed */}
+          {arqReconcileResult && (
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30 p-3 space-y-1.5">
+              <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                {arqReconcileResult.count === 1
+                  ? 'Depósito conciliado'
+                  : `${arqReconcileResult.count} depósitos conciliados`}
+              </p>
+              <div className="grid grid-cols-3 gap-2 text-[11px]">
+                <div className="space-y-0.5">
+                  <p className="text-muted-foreground">Depositado</p>
+                  <p className="font-mono font-semibold text-foreground">${arqReconcileResult.deposited.toFixed(2)}</p>
+                </div>
+                <div className="space-y-0.5">
+                  <p className="text-muted-foreground">Gastado</p>
+                  <p className="font-mono font-semibold text-destructive">-${arqReconcileResult.spent.toFixed(2)}</p>
+                </div>
+                <div className="space-y-0.5">
+                  <p className="text-muted-foreground">Balance ARQ</p>
+                  <p className="font-mono font-semibold text-emerald-600">${arqReconcileResult.balance.toFixed(2)}</p>
+                </div>
+              </div>
             </div>
           )}
 

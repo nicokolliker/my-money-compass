@@ -157,6 +157,14 @@ Deno.serve(async (req) => {
             amountUsd = amount * fxRate;
           }
 
+          // Extract description into a variable so we can use it for
+          // ARQ transfer detection below.
+          const description =
+            tx.details?.description ||
+            tx.details?.merchant?.name ||
+            tx.details?.type ||
+            "Wise";
+
           const { error: insErr } = await supabaseAdmin
             .from("transactions")
             .upsert(
@@ -164,11 +172,7 @@ Deno.serve(async (req) => {
                 user_id: userId,
                 account_id: localAccount.id,
                 date: (tx.date || "").split("T")[0],
-                description:
-                  tx.details?.description ||
-                  tx.details?.merchant?.name ||
-                  tx.details?.type ||
-                  "Wise",
+                description,
                 amount: amount,
                 currency,
                 fx_rate: fxRate,
@@ -179,6 +183,41 @@ Deno.serve(async (req) => {
               { onConflict: "external_id", ignoreDuplicates: true },
             );
           if (!insErr) importedTotal += 1;
+
+          // ── Wise → ARQ/DolarApp transfer detection ─────────────────────
+          // When sync-wise picks up an outgoing transfer to DolarApp/ARQ,
+          // create a pending arq_reconciliation so Accounts shows the badge
+          // and Import.tsx can close it when the statement is uploaded.
+          const isArqOutgoing =
+            type === "transfer" &&
+            amount < 0 &&
+            /dolarapp|arq\b/i.test(description);
+
+          if (isArqOutgoing) {
+            // Look up the transaction we just upserted by external_id
+            const { data: txRow } = await supabaseAdmin
+              .from("transactions")
+              .select("id")
+              .eq("external_id", external_id)
+              .eq("user_id", userId)
+              .maybeSingle();
+
+            if (txRow?.id) {
+              await supabaseAdmin
+                .from("arq_reconciliations")
+                .upsert(
+                  {
+                    user_id: userId,
+                    wise_tx_id: txRow.id,
+                    wise_amount_usd: Math.abs(amountUsd),
+                    wise_date: (tx.date || "").split("T")[0],
+                    wise_description: description,
+                    status: "pending",
+                  },
+                  { onConflict: "wise_tx_id", ignoreDuplicates: true },
+                );
+            }
+          }
         }
       }
 

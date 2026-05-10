@@ -15,13 +15,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { ACCOUNT_TYPE_LABELS, CURRENCIES, formatCurrency, formatUSD } from '@/lib/constants';
 import { MerchantLogo } from '@/components/MerchantLogo';
 import { getAccountStyle } from '@/lib/accountIcons';
-import { Plus, ChevronDown, FolderPlus, Pencil, Trash2, FileUp, PenLine, Wifi, Clock } from 'lucide-react';
+import { Plus, ChevronDown, FolderPlus, Pencil, Trash2, FileUp, PenLine, Wifi, Clock, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { DemoDataBanner } from '@/components/DemoDataBanner';
 import { useDemoData } from '@/hooks/useDemoData';
 import { Badge } from '@/components/ui/badge';
 import { useQueryClient } from '@tanstack/react-query';
 import { useImportLog } from '@/hooks/useImportLog';
+import { useArqPendingReconciliations } from '@/hooks/useArqReconciliation';
 import { useUserSettings } from '@/hooks/useUserSettings';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -41,6 +42,15 @@ export default function Accounts() {
   const navigate = useNavigate();
   const { data: accounts, isLoading } = useAccountBalances();
   const { data: importLog } = useImportLog();
+  const { data: arqPending } = useArqPendingReconciliations();
+
+  /** Total USD pending reconciliation across all unreconciled Wise→ARQ transfers */
+  const arqPendingTotal = (arqPending || []).reduce(
+    (s, r) => s + Number(r.wise_amount_usd), 0
+  );
+  /** Most recent pending deposit date, for the badge subtitle */
+  const arqPendingLatestDate = arqPending?.[0]?.wise_date ?? null;
+  const isArqAccount = (name: string) => /arq|dolarapp/i.test(name.toLowerCase());
   const { data: groups } = useAccountGroups();
   const createAccount = useCreateAccount();
   const updateAccount = useUpdateAccount();
@@ -249,6 +259,18 @@ export default function Accounts() {
                                   ? <>Últ. extracto: <span className="font-medium">{getLastImport(a.name)}</span></>
                                   : <span className="italic">Sin extracto importado</span>
                                 }
+                              </p>
+                            )}
+                            {/* ARQ reconciliation pending badge */}
+                            {isArqAccount(a.name) && arqPendingTotal > 0 && (
+                              <p className="text-[10px] text-amber-600 flex items-center gap-1 mt-0.5 font-medium">
+                                <AlertTriangle className="h-2.5 w-2.5 shrink-0" />
+                                ${arqPendingTotal.toFixed(0)} sin conciliar
+                                {arqPendingLatestDate && (
+                                  <span className="font-normal text-amber-500">
+                                    — desde {arqPendingLatestDate}
+                                  </span>
+                                )}
                               </p>
                             )}
                           </div>
