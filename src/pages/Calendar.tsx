@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isToday, addMonths, subMonths, getDay } from 'date-fns';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 export default function CalendarPage({ embedded = false }: { embedded?: boolean } = {}) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
