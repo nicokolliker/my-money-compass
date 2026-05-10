@@ -1650,7 +1650,39 @@ function ViejoCycleHistory({ importLog }: { importLog: any[] }) {
             </DialogTitle>
           </DialogHeader>
           {selected?.parsed ? (
-            <SettlementDetail parsed={selected.parsed} />
+            <>
+              <SettlementDetail parsed={selected.parsed} />
+              <div className="flex justify-end pt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const p = selected.parsed;
+                    const monthLabel = format(new Date(selectedMonth + '-01T00:00:00'), 'MMMM yyyy', { locale: es });
+                    const breakdown: Record<string, number> = p.breakdown || {};
+                    const manualItems = Object.entries(breakdown)
+                      .filter(([k, v]) => !CARD_KEYS.includes(k) && Number(v) > 0)
+                      .map(([k, v]) => ({ label: ITEM_META[k]?.label || k, amountARS: Number(v) }));
+                    if (Array.isArray(p.extras)) {
+                      for (const e of p.extras) manualItems.push({ label: e.label, amountARS: e.amountARS, categoryName: e.categoryName } as any);
+                    }
+                    downloadSettlementPdf({
+                      monthLabel,
+                      mamaRows: p.mamaRows || [],
+                      papaRows: p.papaRows || [],
+                      santRows: p.santRows || [],
+                      manualItems,
+                      totalARS: p.totalARS || 0,
+                      tcBlue: p.tcBlue || 0,
+                      usdAPagar: p.usdPagado || 0,
+                      vueltoARS: p.vueltoARS || 0,
+                    }, `liquidacion-${selectedMonth}.pdf`);
+                  }}
+                >
+                  <Download className="h-4 w-4 mr-1.5" /> Descargar PDF
+                </Button>
+              </div>
+            </>
           ) : (
             <p className="text-sm text-muted-foreground">No hay detalles guardados para este mes.</p>
           )}
