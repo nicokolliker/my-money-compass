@@ -153,8 +153,19 @@ export default function ManualMatchDialog({ instance, open, onOpenChange }: Prop
           })}
         </div>
 
-        <div className="flex justify-end pt-2">
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+        <div className="pt-3 border-t space-y-2">
+          <Button
+            variant="outline"
+            className="w-full justify-center"
+            disabled={markPaid.isPending || !instance}
+            onClick={handleMarkPaidUnlinked}
+          >
+            <CheckCircle2 className="h-4 w-4 mr-2" />
+            Marcar como pagado sin vincular →
+          </Button>
+          <div className="flex justify-end">
+            <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>Cancel</Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
