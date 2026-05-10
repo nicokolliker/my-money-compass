@@ -818,23 +818,43 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
                 </div>
               );
             };
+            const expanded = !!expandedDetails[key];
+            const selectedCount = rows.filter(r => r.selected).length;
             return (
               <div className="ml-9 mt-1 mb-2 border rounded-lg overflow-hidden bg-muted/20">
-                {arsIdx.length > 0 && (
-                  <>
-                    <div className="px-3 py-1 bg-muted/40 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground border-b">
-                      En ARS · {arsIdx.length}
-                    </div>
-                    {arsIdx.map(renderRow)}
-                  </>
-                )}
-                {usdIdx.length > 0 && (
-                  <>
-                    <div className={cn('px-3 py-1 bg-muted/40 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground border-b', arsIdx.length > 0 && 'border-t')}>
-                      En USD · {usdIdx.length}
-                    </div>
-                    {usdIdx.map(renderRow)}
-                  </>
+                <button
+                  type="button"
+                  onClick={() => setExpandedDetails(prev => ({ ...prev, [key]: !prev[key] }))}
+                  className="w-full flex items-center justify-between px-3 py-1.5 bg-muted/40 hover:bg-muted/60 transition-colors"
+                >
+                  <span className="text-[11px] font-medium text-muted-foreground">
+                    {expanded ? '▾' : '▸'} Detalle ({selectedCount}/{rows.length} seleccionadas)
+                  </span>
+                  <span className="text-[10px] text-muted-foreground">
+                    {arsIdx.length > 0 && `${arsIdx.length} ARS`}
+                    {arsIdx.length > 0 && usdIdx.length > 0 && ' · '}
+                    {usdIdx.length > 0 && `${usdIdx.length} USD`}
+                  </span>
+                </button>
+                {expanded && (
+                  <div>
+                    {arsIdx.length > 0 && (
+                      <>
+                        <div className="px-3 py-1 bg-muted/30 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground border-t border-b">
+                          En ARS · {arsIdx.length}
+                        </div>
+                        {arsIdx.map(renderRow)}
+                      </>
+                    )}
+                    {usdIdx.length > 0 && (
+                      <>
+                        <div className="px-3 py-1 bg-muted/30 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground border-t border-b">
+                          En USD · {usdIdx.length}
+                        </div>
+                        {usdIdx.map(renderRow)}
+                      </>
+                    )}
+                  </div>
                 )}
               </div>
             );
