@@ -30,14 +30,14 @@ function extractCardBlock(pdfText: string, cardNumber: string): string | null {
 
   // En el texto antes del cierre, buscar la última línea "Tarjeta XXXX Total Consumos"
   const textBefore = pdfText.slice(0, closingIdx);
-  const prevTotalRegex = /Tarjeta\s+\d{4}\s+Total\s+Consumos[^\n]*\n/gi;
-  let lastMatch: RegExpExecArray | null = null;
+  const prevTotalRegex = /Tarjeta\s+(\d{4})\s+Total\s+Consumos/gi;
+  let lastEnd = -1;
   let m: RegExpExecArray | null;
   while ((m = prevTotalRegex.exec(textBefore)) !== null) {
-    lastMatch = m;
+    if (m[1] !== cardNumber) lastEnd = m.index + m[0].length;
   }
 
-  const startIdx = lastMatch ? lastMatch.index + lastMatch[0].length : 0;
+  const startIdx = lastEnd >= 0 ? lastEnd : 0;
   return pdfText.slice(startIdx, closingIdx);
 }
 
