@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { useAccountBalances } from '@/hooks/useAccounts';
 
 const CARD_LABELS: Record<string, string> = {
   visa_ciudad_mama: 'VISA Ciudad — Mamá',
