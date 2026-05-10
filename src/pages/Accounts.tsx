@@ -599,6 +599,7 @@ export default function Accounts() {
         <ArqReconciliationSheet
           open={!!arqSheetAccount}
           onClose={() => setArqSheetAccount(null)}
+          accountId={arqSheetAccount.id}
           accountName={arqSheetAccount.name}
           balanceUsd={arqSheetAccount.computed_balance_usd}
         />
