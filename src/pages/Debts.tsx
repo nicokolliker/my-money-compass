@@ -444,7 +444,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
       setExtraItems([]);
     }
     setTcBlue(defaultBlueRate);
-  }, [step, bcTotalARS, santTotalARS, visaCiudadMamaARS, visaCiudadPapaARS, defaultBlueRate]);
+  }, [step, bcTotalARS, santTotalARS, visaCiudadMamaARS, visaCiudadPapaARS, amexARS, defaultBlueRate]);
 
   const totalARS = items.reduce((s, i) => s + (i.amountARS || 0), 0) + extraItems.reduce((s, i) => s + (i.amountARS || 0), 0);
   const usdExacto = tcBlue > 0 ? totalARS / tcBlue : 0;
