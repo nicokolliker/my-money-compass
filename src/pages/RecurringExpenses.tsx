@@ -295,7 +295,7 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
         <Dialog open={showAdd} onOpenChange={o => { setShowAdd(o); if (!o) { setEditingId(null); setForm(emptyForm); } }}>
           <DialogTrigger asChild>
             <Button size="sm" onClick={() => { if (!form.type && tree[0]) setForm(f => ({ ...f, type: tree[0].id })); }}>
-              <Plus className="h-4 w-4 mr-1" /> Add
+              <Plus className="h-4 w-4 mr-1" /> Agregar recurrente
             </Button>
           </DialogTrigger>
           <DialogContent className="max-h-[85vh] overflow-y-auto">
