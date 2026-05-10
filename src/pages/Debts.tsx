@@ -1152,10 +1152,16 @@ function ViejoSettlementWizard({ open, onOpenChange, onSantTotalDetected }: { op
               <p className="font-medium mb-1">💸 Pago al viejo:</p>
               <p className="text-xs text-muted-foreground">• Cash USD −${usdAPagar.toLocaleString()}</p>
             </div>
-            {vueltoARS > 0 && (
+            {diferencia > 0 && (
               <div>
                 <p className="font-medium mb-1">💰 Vuelto esperado:</p>
-                <p className="text-xs text-muted-foreground">• Mercado Pago +{formatARS(vueltoARS)} ARS</p>
+                <p className="text-xs text-muted-foreground">• Mercado Pago +{formatARS(diferencia)} ARS</p>
+              </div>
+            )}
+            {diferencia < 0 && (
+              <div>
+                <p className="font-medium mb-1">⚠️ Diferencia pendiente:</p>
+                <p className="text-xs text-muted-foreground">• Quedás debiendo {formatARS(diferencia)} ARS — se acumulará al próximo mes</p>
               </div>
             )}
             <div className="flex justify-between pt-2">
