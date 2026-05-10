@@ -218,9 +218,55 @@ function rowsToTableBody(rows: SettlementPdfRow[]) {
   return rows.map((r) => [
     fmtDate(r.date),
     r.description,
-    r.categoryName || '—',
+    r.categoryName || 'Otros',
     r.matched ? fmtUSD(r.amountUSD) : fmtARS(r.amountARS),
   ]);
+}
+
+/** Renders the Categoría cell with an emoji prefix using the emoji font. */
+function makeCategoryCellRenderer(
+  doc: jsPDF,
+  textFont: string,
+  emojiFont: string | null,
+  colIndex: number,
+) {
+  return {
+    willDrawCell: (data: any) => {
+      if (data.section !== 'body' || data.column.index !== colIndex) return;
+      data.cell.text = [''];
+    },
+    didDrawCell: (data: any) => {
+      if (data.section !== 'body' || data.column.index !== colIndex) return;
+      const raw = String((data.row.raw as any[])[colIndex] ?? '');
+      if (!raw) return;
+      const emoji = getCategoryEmoji(raw);
+      const padLeft = 8;
+      const padRight = 8;
+      const padTop = 6;
+      const fontSize = data.cell.styles.fontSize || 9;
+      const x = data.cell.x + padLeft;
+      const y = data.cell.y + padTop + fontSize * 0.85;
+
+      if (emojiFont) {
+        rgb(doc, 'setTextColor', BRAND.ink);
+        doc.setFont(emojiFont, 'normal');
+        doc.setFontSize(fontSize);
+        doc.text(emoji, x, y);
+      }
+      const emojiW = emojiFont ? fontSize * 1.4 : 0;
+
+      doc.setFont(textFont, 'normal');
+      doc.setFontSize(fontSize);
+      rgb(doc, 'setTextColor', BRAND.muted);
+      const maxW = data.cell.width - padLeft - padRight - emojiW;
+      let label = raw;
+      while (doc.getTextWidth(label) > maxW && label.length > 3) {
+        label = label.slice(0, -2);
+      }
+      if (label !== raw) label = label.slice(0, -1) + '…';
+      doc.text(label, x + emojiW, y);
+    },
+  };
 }
 
 interface SectionMeta {
