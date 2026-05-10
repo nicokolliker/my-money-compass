@@ -328,6 +328,51 @@ function drawSection(doc: jsPDF, section: SectionMeta, y: number, margin: number
     head: [['Fecha', 'Descripción', 'Categoría', 'Monto']],
     body: rowsToTableBody(rows),
     theme: 'plain',
+function drawSection(doc: jsPDF, section: SectionMeta, y: number, margin: number, pageW: number, font: string, emojiFont: string | null): number {
+  const { title, subtitle, rows, accent } = section;
+  if (rows.length === 0) return y;
+
+  y = ensureSpace(doc, y, 80, margin);
+
+  const ars = rows.filter((r) => !r.matched);
+  const usd = rows.filter((r) => r.matched);
+  const subtotalARS = ars.reduce((s, r) => s + r.amountARS, 0);
+  const subtotalUSD = usd.reduce((s, r) => s + r.amountUSD, 0);
+
+  rgb(doc, 'setFillColor', accent);
+  doc.rect(margin, y - 4, 4, 22, 'F');
+
+  rgb(doc, 'setTextColor', BRAND.ink);
+  doc.setFont(font, 'bold');
+  doc.setFontSize(13);
+  doc.text(title, margin + 12, y + 8);
+
+  if (subtitle) {
+    rgb(doc, 'setTextColor', BRAND.muted);
+    doc.setFont(font, 'normal');
+    doc.setFontSize(9);
+    doc.text(subtitle, margin + 12, y + 20);
+  }
+
+  const totalParts: string[] = [];
+  if (subtotalARS > 0) totalParts.push(fmtARS(subtotalARS));
+  if (subtotalUSD > 0) totalParts.push(fmtUSD(subtotalUSD));
+  if (totalParts.length > 0) {
+    rgb(doc, 'setTextColor', BRAND.ink);
+    doc.setFont(font, 'bold');
+    doc.setFontSize(11);
+    doc.text(totalParts.join('  ·  '), pageW - margin, y + 8, { align: 'right' });
+  }
+
+  y += subtitle ? 28 : 22;
+
+  const catHook = makeCategoryCellRenderer(doc, font, emojiFont, 2);
+
+  autoTable(doc, {
+    startY: y,
+    head: [['Fecha', 'Descripción', 'Categoría', 'Monto']],
+    body: rowsToTableBody(rows),
+    theme: 'plain',
     styles: {
       font,
       fontSize: 9,
@@ -346,12 +391,14 @@ function drawSection(doc: jsPDF, section: SectionMeta, y: number, margin: number
     },
     alternateRowStyles: { fillColor: [252, 252, 253] as any },
     columnStyles: {
-      0: { cellWidth: 55, textColor: BRAND.muted },
+      0: { cellWidth: COL.date, textColor: BRAND.muted },
       1: { cellWidth: 'auto' },
-      2: { cellWidth: 90, textColor: BRAND.muted, fontSize: 8 },
-      3: { cellWidth: 80, halign: 'right', fontStyle: 'bold' },
+      2: { cellWidth: COL.category, textColor: BRAND.muted, fontSize: 9 },
+      3: { cellWidth: COL.amount, halign: 'right', fontStyle: 'bold' },
     },
     margin: { left: margin, right: margin },
+    willDrawCell: catHook.willDrawCell,
+    didDrawCell: catHook.didDrawCell,
   });
 
   return (doc as any).lastAutoTable.finalY + 22;
