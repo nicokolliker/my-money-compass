@@ -685,6 +685,10 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
           settlement: true,
           month: settlementMonth,
           breakdown: Object.fromEntries(items.filter((i) => i.amountARS > 0).map((i) => [i.key, i.amountARS])),
+          extras: extraItems.filter(e => e.amountARS > 0 && e.label.trim()).map(e => ({ label: e.label, amountARS: e.amountARS, categoryName: e.categoryName })),
+          mamaRows: iebraRows.filter(r => r.selected).map(r => ({ date: r.date, description: r.description, amountARS: r.amountARS, amountUSD: r.amountUSD, matched: r.matched, categoryName: r.categoryName })),
+          papaRows: kollikerRows.filter(r => r.selected).map(r => ({ date: r.date, description: r.description, amountARS: r.amountARS, amountUSD: r.amountUSD, matched: r.matched, categoryName: r.categoryName })),
+          santRows: santRows.filter(r => r.selected).map(r => ({ date: r.date, description: r.description, amountARS: r.amountARS, amountUSD: r.amountUSD, matched: r.matched, categoryName: r.categoryName })),
           tcBlue, totalARS, usdPagado: usdAPagar, vueltoARS,
         }),
       });
