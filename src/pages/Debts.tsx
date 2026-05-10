@@ -610,16 +610,33 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
         setSubmitting(false);
         return;
       }
-      const editableItems = items.filter((i) => i.editable && i.amountARS > 0);
-      const validExtras = extraItems.filter((e) => e.amountARS > 0 && e.label.trim());
       const fxArsUsd = arsToUsd || (tcBlue > 0 ? 1 / tcBlue : 0);
 
-      const allManualItems: { label: string; amountARS: number; categoryName: string }[] = [
-        ...editableItems.map((i) => ({ label: i.label, amountARS: i.amountARS, categoryName: i.categoryName })),
-        ...validExtras.map((e) => ({ label: e.label, amountARS: e.amountARS, categoryName: e.categoryName })),
-      ];
+      // 1. Transacciones individuales de las filas del PDF
+      const pdfRows = [...iebraRows, ...kollikerRows, ...santRows].filter(r => r.selected);
+      for (const row of pdfRows) {
+        const cat = categories.find((c: any) => c.name === row.categoryName);
+        await supabase.from('transactions').insert({
+          user_id: user.id,
+          account_id: tarjetaViejoAcc.id,
+          date: row.date,
+          description: row.description,
+          amount: -row.amountARS,
+          currency: 'ARS',
+          fx_rate: fxArsUsd,
+          amount_usd: -(row.amountARS * fxArsUsd),
+          type: 'expense' as const,
+          category_id: cat?.id || null,
+          external_id: row.external_id,
+        });
+      }
 
-      for (const item of allManualItems) {
+      // 2. Ítems manuales (todos los items con monto > 0, incluyendo los no editables)
+      const allItems = [
+        ...items.filter(i => i.amountARS > 0),
+        ...extraItems.filter(e => e.amountARS > 0 && e.label.trim()),
+      ];
+      for (const item of allItems) {
         const cat = categories.find((c: any) => c.name === item.categoryName);
         await supabase.from('transactions').insert({
           user_id: user.id,
