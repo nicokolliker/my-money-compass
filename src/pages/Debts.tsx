@@ -1585,7 +1585,7 @@ function SplitwiseSettlementWizard({ open, onOpenChange }: { open: boolean; onOp
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{step === 1 ? 'Splitwise — Subir CSV' : 'Splitwise — Confirmar'}</DialogTitle>
+          <DialogTitle>Splitwise — Conciliar gastos</DialogTitle>
         </DialogHeader>
 
         {step === 1 && (
