@@ -25,10 +25,12 @@ import {
   useArqReconciliationHistory,
 } from '@/hooks/useArqReconciliation';
 import { formatUSD } from '@/lib/constants';
+import { RecentTransactionsList } from './RecentTransactionsList';
 
 interface Props {
   open: boolean;
   onClose: () => void;
+  accountId: string;
   accountName: string;
   balanceUsd: number;
 }
@@ -39,7 +41,7 @@ function formatDate(iso: string): string {
   return `${parseInt(d)} ${months[parseInt(m) - 1]} ${y}`;
 }
 
-export function ArqReconciliationSheet({ open, onClose, accountName, balanceUsd }: Props) {
+export function ArqReconciliationSheet({ open, onClose, accountId, accountName, balanceUsd }: Props) {
   const navigate = useNavigate();
   const { data: pending  = [] } = useArqPendingReconciliations();
   const { data: history  = [] } = useArqReconciliationHistory();
