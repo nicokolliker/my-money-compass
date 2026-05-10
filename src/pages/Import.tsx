@@ -410,7 +410,7 @@ export default function ImportPage() {
       const dupCount = rows.filter((r) => r.duplicate).length;
       setResultMsg(`${toImport.length} transacciones importadas, ${dupCount} duplicados ignorados`);
       toast.success('Importación completa');
-      setRows([]);
+      silentRefreshRecurring();
       setArqMonth('');
       setArsFile(null);
       setUsdFile(null);
