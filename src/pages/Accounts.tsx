@@ -49,9 +49,9 @@ export default function Accounts() {
   const { data: importLog } = useImportLog();
   const { data: arqPending } = useArqPendingReconciliations();
 
-  /** Total USD pending reconciliation across all unreconciled Wise→ARQ transfers */
+  /** Total USD remaining (transferred - spent) for pending Wise→ARQ transfers */
   const arqPendingTotal = (arqPending || []).reduce(
-    (s, r) => s + Number(r.wise_amount_usd), 0
+    (s, r) => s + Math.max(0, Number(r.wise_amount_usd) - Number(r.total_spent_usd ?? 0)), 0
   );
   /** Most recent pending deposit date, for the badge subtitle */
   const arqPendingLatestDate = arqPending?.[0]?.wise_date ?? null;
