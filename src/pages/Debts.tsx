@@ -877,6 +877,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
                     </p>
                     {groupItems.map((it) => {
                       const autoFilled = !it.editable;
+                      const isCard = CARD_KEYS.includes(it.key);
                       return (
                         <div key={it.key}>
                           <div className="flex items-center gap-3 py-2.5">
@@ -897,7 +898,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
                                 placeholder="0"
                               />
                             )}
-                            {!autoFilled ? (
+                            {!autoFilled && !isCard ? (
                               <Select value={it.categoryName} onValueChange={(v) => updateItem(it.key, { categoryName: v })}>
                                 <SelectTrigger className="w-28 h-8 text-xs shrink-0"><SelectValue /></SelectTrigger>
                                 <SelectContent>
