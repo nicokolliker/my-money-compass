@@ -1090,7 +1090,8 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
   );
 }
 
-function FileSlot({ label, file, onChange }: { label: string; file: File | null; onChange: (f: File | null) => void }) {
+function FileSlot({ label, file, onChange, accept = '.pdf' }: { label: string; file: File | null; onChange: (f: File | null) => void; accept?: string }) {
+  const acceptLabel = accept.replace(/^\./, '').toUpperCase().split(',')[0];
   return (
     <div className="overflow-hidden min-w-0 w-full" style={{ maxWidth: '100%' }}>
       <Label className="text-xs">{label}</Label>
@@ -1115,8 +1116,8 @@ function FileSlot({ label, file, onChange }: { label: string; file: File | null;
         </div>
       ) : (
         <label className="mt-1 flex items-center justify-center rounded-md border border-dashed p-3 cursor-pointer hover:bg-muted/50 text-xs text-muted-foreground gap-2">
-          <Upload className="h-3 w-3" /> Subir PDF
-          <input type="file" accept=".pdf" className="hidden" onChange={(e) => onChange(e.target.files?.[0] || null)} />
+          <Upload className="h-3 w-3" /> Subir {acceptLabel}
+          <input type="file" accept={accept} className="hidden" onChange={(e) => onChange(e.target.files?.[0] || null)} />
         </label>
       )}
     </div>
@@ -1305,7 +1306,7 @@ function SplitwiseSettlementWizard({ open, onOpenChange }: { open: boolean; onOp
 
         {step === 1 && (
           <div className="space-y-4">
-            <FileSlot label="CSV de Splitwise" file={file} onChange={(f) => { setFile(f); setRows([]); }} />
+            <FileSlot label="CSV de Splitwise" file={file} accept=".csv" onChange={(f) => { setFile(f); setRows([]); }} />
             {file && rows.length === 0 && (
               <Button onClick={handleProcess} disabled={processing}>{processing ? 'Procesando...' : 'Procesar CSV'}</Button>
             )}
