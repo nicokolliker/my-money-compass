@@ -510,6 +510,115 @@ export default function ImportPage() {
   const mpSelectedCount = mpRows.filter((r) => r.selected && !r.duplicate).length;
   const mpDupCount = mpRows.filter((r) => r.duplicate).length;
 
+  // ---- Galicia state ----
+  const [galiciaFile, setGaliciaFile] = useState<File | null>(null);
+  const [galiciaProcessing, setGaliciaProcessing] = useState(false);
+  const [galiciaRows, setGaliciaRows] = useState<PreviewRow[]>([]);
+  const [galiciaImporting, setGaliciaImporting] = useState(false);
+  const [galiciaResultMsg, setGaliciaResultMsg] = useState<string | null>(null);
+  const [galiciaMonth, setGaliciaMonth] = useState<string>('');
+
+  const galiciaAccount = useMemo(
+    () => accounts?.find((a) => /galicia/i.test(a.name)) || null,
+    [accounts],
+  );
+
+  async function handleGaliciaProcess() {
+    if (!galiciaFile) return;
+    setGaliciaProcessing(true);
+    setGaliciaResultMsg(null);
+    try {
+      const buf = await galiciaFile.arrayBuffer();
+      const parsed = parseGalicia(buf);
+      if (parsed.length === 0) {
+        toast.error('No se encontraron transacciones');
+        setGaliciaRows([]);
+        return;
+      }
+      const ids = parsed.map((p) => p.external_id);
+      const { data: existing } = await supabase
+        .from('transactions')
+        .select('external_id')
+        .in('external_id', ids);
+      const dupSet = new Set((existing || []).map((r: any) => r.external_id));
+      setGaliciaRows(
+        parsed.map((p) => ({
+          ...p,
+          duplicate: dupSet.has(p.external_id),
+          selected: !dupSet.has(p.external_id) && p.type !== 'transfer',
+        })),
+      );
+      setGaliciaMonth(detectPredominantMonth(parsed));
+      toast.success(`${parsed.length} transacciones detectadas`);
+    } catch (e: any) {
+      toast.error(e.message || 'Error al procesar archivo');
+    } finally {
+      setGaliciaProcessing(false);
+    }
+  }
+
+  async function handleGaliciaImport() {
+    if (!galiciaAccount) {
+      toast.error('No se encontró cuenta Galicia');
+      return;
+    }
+    const toImport = galiciaRows.filter((r) => r.selected && !r.duplicate);
+    if (toImport.length === 0) return;
+    setGaliciaImporting(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+      const fxRate = arsToUsd || 0;
+      const payload = toImport.map((r) => {
+        const isIncome = r.type === 'income';
+        const isTransfer = r.type === 'transfer';
+        const sign = isIncome || isTransfer ? 1 : -1;
+        return {
+          user_id: user.id,
+          account_id: galiciaAccount.id,
+          date: r.date,
+          description: r.description,
+          merchant: r.description,
+          amount: sign * r.amountARS,
+          currency: 'ARS',
+          fx_rate: fxRate,
+          amount_usd: fxRate > 0 ? +(sign * r.amountARS * fxRate).toFixed(2) : 0,
+          type: (isIncome ? 'income' : isTransfer ? 'transfer' : 'expense') as any,
+          external_id: r.external_id,
+          raw_imported_description: r.description,
+        };
+      });
+      const { error } = await supabase.from('transactions').insert(payload);
+      if (error) throw error;
+      if (galiciaMonth) {
+        await supabase.from('import_log').upsert(
+          {
+            user_id: user.id,
+            source: 'galicia',
+            month: galiciaMonth,
+            transaction_count: toImport.length,
+            imported_at: new Date().toISOString(),
+          },
+          { onConflict: 'user_id,source,month' },
+        );
+        qc.invalidateQueries({ queryKey: ['import-log'] });
+      }
+      const dups = galiciaRows.filter((r) => r.duplicate).length;
+      setGaliciaResultMsg(`${toImport.length} transacciones importadas, ${dups} duplicados ignorados`);
+      toast.success('Importación completa');
+      setGaliciaRows([]);
+      setGaliciaMonth('');
+      setGaliciaFile(null);
+    } catch (e: any) {
+      toast.error(e.message || 'Error al importar');
+    } finally {
+      setGaliciaImporting(false);
+    }
+  }
+
+  const galiciaSelectedCount = galiciaRows.filter((r) => r.selected && !r.duplicate).length;
+  const galiciaDupCount = galiciaRows.filter((r) => r.duplicate).length;
+
 
 
   // ---- Wise CSV state ----
