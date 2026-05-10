@@ -73,25 +73,13 @@ async function extractPdfText(file: File): Promise<string> {
 }
 
 export default function DebtsPage() {
-  const { data: accounts } = useAccountBalances();
   const { data: importLog } = useImportLog();
+  const { data: accounts } = useAccountBalances();
   const [openViejo, setOpenViejo] = useState(false);
   const [openSw, setOpenSw] = useState(false);
-  const [transferTarget, setTransferTarget] = useState<any>(null);
-
-  const viejoAccount = useMemo(() =>
-    accounts?.find((a: any) => /viejo/i.test(a.name)) || null,
-  [accounts]);
 
   const splitwiseAccount = useMemo(() =>
     accounts?.find((a: any) => /splitwise/i.test(a.name)) || null,
-  [accounts]);
-
-  const otherDebts = useMemo(() =>
-    (accounts || []).filter((a: any) =>
-      ['debt', 'credit_card'].includes(a.type) &&
-      !/viejo|splitwise/i.test(a.name)
-    ),
   [accounts]);
 
   return (
@@ -101,16 +89,11 @@ export default function DebtsPage() {
         <p className="text-sm text-muted-foreground">Revisión y liquidación mensual</p>
       </div>
 
-      {viejoAccount && (
-        <>
-          <ViejoDebtCard
-            account={viejoAccount}
-            importLog={importLog || []}
-            onOpen={() => setOpenViejo(true)}
-          />
-          <ViejoCycleHistory importLog={importLog || []} />
-        </>
-      )}
+      <ViejoDebtCard
+        importLog={importLog || []}
+        onOpen={() => setOpenViejo(true)}
+      />
+      <ViejoCycleHistory importLog={importLog || []} />
 
       {splitwiseAccount ? (
         <SplitwiseDebtCard
@@ -138,103 +121,122 @@ export default function DebtsPage() {
         </Card>
       )}
 
-      {otherDebts.map((a: any) => (
-        <SimpleDebtCard key={a.id} account={a} onTransfer={() => setTransferTarget(a)} />
-      ))}
-
-      {!viejoAccount && !splitwiseAccount && otherDebts.length === 0 && (
-        <Card>
-          <CardContent className="p-6 text-sm text-muted-foreground text-center">
-            No tenés cuentas de deuda activas. Creá una en Accounts con tipo "Debt".
-          </CardContent>
-        </Card>
-      )}
-
       <ViejoSettlementWizard open={openViejo} onOpenChange={setOpenViejo} />
       <SplitwiseSettlementWizard open={openSw} onOpenChange={setOpenSw} />
-      <TransferDialog account={transferTarget} onClose={() => setTransferTarget(null)} />
     </div>
   );
 }
 
-function ViejoDebtCard({ account, importLog, onOpen }: {
-  account: any; importLog: any[]; onOpen: () => void;
+function ViejoDebtCard({ importLog, onOpen }: {
+  importLog: any[]; onOpen: () => void;
 }) {
   const currentMonth = format(new Date(), 'yyyy-MM');
-  const balance = Number(account.computed_balance_usd || 0);
-  const isDebt = balance < -0.5;
+  const monthLabel = format(new Date(), 'MMMM yyyy', { locale: es });
 
-  const bcImportado = importLog.some(l =>
-    ['banco_ciudad', 'santander'].includes(l.source) && l.month === currentMonth
-  );
-
-  const { data: liquidacionTxs } = useQuery({
+  const { data: liquidacionTx } = useQuery({
     queryKey: ['liquidacion-check', currentMonth],
     queryFn: async () => {
       const { data } = await supabase
         .from('transactions')
-        .select('id, description, amount_usd')
-        .ilike('description', '%Liquidación%')
-        .gte('date', currentMonth + '-01');
-      return data || [];
-    },
-  });
-
-  const yaLiquidado = (liquidacionTxs || []).length > 0;
-
-  const { data: vueltoTx } = useQuery({
-    queryKey: ['vuelto-check', currentMonth],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('transactions')
-        .select('id, amount')
-        .ilike('notes', `%vuelto_settlement_${currentMonth}%`)
+        .select('id, description, amount_usd, notes, date')
+        .ilike('description', `%Liquidación%`)
+        .ilike('description', `%viejo%`)
+        .gte('date', currentMonth + '-01')
+        .not('notes', 'is', null)
         .maybeSingle();
       return data;
     },
   });
 
-  const monthLabel = format(new Date(), 'MMMM yyyy', { locale: es });
+  const yaLiquidado = !!liquidacionTx;
+
+  const settlementData = useMemo(() => {
+    if (!liquidacionTx?.notes) return null;
+    try { return JSON.parse(liquidacionTx.notes); } catch { return null; }
+  }, [liquidacionTx]);
+
+  const { data: lastLiquidacion } = useQuery({
+    queryKey: ['last-liquidacion'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('transactions')
+        .select('date, notes, amount_usd')
+        .ilike('description', '%Liquidación%')
+        .ilike('description', '%viejo%')
+        .not('notes', 'is', null)
+        .lt('date', currentMonth + '-01')
+        .order('date', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data;
+    },
+  });
+
+  const lastMonth = lastLiquidacion
+    ? format(new Date(lastLiquidacion.date + 'T12:00:00'), 'MMMM yyyy', { locale: es })
+    : null;
 
   return (
-    <Card>
-      <CardContent className="p-5 space-y-4">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-center gap-3 min-w-0">
-            <MerchantLogo name={account.name} size={40} />
-            <div className="min-w-0">
-              <p className="font-semibold text-base">Viejo</p>
-              <p className="text-xs text-muted-foreground capitalize">
-                Ciclo {monthLabel}
-              </p>
-            </div>
+    <Card className="rounded-2xl overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-4 border-b border-border/50">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center text-base">
+            👴
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-foreground">Viejo</p>
+            <p className="text-xs text-muted-foreground">
+              {lastMonth
+                ? `Último mes liquidado: ${lastMonth}`
+                : 'Sin liquidaciones anteriores'}
+            </p>
           </div>
         </div>
+        {yaLiquidado && (
+          <Badge variant="secondary" className="text-[10px]">✓ {monthLabel}</Badge>
+        )}
+      </div>
 
-        {yaLiquidado ? (
-          <div className="space-y-3">
-            <div className="flex items-center gap-3 rounded-xl bg-success/10 px-4 py-3">
-              <CheckCircle2 className="h-5 w-5 text-success shrink-0" />
-              <div className="flex-1">
-                <p className="text-sm font-medium text-foreground capitalize">
-                  {monthLabel} liquidado ✓
+      <div className="px-5 py-4 space-y-3">
+        {yaLiquidado && settlementData ? (
+          <>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="rounded-xl bg-muted/50 px-3 py-2.5">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Total ARS</p>
+                <p className="text-sm font-mono font-medium text-foreground mt-0.5">
+                  {'$' + Math.round(settlementData.totalARS || 0).toLocaleString('es-AR')}
                 </p>
-                <p className="text-xs text-muted-foreground">
-                  Pagaste {formatUSD(Math.abs(Number(liquidacionTxs?.[0]?.amount_usd || 0)))} USD
-                  {vueltoTx && ` · Vuelto ARS ${Math.round(Number(vueltoTx.amount)).toLocaleString('es-AR')} en MP`}
+              </div>
+              <div className="rounded-xl bg-muted/50 px-3 py-2.5">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wide">USD pagado</p>
+                <p className="text-sm font-mono font-bold text-foreground mt-0.5">
+                  ${(settlementData.usdPagado || 0).toLocaleString('en-US')}
+                </p>
+              </div>
+              <div className="rounded-xl bg-muted/50 px-3 py-2.5">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Vuelto ARS</p>
+                <p className="text-sm font-mono text-success mt-0.5">
+                  {settlementData.vueltoARS > 0
+                    ? '+$' + Math.round(settlementData.vueltoARS).toLocaleString('es-AR')
+                    : '—'}
                 </p>
               </div>
             </div>
-            <Button variant="outline" className="w-full" onClick={onOpen}>
+            <Button variant="outline" className="w-full" size="sm" onClick={onOpen}>
               Ver detalle / Reliquidar →
             </Button>
-          </div>
+          </>
         ) : (
-          <Button className="w-full" onClick={onOpen}>
-            Empezar liquidación de {monthLabel} →
-          </Button>
+          <>
+            <p className="text-xs text-muted-foreground">
+              Subí los resúmenes de BC + Santander y completá los gastos del mes para liquidar.
+            </p>
+            <Button className="w-full" onClick={onOpen}>
+              Liquidar {monthLabel} →
+            </Button>
+          </>
         )}
-      </CardContent>
+      </div>
     </Card>
   );
 }
@@ -604,8 +606,25 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
         { locale: es }
       );
 
-      // ── Buscar las tres cuentas ──────────────────────────────────────
-      const tarjetaViejoAcc = accounts.find((a: any) => /viejo/i.test(a.name));
+      // ── Obtener o crear cuenta virtual "Viejo" (oculta en Accounts) ──
+      let tarjetaViejoAcc: any = accounts.find((a: any) => /viejo/i.test(a.name));
+      if (!tarjetaViejoAcc) {
+        const { data: newAcc, error: accErr } = await supabase
+          .from('accounts')
+          .insert({
+            user_id: user.id,
+            name: 'Viejo',
+            type: 'debt',
+            currency: 'ARS',
+            opening_balance: 0,
+            is_active: true,
+          })
+          .select()
+          .single();
+        if (accErr) throw accErr;
+        tarjetaViejoAcc = newAcc;
+      }
+
       const cashAcc = accounts.find(
         (a: any) => /cash/i.test(a.name) && a.currency === 'USD'
       );
@@ -613,11 +632,6 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
         /mercado.*pago|mercadopago/i.test(a.name)
       );
 
-      if (!tarjetaViejoAcc) {
-        toast.error('No se encontró la cuenta "Viejo". Creála en Accounts con tipo Debt.');
-        setSubmitting(false);
-        return;
-      }
       if (!cashAcc || !mpAcc) {
         toast.error('Faltan cuentas: Cash USD y/o Mercado Pago');
         setSubmitting(false);
