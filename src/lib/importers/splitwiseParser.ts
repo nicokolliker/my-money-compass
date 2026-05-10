@@ -67,10 +67,14 @@ export function parseSplitwise(
   userColumn: string = 'nicolaskolliker',
   arsToUsd: number = 0,
   cutoffDate?: string,
-): SplitwiseRow[] {
+  groupNameHint?: string,
+): SplitwiseParseResult {
   const CUTOFF = cutoffDate || DEFAULT_CUTOFF;
   const lines = csvText.split(/\r?\n/).filter((l) => l.trim().length > 0);
-  if (lines.length < 2) return [];
+  const empty: SplitwiseParseResult = {
+    rows: [], netBalance: 0, currency: 'USD', groupName: groupNameHint || '', earliestDate: null,
+  };
+  if (lines.length < 2) return empty;
   const header = parseCsvLine(lines[0]).map((h) => h.trim());
   const lower = header.map((h) => h.toLowerCase());
 
@@ -83,11 +87,19 @@ export function parseSplitwise(
   const curIdx = lower.findIndex((h) => h === 'moneda' || h === 'currency');
   const amtIdx = lower.findIndex((h) => h === 'importe' || h === 'monto' || h === 'cost');
 
-  if (userIdx < 0 || dateIdx < 0) return [];
+  if (userIdx < 0 || dateIdx < 0) return empty;
 
   const out: SplitwiseRow[] = [];
+  const curCount: Record<string, number> = {};
+  let netByCurrency: Record<string, number> = {};
+  let earliest: string | null = null;
+
   for (let r = 1; r < lines.length; r++) {
     const cols = parseCsvLine(lines[r]);
+    const description = (descIdx >= 0 ? cols[descIdx] : '').trim() || 'Splitwise';
+    // Skip the trailing "Total balance" summary row Splitwise appends
+    if (TOTAL_BALANCE_RE.test(description)) continue;
+
     const date = normalizeDate(cols[dateIdx] || '');
     if (!date || date < CUTOFF) continue;
     const category = (catIdx >= 0 ? cols[catIdx] : '').trim();
@@ -97,7 +109,6 @@ export function parseSplitwise(
     const userAmount = parseFloat(userRaw.replace(/,/g, ''));
     if (!isFinite(userAmount) || Math.abs(userAmount) < 0.01) continue;
 
-    const description = (descIdx >= 0 ? cols[descIdx] : '').trim() || 'Splitwise';
     const currency = ((curIdx >= 0 ? cols[curIdx] : 'USD') || 'USD').trim().toUpperCase();
     const swType: 'expense' | 'receivable' = userAmount > 0 ? 'expense' : 'receivable';
     const abs = Math.abs(userAmount);
@@ -113,6 +124,10 @@ export function parseSplitwise(
       amountUSD = abs;
     }
 
+    curCount[currency] = (curCount[currency] || 0) + 1;
+    netByCurrency[currency] = (netByCurrency[currency] || 0) + userAmount;
+    if (!earliest || date < earliest) earliest = date;
+
     out.push({
       date,
       description,
@@ -122,8 +137,21 @@ export function parseSplitwise(
       external_id: `sw-${date}-${description}-${userAmount}`,
       matched: false,
       swType,
+      currency,
+      userAmount,
       category_hint: CATEGORY_MAP[category] || category || undefined,
     });
   }
-  return out;
+
+  // Dominant currency = most frequent
+  const dominant = (Object.entries(curCount).sort((a, b) => b[1] - a[1])[0]?.[0] || 'USD') as 'USD' | 'ARS';
+  const netBalance = netByCurrency[dominant] || 0;
+
+  return {
+    rows: out,
+    netBalance,
+    currency: dominant,
+    groupName: groupNameHint || '',
+    earliestDate: earliest,
+  };
 }
