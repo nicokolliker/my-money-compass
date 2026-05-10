@@ -285,49 +285,6 @@ function ensureSpace(doc: jsPDF, y: number, needed: number, margin: number): num
   return y;
 }
 
-function drawSection(doc: jsPDF, section: SectionMeta, y: number, margin: number, pageW: number, font: string): number {
-  const { title, subtitle, rows, accent } = section;
-  if (rows.length === 0) return y;
-
-  y = ensureSpace(doc, y, 80, margin);
-
-  const ars = rows.filter((r) => !r.matched);
-  const usd = rows.filter((r) => r.matched);
-  const subtotalARS = ars.reduce((s, r) => s + r.amountARS, 0);
-  const subtotalUSD = usd.reduce((s, r) => s + r.amountUSD, 0);
-
-  rgb(doc, 'setFillColor', accent);
-  doc.rect(margin, y - 4, 4, 22, 'F');
-
-  rgb(doc, 'setTextColor', BRAND.ink);
-  doc.setFont(font, 'bold');
-  doc.setFontSize(13);
-  doc.text(title, margin + 12, y + 8);
-
-  if (subtitle) {
-    rgb(doc, 'setTextColor', BRAND.muted);
-    doc.setFont(font, 'normal');
-    doc.setFontSize(9);
-    doc.text(subtitle, margin + 12, y + 20);
-  }
-
-  const totalParts: string[] = [];
-  if (subtotalARS > 0) totalParts.push(fmtARS(subtotalARS));
-  if (subtotalUSD > 0) totalParts.push(fmtUSD(subtotalUSD));
-  if (totalParts.length > 0) {
-    rgb(doc, 'setTextColor', BRAND.ink);
-    doc.setFont(font, 'bold');
-    doc.setFontSize(11);
-    doc.text(totalParts.join('  ·  '), pageW - margin, y + 8, { align: 'right' });
-  }
-
-  y += subtitle ? 28 : 22;
-
-  autoTable(doc, {
-    startY: y,
-    head: [['Fecha', 'Descripción', 'Categoría', 'Monto']],
-    body: rowsToTableBody(rows),
-    theme: 'plain',
 function drawSection(doc: jsPDF, section: SectionMeta, y: number, margin: number, pageW: number, font: string, emojiFont: string | null): number {
   const { title, subtitle, rows, accent } = section;
   if (rows.length === 0) return y;
