@@ -773,9 +773,9 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
           const setterFor = (src: RowSrc) =>
             src === 'iebra' ? setIebraRows : src === 'kolliker' ? setKollikerRows : setSantRows;
           const rowsFor = (key: string): { rows: Row[]; src: RowSrc } | null => {
-            if (key === 'visa_ciudad') return { rows: iebraRows, src: 'iebra' };
+            if (key === 'visa_ciudad_mama') return { rows: iebraRows, src: 'iebra' };
+            if (key === 'visa_ciudad_papa') return { rows: kollikerRows, src: 'kolliker' };
             if (key === 'visa_santander') return { rows: santRows, src: 'sant' };
-            if (key === 'obra_social') return { rows: kollikerRows, src: 'kolliker' };
             return null;
           };
           const renderPdfRows = (key: string) => {
