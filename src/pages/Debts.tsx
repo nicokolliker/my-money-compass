@@ -826,6 +826,58 @@ function ViejoSettlementWizard({ open, onOpenChange, onSantTotalDetected }: { op
         .map(e => ({ label: e.label, categoryName: e.categoryName, emoji: e.emoji }));
       localStorage.setItem(STORAGE_KEY, JSON.stringify(defaults));
 
+      // ── Auto-mark matching recurring instances as paid ──────────────
+      try {
+        const monthStart = settlementMonth + '-01';
+        const [ysm, msm] = settlementMonth.split('-').map(Number);
+        const monthEnd = new Date(ysm, msm, 0).toISOString().split('T')[0];
+        const labels = [
+          ...items.filter(i => i.amountARS > 0).map(i => i.label),
+          ...extraItems.filter(e => e.amountARS > 0 && e.label.trim()).map(e => e.label),
+        ];
+        const normalize = (s: string) => (s || '')
+          .toLowerCase()
+          .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+          .replace(/[^a-z0-9\s]/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+        const labelTokens = labels.map(l => {
+          const n = normalize(l);
+          return { full: n, words: n.split(' ').filter(w => w.length >= 4) };
+        });
+        const { data: pendingInsts } = await supabase
+          .from('recurring_instances')
+          .select('id, status, recurring_id, recurring_expenses!recurring_id(name)')
+          .eq('user_id', user.id)
+          .gte('expected_date', monthStart)
+          .lte('expected_date', monthEnd)
+          .not('status', 'in', '("matched","paid_manual","skipped")');
+        const toMark: string[] = [];
+        for (const inst of (pendingInsts || []) as any[]) {
+          const rname = normalize(inst.recurring_expenses?.name || '');
+          if (!rname) continue;
+          const rwords = rname.split(' ').filter((w: string) => w.length >= 4);
+          const match = labelTokens.some(lt => {
+            if (!lt.full) return false;
+            if (lt.full.includes(rname) || rname.includes(lt.full)) return true;
+            return lt.words.some(w => rname.includes(w)) || rwords.some(w => lt.full.includes(w));
+          });
+          if (match) toMark.push(inst.id);
+        }
+        if (toMark.length > 0) {
+          const note = `Incluido en liquidación ${settlementMonth}`;
+          await supabase
+            .from('recurring_instances')
+            .update({ status: 'paid_manual', matched_at: new Date().toISOString(), notes: note } as any)
+            .in('id', toMark);
+          qc.invalidateQueries({ queryKey: ['recurring-instances'] });
+        }
+      } catch (autoMarkErr) {
+        // Fail silently — settlement itself already succeeded
+        console.warn('auto-mark recurring failed', autoMarkErr);
+      }
+
+
       qc.invalidateQueries({ queryKey: ['transactions'] });
       qc.invalidateQueries({ queryKey: ['account-balances'] });
       qc.invalidateQueries({ queryKey: ['liquidacion-history-all'] });
