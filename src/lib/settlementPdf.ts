@@ -66,6 +66,12 @@ const fmtDate = (iso: string) => {
   return m ? `${m[3]}/${m[2]}/${m[1].slice(2)}` : iso;
 };
 
+/** Strip emoji/symbol characters — jsPDF built-in fonts don't render them. */
+function stripEmoji(s: string): string {
+  if (!s) return s;
+  return s.replace(/[\u{1F000}-\u{1FFFF}|\u{2600}-\u{27BF}]/gu, '').replace(/\s+/g, ' ').trim();
+}
+
 function rgb(doc: jsPDF, fn: 'setFillColor' | 'setTextColor' | 'setDrawColor', c: [number, number, number]) {
   doc[fn](c[0], c[1], c[2]);
 }
@@ -217,8 +223,8 @@ function registerPoppins(doc: jsPDF, fonts: { regular: string; bold: string }): 
 function rowsToTableBody(rows: SettlementPdfRow[]) {
   return rows.map((r) => [
     fmtDate(r.date),
-    r.description,
-    r.categoryName || 'Otros',
+    stripEmoji(r.description),
+    stripEmoji(r.categoryName || 'Otros'),
     r.matched ? fmtUSD(r.amountUSD) : fmtARS(r.amountARS),
   ]);
 }
@@ -302,13 +308,13 @@ function drawSection(doc: jsPDF, section: SectionMeta, y: number, margin: number
   rgb(doc, 'setTextColor', BRAND.ink);
   doc.setFont(font, 'bold');
   doc.setFontSize(13);
-  doc.text(title, margin + 12, y + 8);
+  doc.text(stripEmoji(title), margin + 12, y + 8);
 
   if (subtitle) {
     rgb(doc, 'setTextColor', BRAND.muted);
     doc.setFont(font, 'normal');
     doc.setFontSize(9);
-    doc.text(subtitle, margin + 12, y + 20);
+    doc.text(stripEmoji(subtitle), margin + 12, y + 20);
   }
 
   const totalParts: string[] = [];
@@ -443,11 +449,12 @@ function drawCategoryBreakdown(
     doc.setFont(font, 'bold');
     doc.setFontSize(10);
     const maxLabelW = labelW - 18 - emojiW;
-    let labelText = name;
+    let labelText = stripEmoji(name);
+    const fullLabel = labelText;
     while (doc.getTextWidth(labelText) > maxLabelW && labelText.length > 3) {
       labelText = labelText.slice(0, -2);
     }
-    if (labelText !== name) labelText = labelText.slice(0, -1) + '…';
+    if (labelText !== fullLabel) labelText = labelText.slice(0, -1) + '…';
     doc.text(labelText, labelX + 14 + emojiW, ry + 16);
 
     // Bar background
