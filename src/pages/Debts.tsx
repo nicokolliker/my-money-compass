@@ -34,6 +34,7 @@ import { useImportLog } from '@/hooks/useImportLog';
 import { extractPdfText } from '@/lib/pdfReader';
 import { parseAmexTotal } from '@/lib/importers/amexParser';
 import { PendingCreditsBanner } from '@/components/PendingCreditsBanner';
+import { CreditCardDebtCard } from '@/components/debts/CreditCardDebtCard';
 
 export default function DebtsPage() {
   const { data: importLog } = useImportLog();
@@ -69,6 +70,8 @@ export default function DebtsPage() {
         santPreviewARS={santPreviewARS}
         onOpen={() => setOpenViejo(true)}
       />
+
+      <CreditCardDebtCard />
 
       {splitwiseAccount ? (
         <SplitwiseDebtCard

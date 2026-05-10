@@ -1,0 +1,173 @@
+import { useMemo, useState } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { ChevronDown, CreditCard } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
+
+const CARD_LABELS: Record<string, string> = {
+  visa_ciudad_mama: 'VISA Ciudad — Mamá',
+  visa_ciudad_papa: 'VISA Ciudad — Papá',
+  visa_santander:   'VISA Santander',
+  amex:             'AMEX Santander',
+};
+
+function formatARS(n: number): string {
+  return '$' + Math.round(n).toLocaleString('es-AR');
+}
+
+export function CreditCardDebtCard() {
+  const [openCuotas, setOpenCuotas] = useState(false);
+
+  // Last settlement transaction (used for per-card balances + last update date)
+  const { data: lastSettlement } = useQuery({
+    queryKey: ['last-settlement-for-cards'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('transactions')
+        .select('date, notes')
+        .ilike('description', '%Liquidación%')
+        .ilike('description', '%viejo%')
+        .not('notes', 'is', null)
+        .order('date', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data;
+    },
+  });
+
+  // Pending cuotas — scan transactions whose description matches "(Cuota X/Y)"
+  const { data: cuotaTxs } = useQuery({
+    queryKey: ['pending-cuotas'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('transactions')
+        .select('id, date, description, amount, currency, amount_usd')
+        .ilike('description', '%cuota%')
+        .order('date', { ascending: false })
+        .limit(500);
+      return data || [];
+    },
+  });
+
+  const cardBalances = useMemo(() => {
+    if (!lastSettlement?.notes) return [];
+    let parsed: any = null;
+    try { parsed = JSON.parse(lastSettlement.notes); } catch { return []; }
+    const bd = parsed?.breakdown || {};
+    return Object.keys(CARD_LABELS)
+      .map(k => ({ key: k, label: CARD_LABELS[k], ars: Number(bd[k] || 0) }))
+      .filter(c => c.ars > 0);
+  }, [lastSettlement]);
+
+  const pendingCuotas = useMemo(() => {
+    if (!cuotaTxs) return [];
+    const re = /\(Cuota\s*(\d+)\/(\d+)\)/i;
+    const seen = new Set<string>();
+    const out: { id: string; description: string; remaining: number; amount: number; currency: string; date: string }[] = [];
+    for (const t of cuotaTxs as any[]) {
+      const desc: string = t.description || '';
+      const m = desc.match(re);
+      if (!m) continue;
+      const x = parseInt(m[1], 10);
+      const y = parseInt(m[2], 10);
+      if (!Number.isFinite(x) || !Number.isFinite(y) || y <= x) continue;
+      const cleanDesc = desc.replace(re, '').replace(/\s+/g, ' ').trim();
+      // Dedupe by clean description (keep most recent occurrence with min remaining)
+      const key = cleanDesc.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({
+        id: t.id,
+        description: cleanDesc,
+        remaining: y - x,
+        amount: Math.abs(Number(t.amount) || 0),
+        currency: t.currency || 'ARS',
+        date: t.date,
+      });
+    }
+    return out.sort((a, b) => a.remaining - b.remaining);
+  }, [cuotaTxs]);
+
+  const totalARS = cardBalances.reduce((s, c) => s + c.ars, 0);
+  const hasData = cardBalances.length > 0 || pendingCuotas.length > 0;
+
+  return (
+    <Card className="rounded-2xl overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-4 border-b border-border/50">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center">
+            <CreditCard className="h-4 w-4 text-foreground" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-foreground">Deuda en tarjetas</p>
+            <p className="text-xs text-muted-foreground">
+              {lastSettlement?.date
+                ? <>Última actualización: <span className="capitalize">{format(new Date(lastSettlement.date + 'T12:00:00'), "d 'de' MMMM yyyy", { locale: es })}</span></>
+                : 'Sin datos aún'}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <CardContent className="p-5 space-y-4">
+        {!hasData && (
+          <p className="text-xs text-muted-foreground">Subí los PDFs de tarjeta para ver el resumen</p>
+        )}
+
+        {cardBalances.length > 0 && (
+          <div className="rounded-xl border border-border/60 divide-y divide-border/60">
+            {cardBalances.map(c => (
+              <div key={c.key} className="flex items-center justify-between px-3 py-2.5">
+                <p className="text-xs font-medium text-foreground">{c.label}</p>
+                <p className="text-sm font-mono font-semibold text-foreground tabular-nums">
+                  {formatARS(c.ars)}
+                </p>
+              </div>
+            ))}
+            {cardBalances.length > 1 && (
+              <div className="flex items-center justify-between px-3 py-2.5 bg-muted/30">
+                <p className="text-xs font-semibold text-foreground">Total</p>
+                <p className="text-sm font-mono font-bold text-foreground tabular-nums">
+                  {formatARS(totalARS)}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {pendingCuotas.length > 0 && (
+          <Collapsible open={openCuotas} onOpenChange={setOpenCuotas}>
+            <CollapsibleTrigger className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-muted/40 hover:bg-muted/60 transition-colors">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-foreground">Cuotas pendientes</span>
+                <span className="text-[10px] text-muted-foreground">· {pendingCuotas.length}</span>
+              </div>
+              <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', openCuotas && 'rotate-180')} />
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-2">
+              <div className="rounded-xl border border-border/60 divide-y divide-border/60">
+                {pendingCuotas.map(c => (
+                  <div key={c.id} className="flex items-center justify-between px-3 py-2 gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-medium text-foreground truncate">{c.description}</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {c.remaining} {c.remaining === 1 ? 'cuota restante' : 'cuotas restantes'}
+                      </p>
+                    </div>
+                    <p className="text-xs font-mono font-semibold text-foreground tabular-nums shrink-0">
+                      {c.currency === 'ARS' ? formatARS(c.amount) : `${c.amount.toFixed(2)} ${c.currency}`}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        )}
+      </CardContent>
+    </Card>
+  );
+}

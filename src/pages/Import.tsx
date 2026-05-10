@@ -13,6 +13,7 @@ import { parseArqStatements, type ParsedTransaction, type ParsedArqResult } from
 import { useInvalidateArqReconciliations } from '@/hooks/useArqReconciliation';
 import { parseMercadoPago } from '@/lib/importers/mercadoPagoParser';
 import { parseGalicia } from '@/lib/importers/galiciaParser';
+import { useRefreshRecurringTracking } from '@/hooks/useRecurringInstances';
 
 /** Close pending account_reconciliations for a destination account covering the imported month. */
 async function closeAccountReconciliations(opts: {
@@ -224,6 +225,8 @@ export default function ImportPage() {
   } | null>(null);
   const qc = useQueryClient();
   const invalidateArqRecons = useInvalidateArqReconciliations();
+  const refreshRecurring = useRefreshRecurringTracking();
+  const silentRefreshRecurring = () => { refreshRecurring.mutateAsync().catch(() => {}); };
 
   async function handleProcess() {
     if (!arsFile) {
@@ -407,6 +410,7 @@ export default function ImportPage() {
       const dupCount = rows.filter((r) => r.duplicate).length;
       setResultMsg(`${toImport.length} transacciones importadas, ${dupCount} duplicados ignorados`);
       toast.success('Importación completa');
+      silentRefreshRecurring();
       setRows([]);
       setArqMonth('');
       setArsFile(null);
@@ -527,6 +531,7 @@ export default function ImportPage() {
       const dups = mpRows.filter((r) => r.duplicate).length;
       setMpResultMsg(`${toImport.length} transacciones importadas, ${dups} duplicados ignorados`);
       toast.success('Importación completa');
+      silentRefreshRecurring();
       setMpRows([]);
       setMpMonth('');
       setMpFile(null);
@@ -645,6 +650,7 @@ export default function ImportPage() {
       const dups = galiciaRows.filter((r) => r.duplicate).length;
       setGaliciaResultMsg(`${toImport.length} transacciones importadas, ${dups} duplicados ignorados`);
       toast.success('Importación completa');
+      silentRefreshRecurring();
       setGaliciaRows([]);
       setGaliciaMonth('');
       setGaliciaFile(null);
