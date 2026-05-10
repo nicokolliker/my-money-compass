@@ -521,3 +521,77 @@ function InvoiceForm({ open, onClose, onSaved }: { open: boolean; onClose: () =>
     </Dialog>
   );
 }
+
+function MonotributoConfigDialog({
+  open,
+  onClose,
+  current,
+}: {
+  open: boolean;
+  onClose: () => void;
+  current: MonotributoConfig;
+}) {
+  const [vigencia, setVigencia] = useState(current.vigencia);
+  const [catActual, setCatActual] = useState(current.cat_actual);
+  const [cuotaActual, setCuotaActual] = useState(String(current.cuota_actual));
+  const [saving, setSaving] = useState(false);
+  const upsert = useUpsertUserSettings();
+
+  // Re-sync when the dialog re-opens with new defaults.
+  useMemo(() => {
+    if (open) {
+      setVigencia(current.vigencia);
+      setCatActual(current.cat_actual);
+      setCuotaActual(String(current.cuota_actual));
+    }
+  }, [open, current]);
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      const payload: MonotributoConfig = {
+        vigencia: vigencia.trim() || current.vigencia,
+        cat_actual: catActual.trim().toUpperCase() || current.cat_actual,
+        cuota_actual: Number(cuotaActual) || current.cuota_actual,
+      };
+      await upsert.mutateAsync({ monotributo_config: payload } as any);
+      toast.success('Configuración actualizada');
+      onClose();
+    } catch (e: any) {
+      toast.error(e.message || 'No se pudo guardar');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Editar Monotributo</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div>
+            <label className="text-xs text-muted-foreground">Vigencia</label>
+            <Input value={vigencia} onChange={(e) => setVigencia(e.target.value)} placeholder="Feb–Jul 2026" />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground">Categoría actual</label>
+            <Input value={catActual} onChange={(e) => setCatActual(e.target.value)} placeholder="A" />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground">Cuota mensual (ARS)</label>
+            <Input type="number" value={cuotaActual} onChange={(e) => setCuotaActual(e.target.value)} placeholder="45700.74" />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Actualizá estos valores cuando ARCA publique nueva tabla de Monotributo.
+          </p>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+          <Button onClick={handleSave} disabled={saving}>{saving ? 'Guardando...' : 'Guardar'}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
