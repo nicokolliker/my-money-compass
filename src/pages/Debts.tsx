@@ -1429,6 +1429,8 @@ function TransferDialog({ account, onClose }: { account: any; onClose: () => voi
 
 const ITEM_META: Record<string, { label: string; emoji: string }> = {
   visa_ciudad: { label: 'VISA Ciudad', emoji: '🏦' },
+  visa_ciudad_mama: { label: 'VISA Ciudad — Mamá', emoji: '🏦' },
+  visa_ciudad_papa: { label: 'VISA Ciudad — Papá', emoji: '🏦' },
   visa_santander: { label: 'VISA Santander', emoji: '🏦' },
   amex: { label: 'AMEX Santander', emoji: '💳' },
   expensas: { label: 'Expensas', emoji: '🏠' },
@@ -1439,7 +1441,7 @@ const ITEM_META: Record<string, { label: string; emoji: string }> = {
   obra_social: { label: 'Obra Social', emoji: '❤️' },
 };
 
-const CARD_KEYS = ['visa_ciudad', 'visa_santander', 'amex'];
+const CARD_KEYS = ['visa_ciudad', 'visa_ciudad_mama', 'visa_ciudad_papa', 'visa_santander', 'amex'];
 
 type RangeFilter = '6' | '12' | '24' | 'all';
 
