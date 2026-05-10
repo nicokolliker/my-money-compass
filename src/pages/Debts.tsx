@@ -41,10 +41,19 @@ export default function DebtsPage() {
   const { data: pendingCredits } = usePendingCredits();
   const [openViejo, setOpenViejo] = useState(false);
   const [openSw, setOpenSw] = useState(false);
+  const [santPreviewARS, setSantPreviewARS] = useState<number>(() => {
+    const v = Number(sessionStorage.getItem('viejo_santTotalARS') || 0);
+    return Number.isFinite(v) ? v : 0;
+  });
 
   const splitwiseAccount = useMemo(() =>
     accounts?.find((a: any) => /splitwise/i.test(a.name)) || null,
   [accounts]);
+
+  const handleSantDetected = (n: number) => {
+    setSantPreviewARS(n);
+    try { sessionStorage.setItem('viejo_santTotalARS', String(n)); } catch {}
+  };
 
   return (
     <div className="space-y-6">
@@ -53,27 +62,31 @@ export default function DebtsPage() {
         <p className="text-sm text-muted-foreground">Revisión y liquidación mensual</p>
       </div>
 
-      {(pendingCredits || []).map((pc) => (
-        <Card key={pc.id} className="rounded-2xl border-success/40 bg-success/10">
-          <CardContent className="p-4">
-            <p className="text-xs font-semibold text-success uppercase tracking-wide mb-1">
-              Saldo a favor pendiente
-            </p>
-            <p className="text-sm text-foreground">
-              <span className="font-mono font-semibold text-success">
-                +${Math.round(pc.amount_ars).toLocaleString('es-AR')}
-              </span>{' '}
-              de liquidación {pc.settlement_month} — llegará por MercadoPago
-            </p>
+      {(pendingCredits || []).length > 0 && (
+        <Card className="rounded-2xl border-success/40 bg-success/10">
+          <CardContent className="p-4 space-y-2">
+            {(pendingCredits || []).map((pc) => (
+              <p key={pc.id} className="text-sm text-foreground leading-snug">
+                <span className="mr-1">💚</span>
+                <span className="font-semibold">Saldo a favor:</span>{' '}
+                <span className="font-mono font-semibold text-success">
+                  +{formatARS(pc.amount_ars)}
+                </span>
+                {pc.settlement_month && (
+                  <> de liquidación <span className="capitalize">{pc.settlement_month}</span></>
+                )}{' '}
+                <span className="text-muted-foreground">— llegará por MercadoPago</span>
+              </p>
+            ))}
           </CardContent>
         </Card>
-      ))}
+      )}
 
       <ViejoDebtCard
         importLog={importLog || []}
+        santPreviewARS={santPreviewARS}
         onOpen={() => setOpenViejo(true)}
       />
-      <ViejoCycleHistory importLog={importLog || []} />
 
       {splitwiseAccount ? (
         <SplitwiseDebtCard
@@ -94,14 +107,16 @@ export default function DebtsPage() {
             <p className="text-xs text-muted-foreground mb-3">
               Cargá tu primer CSV para empezar a trackear los gastos del grupo.
             </p>
-            <Button variant="outline" className="w-full" onClick={() => setOpenSw(true)}>
+            <Button variant="outline" size="sm" onClick={() => setOpenSw(true)}>
               Cargar CSV de Splitwise →
             </Button>
           </CardContent>
         </Card>
       )}
 
-      <ViejoSettlementWizard open={openViejo} onOpenChange={setOpenViejo} />
+      <ViejoCycleHistory importLog={importLog || []} />
+
+      <ViejoSettlementWizard open={openViejo} onOpenChange={setOpenViejo} onSantTotalDetected={handleSantDetected} />
       <SplitwiseSettlementWizard open={openSw} onOpenChange={setOpenSw} />
     </div>
   );
