@@ -532,6 +532,7 @@ function ViejoSettlementWizard({ open, onOpenChange, onSantTotalDetected }: { op
     try {
       const fxFallback = arsToUsd || 0.00072;
       let sant = 0, visaCiudadMama = 0, visaCiudadPapa = 0;
+      const subtotals: Record<string, number> = {};
 
       const bcFiles = [iebraFile, kollikerFile].filter((f): f is File => !!f);
       const allMama: ParsedTransaction[] = [];
