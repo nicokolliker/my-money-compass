@@ -369,6 +369,8 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
   const [iebraFile, setIebraFile] = useState<File | null>(null);
   const [kollikerFile, setKollikerFile] = useState<File | null>(null);
   const [santFile, setSantFile] = useState<File | null>(null);
+  const [amexFile, setAmexFile] = useState<File | null>(null);
+  const [amexARS, setAmexARS] = useState(0);
   const [bcTotalARS, setBcTotalARS] = useState(0);
   const [santTotalARS, setSantTotalARS] = useState(0);
   const [visaCiudadMamaARS, setVisaCiudadMamaARS] = useState(0);
