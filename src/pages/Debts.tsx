@@ -487,7 +487,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
       setStep(1);
       setSettlementMonth(format(new Date(), 'yyyy-MM'));
       setIebraFile(null); setKollikerFile(null); setSantFile(null);
-      setBcTotalARS(0); setSantTotalARS(0); setVisaCiudadARS(0); setObSocARS(0);
+      setBcTotalARS(0); setSantTotalARS(0); setVisaCiudadMamaARS(0); setVisaCiudadPapaARS(0);
       setExtraItems([]);
       setIebraRows([]); setKollikerRows([]); setSantRows([]);
     }
