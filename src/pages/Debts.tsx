@@ -1719,10 +1719,22 @@ function SettlementDetail({ parsed }: { parsed: any }) {
       .map((k) => ({ key: k, label: ITEM_META[k]?.label || k, amount: Number(breakdown[k]) })),
   })).filter((g) => g.items.length > 0);
 
-  const otros = Object.entries(breakdown)
-    .filter(([k, v]) => !ITEM_META[k] && Number(v) > 0)
-    .map(([k, v]) => ({ key: k, label: k, amount: Number(v) }));
-  if (otros.length > 0) groups.push({ label: '➕ Otros', items: otros });
+  const extras = Array.isArray(parsed.extras) ? parsed.extras : [];
+  if (extras.length > 0) {
+    groups.push({
+      label: '➕ Otros',
+      items: extras.map((e: any, idx: number) => ({
+        key: `extra-${idx}`,
+        label: e.label || '—',
+        amount: Number(e.amountARS || 0),
+      })),
+    });
+  }
+
+  // Recompute total robustly: breakdown + extras (cards already included in breakdown)
+  const sumBreakdown = Object.values(breakdown).reduce((s: number, v) => s + Number(v || 0), 0);
+  const sumExtras = extras.reduce((s: number, e: any) => s + Number(e.amountARS || 0), 0);
+  const totalARS = Number(parsed.totalARS) > 0 ? Number(parsed.totalARS) : (sumBreakdown + sumExtras);
 
   return (
     <div className="space-y-4">
@@ -1743,7 +1755,7 @@ function SettlementDetail({ parsed }: { parsed: any }) {
       <div className="rounded-lg bg-muted/40 p-3 space-y-1 text-sm">
         <div className="flex justify-between">
           <span className="text-muted-foreground">Total ARS</span>
-          <span className="font-mono font-semibold">{formatARS(parsed.totalARS || 0)}</span>
+          <span className="font-mono font-semibold">{formatARS(totalARS)}</span>
         </div>
         <div className="flex justify-between">
           <span className="text-muted-foreground">TC Blue</span>
