@@ -1116,8 +1116,8 @@ function FileSlot({ label, file, onChange, accept = '.pdf' }: { label: string; f
         </div>
       ) : (
         <label className="mt-1 flex items-center justify-center rounded-md border border-dashed p-3 cursor-pointer hover:bg-muted/50 text-xs text-muted-foreground gap-2">
-          <Upload className="h-3 w-3" /> Subir PDF
-          <input type="file" accept=".pdf" className="hidden" onChange={(e) => onChange(e.target.files?.[0] || null)} />
+          <Upload className="h-3 w-3" /> Subir {acceptLabel}
+          <input type="file" accept={accept} className="hidden" onChange={(e) => onChange(e.target.files?.[0] || null)} />
         </label>
       )}
     </div>
