@@ -296,6 +296,53 @@ export default function Accounts() {
         );
       })}
 
+      {binanceBalances.length > 0 && (
+        <Collapsible open={!collapsed['cripto']} onOpenChange={(open) => setCollapsed(c => ({ ...c, cripto: !open }))}>
+          <CollapsibleTrigger asChild>
+            <button className="flex items-center justify-between w-full px-1 py-2 group">
+              <div className="flex items-center gap-2">
+                <span className="text-base">₿</span>
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Cripto</span>
+                <span className="text-xs text-muted-foreground tabular-nums">({binanceBalances.length})</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-foreground tabular-nums">{formatUSD(binanceTotalUsd)}</span>
+                <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${!collapsed['cripto'] ? '' : '-rotate-90'}`} />
+              </div>
+            </button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <Card>
+              <CardContent className="divide-y divide-border py-1">
+                {binanceBalances.map((b: any) => {
+                  const pct = totalNetWorth !== 0 ? (b.value_usd / totalNetWorth * 100) : 0;
+                  return (
+                    <div key={b.asset} className="flex items-center gap-3 py-3 px-2">
+                      <MerchantLogo name="Binance" size={40} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-foreground">{b.asset}</p>
+                        <p className="text-xs text-muted-foreground">Binance</p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-sm font-bold tabular-nums text-foreground">
+                          ${Number(b.value_usd).toLocaleString('en-US', { maximumFractionDigits: 2 })}
+                        </p>
+                        <div className="flex items-center gap-1.5 justify-end">
+                          <span className="text-[11px] text-muted-foreground tabular-nums">
+                            {Number(b.total).toFixed(b.asset === 'BTC' ? 8 : 4)} {b.asset}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground tabular-nums">{pct.toFixed(1)}%</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </CardContent>
+            </Card>
+          </CollapsibleContent>
+        </Collapsible>
+      )}
+
       {/* Group Form */}
       <Dialog open={showGroupForm} onOpenChange={setShowGroupForm}>
         <DialogContent className="sm:max-w-md">
