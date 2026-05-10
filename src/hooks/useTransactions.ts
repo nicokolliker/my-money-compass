@@ -17,7 +17,7 @@ export function useTransactions(filters?: { accountId?: string; categoryId?: str
     queryKey: ['transactions', userId, filters],
     enabled: !!userId,
     queryFn: async () => {
-      let q = supabase.from('transactions').select('*, accounts(name, currency), categories(name, icon, color), subcategories(name)').order('date', { ascending: false }).order('created_at', { ascending: false });
+      let q = supabase.from('transactions').select('*, accounts(id, name, currency), categories(id, name, icon, color), subcategories:subcategory_id(id, name), payment_methods(id, name)').order('date', { ascending: false }).order('created_at', { ascending: false });
       if (filters?.accountId) q = q.eq('account_id', filters.accountId);
       if (filters?.categoryId) q = q.eq('category_id', filters.categoryId);
       if (filters?.type) q = q.eq('type', filters.type as 'expense' | 'income' | 'transfer' | 'adjustment');
