@@ -34,11 +34,14 @@ import { useImportLog } from '@/hooks/useImportLog';
 import { extractPdfText } from '@/lib/pdfReader';
 import { parseAmexTotal } from '@/lib/importers/amexParser';
 import { PendingCreditsBanner } from '@/components/PendingCreditsBanner';
-import { CreditCardDebtCard } from '@/components/debts/CreditCardDebtCard';
+import { CreditCardDebtCard, PendingInstallmentsCard } from '@/components/debts/CreditCardDebtCard';
+import { UnifiedCycleHistory } from '@/components/debts/UnifiedCycleHistory';
+import { usePendingCredits } from '@/hooks/usePendingCredits';
 
 export default function DebtsPage() {
   const { data: importLog } = useImportLog();
   const { data: accounts } = useAccountBalances();
+  const { data: pendingCredits } = usePendingCredits();
   const [openViejo, setOpenViejo] = useState(false);
   const [openSw, setOpenSw] = useState(false);
   const [santPreviewARS, setSantPreviewARS] = useState<number>(() => {
@@ -55,57 +58,140 @@ export default function DebtsPage() {
     try { sessionStorage.setItem('viejo_santTotalARS', String(n)); } catch {}
   };
 
+  const hasPendingCredits = (pendingCredits || []).some((c: any) => c.status !== 'matched');
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Deudas y créditos</h1>
         <p className="text-sm text-muted-foreground">Revisión y liquidación mensual</p>
       </div>
 
-      <PendingCreditsBanner />
+      {/* SECTION 1 — Liquidaciones (inputs / actions) */}
+      <section className="space-y-3">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Liquidaciones
+        </h2>
+        <div className="grid gap-3 md:grid-cols-2">
+          <ViejoActionCard onOpen={() => setOpenViejo(true)} />
+          <SplitwiseActionCard
+            account={splitwiseAccount}
+            importLog={importLog || []}
+            onOpen={() => setOpenSw(true)}
+          />
+        </div>
+      </section>
 
+      {/* SECTION 2 — Estado actual */}
+      <section className="space-y-3">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Estado actual
+        </h2>
 
-      <ViejoDebtCard
-        importLog={importLog || []}
-        santPreviewARS={santPreviewARS}
-        onOpen={() => setOpenViejo(true)}
-      />
+        {hasPendingCredits && (
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-foreground/80">💚 Saldo a favor</p>
+            <PendingCreditsBanner />
+          </div>
+        )}
 
-      <CreditCardDebtCard />
+        <CreditCardDebtCard />
+        <PendingInstallmentsCard />
+      </section>
 
-      {splitwiseAccount ? (
-        <SplitwiseDebtCard
-          account={splitwiseAccount}
-          importLog={importLog || []}
-          onOpen={() => setOpenSw(true)}
-        />
-      ) : (
-        <Card className="rounded-2xl">
-          <CardContent className="p-5">
-            <div className="flex items-center gap-3 mb-3">
-              <MerchantLogo name="Splitwise" domain="splitwise.com" size={36} />
-              <div>
-                <p className="text-sm font-semibold">Splitwise</p>
-                <p className="text-xs text-muted-foreground">Sin actividad aún</p>
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground mb-3">
-              Cargá tu primer CSV para empezar a trackear los gastos del grupo.
-            </p>
-            <Button variant="outline" size="sm" onClick={() => setOpenSw(true)}>
-              Cargar CSV de Splitwise →
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      <ViejoCycleHistory importLog={importLog || []} />
+      {/* SECTION 3 — Historial */}
+      <section className="space-y-3">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Historial
+        </h2>
+        <UnifiedCycleHistory />
+      </section>
 
       <ViejoSettlementWizard open={openViejo} onOpenChange={setOpenViejo} onSantTotalDetected={handleSantDetected} />
       <SplitwiseSettlementWizard open={openSw} onOpenChange={setOpenSw} />
     </div>
   );
 }
+
+function ViejoActionCard({ onOpen }: { onOpen: () => void }) {
+  const currentMonthLabel = format(new Date(), 'MMMM', { locale: es });
+  const { data: lastLiquidacion } = useQuery({
+    queryKey: ['last-liquidacion-any'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('transactions')
+        .select('date, amount_usd')
+        .ilike('description', '%Liquidación%')
+        .ilike('description', '%viejo%')
+        .not('notes', 'is', null)
+        .order('date', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data;
+    },
+  });
+
+  const lastUsd = lastLiquidacion ? Math.abs(Number(lastLiquidacion.amount_usd) || 0) : 0;
+  const lastMonth = lastLiquidacion
+    ? format(new Date(lastLiquidacion.date + 'T12:00:00'), 'MMMM yyyy', { locale: es })
+    : null;
+
+  return (
+    <Card className="rounded-2xl overflow-hidden">
+      <CardContent className="p-5 space-y-3">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center text-base">👴</div>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-foreground">Viejo</p>
+            <p className="text-xs text-muted-foreground truncate">
+              {lastMonth && lastUsd > 0
+                ? <>Última: <span className="font-mono">{formatUSD(lastUsd)}</span> · {lastMonth}</>
+                : 'Sin liquidaciones anteriores'}
+            </p>
+          </div>
+        </div>
+        <Button variant="secondary" size="sm" className="w-full" onClick={onOpen}>
+          Liquidar <span className="capitalize">{currentMonthLabel}</span> →
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+function SplitwiseActionCard({ account, importLog, onOpen }: {
+  account: any; importLog: any[]; onOpen: () => void;
+}) {
+  const swImports = (importLog || [])
+    .filter((l: any) => l.source === 'splitwise')
+    .sort((a: any, b: any) => (b.imported_at || '').localeCompare(a.imported_at || ''));
+  const lastImport = swImports[0];
+  const lastDate = lastImport?.imported_at
+    ? format(new Date(lastImport.imported_at), "d 'de' MMM yyyy", { locale: es })
+    : null;
+  const balance = Number(account?.computed_balance_usd || 0);
+
+  return (
+    <Card className="rounded-2xl overflow-hidden">
+      <CardContent className="p-5 space-y-3">
+        <div className="flex items-center gap-3">
+          <MerchantLogo name="Splitwise" domain="splitwise.com" size={36} />
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-foreground">Splitwise</p>
+            <p className="text-xs text-muted-foreground truncate">
+              {lastDate
+                ? <>Último import: {lastDate}{Math.abs(balance) > 0.5 && <> · <span className="font-mono">{balance > 0 ? '+' : ''}${balance.toFixed(2)}</span></>}</>
+                : 'Sin actividad aún'}
+            </p>
+          </div>
+        </div>
+        <Button variant="secondary" size="sm" className="w-full" onClick={onOpen}>
+          Cargar CSV de Splitwise →
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
 
 function ViejoDebtCard({ importLog, santPreviewARS, onOpen }: {
   importLog: any[]; santPreviewARS: number; onOpen: () => void;
