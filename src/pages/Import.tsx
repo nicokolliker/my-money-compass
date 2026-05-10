@@ -954,9 +954,65 @@ export default function ImportPage() {
         </CardContent>
       </Card>
 
+      {/* Banco Galicia */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base flex items-center gap-2">
+            <MerchantLogo name="Banco Galicia" domain="galicia.com.ar" size={28} />
+            Banco Galicia
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <FileDropzone
+              label="Extracto (.xlsx)"
+              file={galiciaFile}
+              onFile={setGaliciaFile}
+              accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              acceptLabel="XLSX"
+            />
+          </div>
+          <div className="flex items-center gap-3">
+            <Button onClick={handleGaliciaProcess} disabled={!galiciaFile || galiciaProcessing}>
+              <Upload className="h-4 w-4 mr-2" />
+              {galiciaProcessing ? 'Procesando...' : 'Procesar'}
+            </Button>
+            {!galiciaAccount && (
+              <Badge variant="outline" className="text-amber-600">
+                No se encontró cuenta Galicia
+              </Badge>
+            )}
+          </div>
+
+          {galiciaResultMsg && (
+            <div className="flex items-center gap-2 text-sm text-success">
+              <CheckCircle2 className="h-4 w-4" /> {galiciaResultMsg}
+            </div>
+          )}
+
+          {galiciaRows.length > 0 && (
+            <div className="space-y-3">
+              <MonthConfirm month={galiciaMonth} onChange={setGaliciaMonth} count={galiciaRows.length} />
+              <div className="flex gap-2 flex-wrap">
+                <Badge>{galiciaSelectedCount} seleccionadas</Badge>
+                {galiciaDupCount > 0 && <Badge variant="secondary">{galiciaDupCount} duplicadas</Badge>}
+              </div>
+              {renderPreviewTable(galiciaRows, (i) =>
+                setGaliciaRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, selected: !r.selected } : r))),
+              )}
+              <Button
+                onClick={handleGaliciaImport}
+                disabled={galiciaImporting || galiciaSelectedCount === 0 || !galiciaAccount || !galiciaMonth}
+                className="w-full"
+              >
+                {galiciaImporting ? 'Importando...' : `Importar ${galiciaSelectedCount} seleccionadas`}
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
 
-      {/* Wise CSV (manual) */}
       <div ref={wiseSectionRef}>
         <Card>
           <CardHeader className="pb-2">
