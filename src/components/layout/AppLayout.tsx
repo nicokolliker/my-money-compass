@@ -20,7 +20,7 @@ type NavEntry = NavLeaf | NavGroup;
 const NAV: NavEntry[] = [
   { path: '/', label: 'Home', icon: LayoutDashboard },
   { path: '/accounts', label: 'Accounts', icon: Wallet },
-  { path: '/debts', label: 'Deudas', icon: CreditCard },
+  { path: '/debts', label: 'Deudas y créditos', icon: CreditCard },
   { path: '/monotributo', label: 'Monotributo', icon: Receipt },
   { path: '/transactions', label: 'Activity', icon: ArrowLeftRight },
   {
