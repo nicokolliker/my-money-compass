@@ -1116,7 +1116,19 @@ function ViejoSettlementWizard({ open, onOpenChange, onSantTotalDetected }: { op
               <div className="flex items-center justify-between gap-3"><span className="text-muted-foreground">USD a pagar:</span>
                 <Input type="number" value={usdAPagar} onChange={(e) => setUsdAPagar(parseFloat(e.target.value) || 0)} className={cn('h-7 text-xs text-right font-mono w-32', NUMERIC_INPUT_CLS)} />
               </div>
-              <div className="border-t pt-2 flex items-center justify-between text-success"><span>Vuelto ARS:</span><span className="font-mono">+{formatARS(vueltoARS)}</span></div>
+              {diferencia > 0 ? (
+                <div className="border-t pt-2 space-y-0.5">
+                  <div className="flex items-center justify-between text-success"><span>Vuelto ARS:</span><span className="font-mono">+{formatARS(diferencia)}</span></div>
+                  <p className="text-[11px] text-muted-foreground">Tu viejo te devuelve esta diferencia por MercadoPago</p>
+                </div>
+              ) : diferencia < 0 ? (
+                <div className="border-t pt-2 space-y-0.5">
+                  <div className="flex items-center justify-between text-amber-600 dark:text-amber-500"><span>Diferencia pendiente:</span><span className="font-mono">{formatARS(diferencia)}</span></div>
+                  <p className="text-[11px] text-muted-foreground">Quedás debiendo este monto — se puede acumular al próximo mes</p>
+                </div>
+              ) : (
+                <div className="border-t pt-2 flex items-center justify-between text-success"><span>Exacto ✓</span><span /></div>
+              )}
             </div>
             <div className="flex justify-between">
               <Button variant="outline" onClick={() => setStep(1)}>← Atrás</Button>
