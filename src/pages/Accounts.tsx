@@ -298,7 +298,11 @@ export default function Accounts() {
                             <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
                           </button>
                         )}
-                        <button onClick={() => openEdit(a)} className="flex items-center gap-3 flex-1 min-w-0 py-3 text-left hover:bg-accent/50 active:bg-accent rounded-lg px-2 -mx-2 transition-colors">
+                        {(() => {
+                          const isSpecial = isArqAccount(a.name) || isTrackedDestAccount(a.name);
+                          const onRowClick = isSpecial ? () => openEdit(a) : () => setDetailAccount(a);
+                          return (
+                        <button onClick={onRowClick} className="flex items-center gap-3 flex-1 min-w-0 py-3 text-left hover:bg-accent/50 active:bg-accent rounded-lg px-2 -mx-2 transition-colors">
                           <AccountLogo name={a.name} institution={(a as any).institution} />
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5">
@@ -356,7 +360,17 @@ export default function Accounts() {
                             </div>
                           </div>
                         </button>
-                        <AlertDialog>
+                          );
+                        })()}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
+                          onClick={() => openEdit(a)}
+                          title="Editar cuenta"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
                           <AlertDialogTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive">
                               <Trash2 className="h-3.5 w-3.5" />
