@@ -1629,67 +1629,53 @@ function SplitwiseSettlementWizard({ open, onOpenChange }: { open: boolean; onOp
                     <span>{result.currency}</span>
                   </div>
                 </div>
-                <p className="text-[11px] text-muted-foreground">
-                  {isPositive
-                    ? `Se va a registrar un ingreso a la cuenta Splitwise: "${groupLabel}" te debe.`
-                    : isNegative
-                    ? `Se va a registrar un gasto a la cuenta Splitwise: vos le debés a "${groupLabel}".`
-                    : 'El balance está en 0 — no hay nada que registrar.'}
-                </p>
+                <div className="rounded-xl border p-3 space-y-2">
+                  <div>
+                    <p className="text-sm font-semibold">Gastos a conciliar — {lastMonthInfo.label}</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      Solo lo que otros pagaron por vos y aún no está registrado
+                    </p>
+                  </div>
+                  {toImport.length === 0 ? (
+                    <p className="text-xs text-muted-foreground py-2">
+                      No hay gastos pagados por otros en {lastMonthInfo.label}.
+                    </p>
+                  ) : (
+                    <div className="max-h-48 overflow-y-auto divide-y -mx-1">
+                      {toImport.map((r, i) => {
+                        const abs = Math.abs(r.userAmount);
+                        return (
+                          <div key={i} className="flex justify-between px-1 py-1.5 text-xs gap-2">
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate font-medium">{r.description}</p>
+                              <p className="text-muted-foreground font-mono">{r.date}</p>
+                            </div>
+                            <span className="font-mono text-destructive shrink-0">
+                              −{r.currency === 'ARS'
+                                ? '$' + Math.round(abs).toLocaleString('es-AR')
+                                : '$' + abs.toFixed(2)}
+                              {' '}{r.currency}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
                 <Button
-                  onClick={() => setStep(2)}
+                  onClick={handleConfirm}
                   className="w-full"
-                  disabled={!isPositive && !isNegative}
+                  disabled={submitting || toImport.length === 0}
                 >
-                  Registrar saldo →
+                  {submitting
+                    ? 'Importando...'
+                    : `Importar ${toImport.length} gastos a registrar →`}
                 </Button>
               </div>
             )}
           </div>
         )}
 
-        {step === 2 && result && (
-          <div className="space-y-4">
-            <div className="rounded-xl border p-4 space-y-2 text-sm">
-              <p className="text-xs text-muted-foreground uppercase tracking-wide">Transacción a crear</p>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Tipo</span>
-                <span className="font-medium">{isPositive ? 'Ingreso' : 'Gasto'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Descripción</span>
-                <span className="font-medium truncate ml-2">Splitwise — {groupLabel} (saldo)</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Monto</span>
-                <span className={cn(
-                  'font-mono font-semibold',
-                  isPositive ? 'text-success' : 'text-destructive',
-                )}>
-                  {isPositive ? '+' : '−'}
-                  {result.currency === 'ARS'
-                    ? '$' + Math.round(Math.abs(net)).toLocaleString('es-AR')
-                    : '$' + Math.abs(net).toFixed(2)}
-                  {' '}{result.currency}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Cuenta</span>
-                <span className="font-medium">{splitwiseAcc?.name || 'Splitwise (se creará)'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Fecha</span>
-                <span className="font-mono">{new Date().toISOString().slice(0, 10)}</span>
-              </div>
-            </div>
-            <div className="flex justify-between gap-2">
-              <Button variant="outline" onClick={() => setStep(1)} disabled={submitting}>← Atrás</Button>
-              <Button onClick={handleConfirm} disabled={submitting}>
-                {submitting ? 'Registrando...' : 'Confirmar'}
-              </Button>
-            </div>
-          </div>
-        )}
       </DialogContent>
     </Dialog>
   );
