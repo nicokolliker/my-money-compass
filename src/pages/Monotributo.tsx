@@ -138,6 +138,15 @@ export default function MonotributoPage() {
               <div className="flex items-center gap-2">
                 <Badge className="text-base px-3 py-1">{CAT_ACTUAL}</Badge>
                 <span className="text-sm text-muted-foreground">Locaciones de servicios</span>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-6 w-6"
+                  onClick={() => setShowConfig(true)}
+                  aria-label="Editar configuración"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
               </div>
               <p className="text-xs text-muted-foreground mt-1">
                 Cuota mensual: {formatARS(CUOTA_ACTUAL)} · Vigencia: {VIGENCIA}
