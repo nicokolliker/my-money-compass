@@ -70,14 +70,104 @@ function rgb(doc: jsPDF, fn: 'setFillColor' | 'setTextColor' | 'setDrawColor', c
   doc[fn](c[0], c[1], c[2]);
 }
 
-// ---------- Poppins font loader ----------
+// ---------- Category emoji mapping ----------
+const CATEGORY_EMOJI: Record<string, string> = {
+  // Comida
+  'Comida': '🍽️', 'Comida fuera': '🍽️', 'Food': '🍽️', 'Food & Drink': '🍽️', 'Food & Drinks': '🍽️',
+  'Restaurantes': '🍽️', 'Restaurants': '🍽️', 'Delivery': '🛵',
+  'Supermercado': '🛒', 'Groceries': '🛒', 'Mercado': '🛒',
+  // Transporte
+  'Transporte': '🚗', 'Transport': '🚗', 'Transportation': '🚗',
+  'Auto': '🚙', 'Nafta': '⛽', 'Combustible': '⛽', 'Fuel': '⛽',
+  'Taxi': '🚕', 'Uber': '🚕',
+  // Casa / Servicios
+  'Casa': '🏠', 'Hogar': '🏠', 'Housing': '🏠', 'Rent': '🏠', 'Alquiler': '🏠',
+  'Expensas': '🏢',
+  'Servicios': '💡', 'Utilities': '💡', 'Luz': '💡', 'Gas': '🔥', 'Agua': '💧',
+  'Internet': '🌐',
+  // Salud
+  'Salud': '💊', 'Health': '💊', 'Healthcare': '💊', 'Farmacia': '💊', 'Médico': '🏥',
+  'Obra Social': '🏥',
+  // Digital / Suscripciones
+  'Digital': '💻', 'Suscripciones': '💳', 'Subscriptions': '💳', 'Software': '🧰',
+  'IA': '🤖', 'AI': '🤖', 'Creatividad': '🎨', 'Productividad': '⚡',
+  'Entretenimiento': '🎬', 'Entertainment': '🎬', 'Streaming': '📺',
+  // Shopping
+  'Shopping': '🛍️', 'Compras': '🛍️', 'Ropa': '👕', 'Clothing': '👕',
+  // Educación / Viajes
+  'Educación': '📚', 'Education': '📚', 'Cursos': '📚',
+  'Viajes': '✈️', 'Travel': '✈️',
+  // Personal / Otros
+  'Personal': '🧖', 'Gimnasio': '🏋️', 'Gym': '🏋️',
+  'Regalos': '🎁', 'Gifts': '🎁',
+  'Mascotas': '🐶', 'Pets': '🐶',
+  'Seguros': '🛡️', 'Insurance': '🛡️',
+  'Préstamo': '💵', 'Prestamo': '💵', 'Loan': '💵',
+  'Impuestos': '🧾', 'Taxes': '🧾',
+  'Trabajo': '💼', 'Work': '💼',
+  'Otros': '📦', 'Other': '📦', 'Uncategorized': '📦',
+};
+
+function getCategoryEmoji(name?: string): string {
+  if (!name) return '📦';
+  if (CATEGORY_EMOJI[name]) return CATEGORY_EMOJI[name];
+  // case-insensitive fallback
+  const lower = name.toLowerCase();
+  for (const k of Object.keys(CATEGORY_EMOJI)) {
+    if (k.toLowerCase() === lower) return CATEGORY_EMOJI[k];
+  }
+  // partial match
+  for (const k of Object.keys(CATEGORY_EMOJI)) {
+    if (lower.includes(k.toLowerCase()) || k.toLowerCase().includes(lower)) return CATEGORY_EMOJI[k];
+  }
+  return '📦';
+}
+
+// ---------- Shared table column widths (consistent across all tables) ----------
+const COL = {
+  date: 58,
+  category: 110,
+  amount: 92,
+};
+
+// ---------- Font loaders (Poppins + Noto Emoji) ----------
 const POPPINS_URLS = {
   regular: 'https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/poppins/Poppins-Regular.ttf',
   bold:    'https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/poppins/Poppins-Bold.ttf',
 };
+const NOTO_EMOJI_URL = 'https://cdn.jsdelivr.net/npm/@expo-google-fonts/noto-emoji@0.2.3/NotoEmoji_400Regular.ttf';
 
 let poppinsCache: { regular: string; bold: string } | null = null;
 let poppinsLoading: Promise<{ regular: string; bold: string } | null> | null = null;
+let emojiCache: string | null = null;
+let emojiLoading: Promise<string | null> | null = null;
+
+async function fetchNotoEmoji(): Promise<string | null> {
+  if (emojiCache) return emojiCache;
+  if (emojiLoading) return emojiLoading;
+  emojiLoading = (async () => {
+    try {
+      const buf = await fetch(NOTO_EMOJI_URL).then((r) => r.arrayBuffer());
+      emojiCache = arrayBufferToBase64(buf);
+      return emojiCache;
+    } catch (e) {
+      console.warn('Noto Emoji load failed', e);
+      return null;
+    }
+  })();
+  return emojiLoading;
+}
+
+function registerNotoEmoji(doc: jsPDF, base64: string): string {
+  try {
+    doc.addFileToVFS('NotoEmoji-Regular.ttf', base64);
+    doc.addFont('NotoEmoji-Regular.ttf', 'NotoEmoji', 'normal');
+    return 'NotoEmoji';
+  } catch (e) {
+    console.warn('Failed to register NotoEmoji', e);
+    return '';
+  }
+}
 
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
   let binary = '';
@@ -128,9 +218,55 @@ function rowsToTableBody(rows: SettlementPdfRow[]) {
   return rows.map((r) => [
     fmtDate(r.date),
     r.description,
-    r.categoryName || '—',
+    r.categoryName || 'Otros',
     r.matched ? fmtUSD(r.amountUSD) : fmtARS(r.amountARS),
   ]);
+}
+
+/** Renders the Categoría cell with an emoji prefix using the emoji font. */
+function makeCategoryCellRenderer(
+  doc: jsPDF,
+  textFont: string,
+  emojiFont: string | null,
+  colIndex: number,
+) {
+  return {
+    willDrawCell: (data: any) => {
+      if (data.section !== 'body' || data.column.index !== colIndex) return;
+      data.cell.text = [''];
+    },
+    didDrawCell: (data: any) => {
+      if (data.section !== 'body' || data.column.index !== colIndex) return;
+      const raw = String((data.row.raw as any[])[colIndex] ?? '');
+      if (!raw) return;
+      const emoji = getCategoryEmoji(raw);
+      const padLeft = 8;
+      const padRight = 8;
+      const padTop = 6;
+      const fontSize = data.cell.styles.fontSize || 9;
+      const x = data.cell.x + padLeft;
+      const y = data.cell.y + padTop + fontSize * 0.85;
+
+      if (emojiFont) {
+        rgb(doc, 'setTextColor', BRAND.ink);
+        doc.setFont(emojiFont, 'normal');
+        doc.setFontSize(fontSize);
+        doc.text(emoji, x, y);
+      }
+      const emojiW = emojiFont ? fontSize * 1.4 : 0;
+
+      doc.setFont(textFont, 'normal');
+      doc.setFontSize(fontSize);
+      rgb(doc, 'setTextColor', BRAND.muted);
+      const maxW = data.cell.width - padLeft - padRight - emojiW;
+      let label = raw;
+      while (doc.getTextWidth(label) > maxW && label.length > 3) {
+        label = label.slice(0, -2);
+      }
+      if (label !== raw) label = label.slice(0, -1) + '…';
+      doc.text(label, x + emojiW, y);
+    },
+  };
 }
 
 interface SectionMeta {
@@ -149,7 +285,7 @@ function ensureSpace(doc: jsPDF, y: number, needed: number, margin: number): num
   return y;
 }
 
-function drawSection(doc: jsPDF, section: SectionMeta, y: number, margin: number, pageW: number, font: string): number {
+function drawSection(doc: jsPDF, section: SectionMeta, y: number, margin: number, pageW: number, font: string, emojiFont: string | null): number {
   const { title, subtitle, rows, accent } = section;
   if (rows.length === 0) return y;
 
@@ -187,6 +323,8 @@ function drawSection(doc: jsPDF, section: SectionMeta, y: number, margin: number
 
   y += subtitle ? 28 : 22;
 
+  const catHook = makeCategoryCellRenderer(doc, font, emojiFont, 2);
+
   autoTable(doc, {
     startY: y,
     head: [['Fecha', 'Descripción', 'Categoría', 'Monto']],
@@ -210,12 +348,14 @@ function drawSection(doc: jsPDF, section: SectionMeta, y: number, margin: number
     },
     alternateRowStyles: { fillColor: [252, 252, 253] as any },
     columnStyles: {
-      0: { cellWidth: 55, textColor: BRAND.muted },
+      0: { cellWidth: COL.date, textColor: BRAND.muted },
       1: { cellWidth: 'auto' },
-      2: { cellWidth: 90, textColor: BRAND.muted, fontSize: 8 },
-      3: { cellWidth: 80, halign: 'right', fontStyle: 'bold' },
+      2: { cellWidth: COL.category, textColor: BRAND.muted, fontSize: 9 },
+      3: { cellWidth: COL.amount, halign: 'right', fontStyle: 'bold' },
     },
     margin: { left: margin, right: margin },
+    willDrawCell: catHook.willDrawCell,
+    didDrawCell: catHook.didDrawCell,
   });
 
   return (doc as any).lastAutoTable.finalY + 22;
@@ -229,6 +369,7 @@ function drawCategoryBreakdown(
   margin: number,
   pageW: number,
   font: string,
+  emojiFont: string | null,
 ): number {
   const entries = Object.entries(breakdown)
     .filter(([, v]) => Number(v) > 0)
@@ -236,7 +377,7 @@ function drawCategoryBreakdown(
   if (entries.length === 0) return y;
 
   const sum = entries.reduce((s, [, v]) => s + Number(v), 0) || 1;
-  const rowH = 26;
+  const rowH = 28;
   const headerH = 38;
   const blockH = headerH + entries.length * rowH + 16;
 
@@ -271,8 +412,11 @@ function drawCategoryBreakdown(
 
   let ry = y + 6;
   const labelX = cardX + 14;
-  const barX = cardX + 150;
-  const barMaxW = cardW - 150 - 14 - 130; // leave room for amount + %
+  const labelW = 170;
+  const barX = cardX + labelW + 14;
+  const amountW = 100;
+  const pctW = 50;
+  const barMaxW = cardW - (barX - cardX) - amountW - pctW - 14;
   const amountX = pageW - margin - 14;
 
   entries.forEach(([name, val], idx) => {
@@ -282,34 +426,49 @@ function drawCategoryBreakdown(
 
     // Color dot
     rgb(doc, 'setFillColor', color);
-    doc.circle(labelX + 4, ry + 11, 3.5, 'F');
+    doc.circle(labelX + 4, ry + 12, 3.8, 'F');
+
+    // Emoji
+    const emoji = getCategoryEmoji(name);
+    if (emojiFont) {
+      rgb(doc, 'setTextColor', BRAND.ink);
+      doc.setFont(emojiFont, 'normal');
+      doc.setFontSize(11);
+      doc.text(emoji, labelX + 14, ry + 16);
+    }
+    const emojiW = emojiFont ? 16 : 0;
 
     // Label
     rgb(doc, 'setTextColor', BRAND.ink);
     doc.setFont(font, 'bold');
     doc.setFontSize(10);
-    const labelText = name.length > 22 ? name.slice(0, 21) + '…' : name;
-    doc.text(labelText, labelX + 14, ry + 14);
+    const maxLabelW = labelW - 18 - emojiW;
+    let labelText = name;
+    while (doc.getTextWidth(labelText) > maxLabelW && labelText.length > 3) {
+      labelText = labelText.slice(0, -2);
+    }
+    if (labelText !== name) labelText = labelText.slice(0, -1) + '…';
+    doc.text(labelText, labelX + 14 + emojiW, ry + 16);
 
     // Bar background
     rgb(doc, 'setFillColor', BRAND.border);
-    doc.roundedRect(barX, ry + 7, barMaxW, 8, 2, 2, 'F');
+    doc.roundedRect(barX, ry + 8, barMaxW, 8, 2, 2, 'F');
     // Bar fill
     rgb(doc, 'setFillColor', color);
     const w = Math.max(2, (pct / 100) * barMaxW);
-    doc.roundedRect(barX, ry + 7, w, 8, 2, 2, 'F');
+    doc.roundedRect(barX, ry + 8, w, 8, 2, 2, 'F');
 
     // % label
     rgb(doc, 'setTextColor', BRAND.muted);
     doc.setFont(font, 'normal');
     doc.setFontSize(9);
-    doc.text(pct.toFixed(1) + '%', barX + barMaxW + 8, ry + 14);
+    doc.text(pct.toFixed(1) + '%', barX + barMaxW + 8, ry + 16);
 
     // Amount
     rgb(doc, 'setTextColor', BRAND.ink);
     doc.setFont(font, 'bold');
     doc.setFontSize(10);
-    doc.text(fmtARS(v), amountX, ry + 14, { align: 'right' });
+    doc.text(fmtARS(v), amountX, ry + 16, { align: 'right' });
 
     ry += rowH;
   });
@@ -325,6 +484,9 @@ export async function generateSettlementPdf(data: SettlementPdfData): Promise<js
 
   const fonts = await fetchPoppins();
   const font = fonts ? registerPoppins(doc, fonts) : 'helvetica';
+  const emojiBase64 = await fetchNotoEmoji();
+  const emojiFont = emojiBase64 ? registerNotoEmoji(doc, emojiBase64) : null;
+  const emojiFontResolved = emojiFont || null;
   doc.setFont(font, 'normal');
 
   // ---------- COVER HEADER ----------
@@ -383,7 +545,7 @@ export async function generateSettlementPdf(data: SettlementPdfData): Promise<js
 
   // ---------- CATEGORY BREAKDOWN (highlighted, near the top) ----------
   if (data.categoryBreakdown && Object.keys(data.categoryBreakdown).length > 0) {
-    y = drawCategoryBreakdown(doc, data.categoryBreakdown, data.totalARS, y, margin, pageW, font);
+    y = drawCategoryBreakdown(doc, data.categoryBreakdown, data.totalARS, y, margin, pageW, font, emojiFontResolved);
   }
 
   // ---------- SECTIONS ----------
@@ -394,7 +556,7 @@ export async function generateSettlementPdf(data: SettlementPdfData): Promise<js
   ];
 
   for (const s of sections) {
-    y = drawSection(doc, s, y, margin, pageW, font);
+    y = drawSection(doc, s, y, margin, pageW, font, emojiFontResolved);
   }
 
   // ---------- MANUAL ITEMS ----------
@@ -422,10 +584,11 @@ export async function generateSettlementPdf(data: SettlementPdfData): Promise<js
 
     y += 28;
 
+    const manualCatHook = makeCategoryCellRenderer(doc, font, emojiFontResolved, 1);
     autoTable(doc, {
       startY: y,
       head: [['Concepto', 'Categoría', 'Monto']],
-      body: data.manualItems.map((i) => [i.label, i.categoryName || '—', fmtARS(i.amountARS)]),
+      body: data.manualItems.map((i) => [i.label, i.categoryName || 'Otros', fmtARS(i.amountARS)]),
       theme: 'plain',
       styles: {
         font,
@@ -446,10 +609,12 @@ export async function generateSettlementPdf(data: SettlementPdfData): Promise<js
       alternateRowStyles: { fillColor: [252, 252, 253] as any },
       columnStyles: {
         0: { cellWidth: 'auto' },
-        1: { cellWidth: 110, textColor: BRAND.muted, fontSize: 8 },
-        2: { cellWidth: 95, halign: 'right', fontStyle: 'bold' },
+        1: { cellWidth: COL.category, textColor: BRAND.muted, fontSize: 9 },
+        2: { cellWidth: COL.amount, halign: 'right', fontStyle: 'bold' },
       },
       margin: { left: margin, right: margin },
+      willDrawCell: manualCatHook.willDrawCell,
+      didDrawCell: manualCatHook.didDrawCell,
     });
     y = (doc as any).lastAutoTable.finalY + 22;
   }
