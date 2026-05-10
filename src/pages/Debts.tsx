@@ -629,6 +629,27 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
       }
       const fxArsUsd = arsToUsd || (tcBlue > 0 ? 1 / tcBlue : 0);
 
+      // Limpiar transacciones previas del mismo mes para evitar duplicados
+      await supabase
+        .from('transactions')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('account_id', cashAcc.id)
+        .ilike('merchant', `Liquidación ${monthLabel} — viejo%`);
+
+      await supabase
+        .from('transactions')
+        .delete()
+        .eq('user_id', user.id)
+        .ilike('description', `%${monthLabel}%`)
+        .ilike('description', '%viejo%');
+
+      await supabase
+        .from('transactions')
+        .delete()
+        .eq('user_id', user.id)
+        .ilike('notes', `%vuelto_settlement_${settlementMonth}%`);
+
       // Construir lista unificada de ítems desglosados por categoría
       type Line = { description: string; amountARS: number; categoryName: string; external_id?: string; date?: string };
       const lines: Line[] = [];
