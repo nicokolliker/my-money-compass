@@ -468,6 +468,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
   const [submitting, setSubmitting] = useState(false);
   const [resultUsd, setResultUsd] = useState(0);
   const [resultVuelto, setResultVuelto] = useState(0);
+  const [expandedDetails, setExpandedDetails] = useState<Record<string, boolean>>({});
 
   const monthOptions = useMemo(() => {
     const arr: { ym: string; label: string }[] = [];
