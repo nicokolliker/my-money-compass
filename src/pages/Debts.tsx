@@ -606,8 +606,25 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
         { locale: es }
       );
 
-      // ── Buscar las tres cuentas ──────────────────────────────────────
-      const tarjetaViejoAcc = accounts.find((a: any) => /viejo/i.test(a.name));
+      // ── Obtener o crear cuenta virtual "Viejo" (oculta en Accounts) ──
+      let tarjetaViejoAcc: any = accounts.find((a: any) => /viejo/i.test(a.name));
+      if (!tarjetaViejoAcc) {
+        const { data: newAcc, error: accErr } = await supabase
+          .from('accounts')
+          .insert({
+            user_id: user.id,
+            name: 'Viejo',
+            type: 'debt',
+            currency: 'ARS',
+            opening_balance: 0,
+            is_active: true,
+          })
+          .select()
+          .single();
+        if (accErr) throw accErr;
+        tarjetaViejoAcc = newAcc;
+      }
+
       const cashAcc = accounts.find(
         (a: any) => /cash/i.test(a.name) && a.currency === 'USD'
       );
@@ -615,11 +632,6 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
         /mercado.*pago|mercadopago/i.test(a.name)
       );
 
-      if (!tarjetaViejoAcc) {
-        toast.error('No se encontró la cuenta "Viejo". Creála en Accounts con tipo Debt.');
-        setSubmitting(false);
-        return;
-      }
       if (!cashAcc || !mpAcc) {
         toast.error('Faltan cuentas: Cash USD y/o Mercado Pago');
         setSubmitting(false);
