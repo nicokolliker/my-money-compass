@@ -822,19 +822,18 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
             const expanded = !!expandedDetails[key];
             const selectedCount = rows.filter(r => r.selected).length;
             return (
-              <div className="ml-9 mt-1 mb-2 border rounded-lg overflow-hidden bg-muted/20">
+              <div className="mt-1 mb-2 border rounded-lg overflow-hidden bg-muted/20">
                 <button
                   type="button"
                   onClick={() => setExpandedDetails(prev => ({ ...prev, [key]: !prev[key] }))}
-                  className="w-full flex items-center justify-between px-3 py-1.5 bg-muted/40 hover:bg-muted/60 transition-colors"
+                  className="w-full flex items-center gap-2 px-3 py-1.5 bg-muted/40 hover:bg-muted/60 transition-colors text-left"
                 >
                   <span className="text-[11px] font-medium text-muted-foreground">
                     {expanded ? '▾' : '▸'} Detalle ({selectedCount}/{rows.length} seleccionadas)
                   </span>
                   <span className="text-[10px] text-muted-foreground">
-                    {arsIdx.length > 0 && `${arsIdx.length} ARS`}
-                    {arsIdx.length > 0 && usdIdx.length > 0 && ' · '}
-                    {usdIdx.length > 0 && `${usdIdx.length} USD`}
+                    {arsIdx.length > 0 && `· ${arsIdx.length} ARS`}
+                    {usdIdx.length > 0 && ` · ${usdIdx.length} USD`}
                   </span>
                 </button>
                 {expanded && (
