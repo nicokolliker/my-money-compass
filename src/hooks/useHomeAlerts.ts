@@ -121,7 +121,7 @@ export function useHomeAlerts() {
     const hasImportThisMonth = importLog?.some(l =>
       ['banco_ciudad', 'santander'].includes(l.source) && l.month === currentMonth,
     );
-    const hasLiquidacion = (liquidacionTxs || []).some((t: any) =>
+    const hasLiquidacion = (Array.isArray(liquidacionTxs) ? liquidacionTxs : []).some((t: any) =>
       t.description?.includes('Liquidación') && (t.date || '').startsWith(currentMonth),
     );
     if (hasImportThisMonth && !hasLiquidacion) {

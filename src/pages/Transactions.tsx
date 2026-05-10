@@ -311,7 +311,7 @@ export default function Transactions() {
         parsed = parseMercadoPago(buf, arsToUsd || 0);
       } else if (importTarget.importSource === 'arq') {
         const text = await extractPdfText(importFile);
-        parsed = parseArqStatements('', text, arsToUsd || 0);
+        parsed = parseArqStatements('', text, arsToUsd || 0).transactions;
       }
       const ids = parsed.map(p => p.external_id);
       const { data: existing } = await supabase
