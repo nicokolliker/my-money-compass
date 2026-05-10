@@ -124,7 +124,7 @@ export default function CalendarPage({ embedded = false }: { embedded?: boolean 
         </Card>
       </div>
 
-      {view === 'timeline' ? (
+      {effectiveView === 'timeline' ? (
         <div className="space-y-3">
           {Object.keys(dayEvents).length === 0 && (
             <div className="text-center py-12 text-muted-foreground">
