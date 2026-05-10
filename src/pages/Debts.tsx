@@ -1416,7 +1416,7 @@ function ViejoCycleHistory({ importLog }: { importLog: any[] }) {
                               <TableCell className="capitalize text-sm font-medium">{r.label}</TableCell>
                               <TableCell className="text-center text-sm">{r.hasImport ? '✓' : '—'}</TableCell>
                               <TableCell className="text-center text-sm">{r.manualCount > 0 ? `✓ (${r.manualCount})` : '—'}</TableCell>
-                              <TableCell className="text-center text-sm">{r.liquidado ? '✓' : '—'}</TableCell>
+                              <TableCell className="text-center text-sm">{r.liquidado ? <span className="text-success font-semibold">✓</span> : '—'}</TableCell>
                               <TableCell className="text-right font-mono text-sm">{r.liquidado ? formatUSD(r.usd) : '—'}</TableCell>
                             </TableRow>
                           ))}
