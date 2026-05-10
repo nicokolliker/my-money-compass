@@ -650,6 +650,7 @@ export default function ImportPage() {
       const dups = galiciaRows.filter((r) => r.duplicate).length;
       setGaliciaResultMsg(`${toImport.length} transacciones importadas, ${dups} duplicados ignorados`);
       toast.success('Importación completa');
+      silentRefreshRecurring();
       setGaliciaRows([]);
       setGaliciaMonth('');
       setGaliciaFile(null);
