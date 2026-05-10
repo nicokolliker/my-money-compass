@@ -228,12 +228,6 @@ function ViejoDebtCard({ account, importLog, onOpen }: {
               </p>
             </div>
           </div>
-          <div className="text-right shrink-0">
-            <p className={cn('text-xl font-bold font-mono', isDebt ? 'text-destructive' : 'text-success')}>
-              {isDebt ? '-' : ''}{formatUSD(Math.abs(balance))}
-            </p>
-            <p className="text-[10px] text-muted-foreground">deuda acumulada</p>
-          </div>
         </div>
 
         <div className="divide-y divide-border border-y">
