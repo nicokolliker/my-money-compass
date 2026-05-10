@@ -26,7 +26,6 @@ const NAV: NavEntry[] = [
   {
     label: 'Planning', icon: Target, children: [
       { path: '/planning/recurring', label: 'Recurring', icon: Repeat },
-      { path: '/planning/calendar', label: 'Calendar', icon: CalendarDays },
       { path: '/planning/budget', label: 'Budget', icon: Target },
     ],
   },
