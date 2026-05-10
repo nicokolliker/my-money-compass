@@ -687,6 +687,26 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
       }
 
       // ── PASO 3: Pago total al viejo → Cash USD ───────────────────────
+      // Build per-key breakdown (cards + manual items by item key) and
+      // per-category aggregated breakdown (categoryName → ARS).
+      const breakdown: Record<string, number> = {};
+      for (const it of items) {
+        if (it.amountARS > 0) breakdown[it.key] = (breakdown[it.key] || 0) + it.amountARS;
+      }
+      const extrasForNotes = extraItems
+        .filter((e) => e.amountARS > 0 && e.label.trim())
+        .map((e) => ({ label: e.label, amountARS: e.amountARS, categoryName: e.categoryName, emoji: e.emoji }));
+
+      const categoryBreakdown: Record<string, number> = {};
+      const addCat = (name: string | undefined, ars: number) => {
+        if (!ars || ars <= 0) return;
+        const key = (name && name.trim()) || 'Sin categoría';
+        categoryBreakdown[key] = (categoryBreakdown[key] || 0) + ars;
+      };
+      for (const r of allPdfRows) addCat(r.categoryName, r.amountARS);
+      for (const it of items.filter((i) => i.amountARS > 0)) addCat(it.categoryName, it.amountARS);
+      for (const e of extrasForNotes) addCat(e.categoryName, e.amountARS);
+
       const settlementNotes = JSON.stringify({
         settlement: true,
         month: settlementMonth,
@@ -694,6 +714,9 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
         totalARS,
         usdPagado: usdAPagar,
         vueltoARS,
+        breakdown,
+        extras: extrasForNotes,
+        categoryBreakdown,
       });
 
       await supabase.from('transactions').insert({
@@ -1063,9 +1086,23 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
             <div className="flex justify-between gap-2">
               <Button
                 variant="outline"
-                onClick={() => {
+                onClick={async () => {
                   const monthLabel = format(new Date(settlementMonth + '-01T00:00:00'), 'MMMM yyyy', { locale: es });
-                  downloadSettlementPdf({
+                  const allRows = [
+                    ...iebraRows.filter(r => r.selected),
+                    ...kollikerRows.filter(r => r.selected),
+                    ...santRows.filter(r => r.selected),
+                  ];
+                  const catBd: Record<string, number> = {};
+                  const addC = (n: string | undefined, v: number) => {
+                    if (!v || v <= 0) return;
+                    const k = (n && n.trim()) || 'Sin categoría';
+                    catBd[k] = (catBd[k] || 0) + v;
+                  };
+                  for (const r of allRows) addC(r.categoryName, r.amountARS);
+                  for (const i of items.filter(x => x.amountARS > 0)) addC(i.categoryName, i.amountARS);
+                  for (const e of extraItems.filter(x => x.amountARS > 0 && x.label.trim())) addC(e.categoryName, e.amountARS);
+                  await downloadSettlementPdf({
                     monthLabel,
                     mamaRows: iebraRows.filter(r => r.selected),
                     papaRows: kollikerRows.filter(r => r.selected),
@@ -1074,6 +1111,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
                       ...items.filter(i => i.editable && i.amountARS > 0).map(i => ({ label: i.label, amountARS: i.amountARS, categoryName: i.categoryName })),
                       ...extraItems.filter(e => e.amountARS > 0 && e.label.trim()).map(e => ({ label: e.label, amountARS: e.amountARS, categoryName: e.categoryName })),
                     ],
+                    categoryBreakdown: catBd,
                     totalARS, tcBlue, usdAPagar: resultUsd, vueltoARS: resultVuelto,
                   }, `liquidacion-${settlementMonth}.pdf`);
                 }}
@@ -1572,12 +1610,13 @@ function ViejoCycleHistory({ importLog }: { importLog: any[] }) {
     const sumBreakdown = Object.values(breakdown).reduce((s: number, v) => s + Number(v || 0), 0);
     const sumExtras = (p.extras || []).reduce((s: number, e: any) => s + Number(e.amountARS || 0), 0);
     const totalARS = Number(p.totalARS) > 0 ? Number(p.totalARS) : (sumBreakdown + sumExtras);
-    downloadSettlementPdf({
+    void downloadSettlementPdf({
       monthLabel,
       mamaRows: p.mamaRows || [],
       papaRows: p.papaRows || [],
       santRows: p.santRows || [],
       manualItems,
+      categoryBreakdown: p.categoryBreakdown || undefined,
       totalARS,
       tcBlue: Number(p.tcBlue) || 0,
       usdAPagar: Number(p.usdPagado) || Math.abs(Number(tx?.amount_usd) || 0),
@@ -1770,8 +1809,67 @@ function SettlementDetail({ parsed }: { parsed: any }) {
   const sumExtras = extras.reduce((s: number, e: any) => s + Number(e.amountARS || 0), 0);
   const totalARS = Number(parsed.totalARS) > 0 ? Number(parsed.totalARS) : (sumBreakdown + sumExtras);
 
+  // Category breakdown (from saved cycle metadata)
+  const catBd: Record<string, number> = parsed.categoryBreakdown || {};
+  const catEntries = Object.entries(catBd)
+    .filter(([, v]) => Number(v) > 0)
+    .sort((a, b) => Number(b[1]) - Number(a[1]));
+  const catSum = catEntries.reduce((s, [, v]) => s + Number(v), 0) || 1;
+  const CAT_COLORS = [
+    'hsl(228, 91%, 64%)',  // primary
+    'hsl(160, 84%, 39%)',  // green
+    'hsl(24, 95%, 53%)',   // orange
+    'hsl(292, 84%, 61%)',  // fuchsia
+    'hsl(199, 89%, 48%)',  // sky
+    'hsl(45, 93%, 47%)',   // amber
+    'hsl(0, 84%, 60%)',    // red
+    'hsl(258, 90%, 66%)',  // violet
+    'hsl(173, 80%, 40%)',  // teal
+    'hsl(330, 81%, 60%)',  // pink
+  ];
+
   return (
     <div className="space-y-4">
+      {catEntries.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-muted-foreground">📊 Distribución por categoría</p>
+            <p className="text-xs font-mono text-muted-foreground">{formatARS(catSum)}</p>
+          </div>
+          {/* Stacked bar */}
+          <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-muted">
+            {catEntries.map(([name, v], idx) => (
+              <div
+                key={name}
+                className="h-full transition-all"
+                style={{
+                  width: `${(Number(v) / catSum) * 100}%`,
+                  background: CAT_COLORS[idx % CAT_COLORS.length],
+                }}
+                title={`${name}: ${formatARS(Number(v))}`}
+              />
+            ))}
+          </div>
+          {/* Legend */}
+          <div className="rounded-lg border divide-y">
+            {catEntries.map(([name, v], idx) => {
+              const pct = (Number(v) / catSum) * 100;
+              return (
+                <div key={name} className="flex items-center gap-3 px-3 py-2 text-sm">
+                  <span
+                    className="inline-block h-2.5 w-2.5 rounded-full shrink-0"
+                    style={{ background: CAT_COLORS[idx % CAT_COLORS.length] }}
+                  />
+                  <span className="flex-1 truncate font-medium">{name}</span>
+                  <span className="text-xs text-muted-foreground tabular-nums w-12 text-right">{pct.toFixed(1)}%</span>
+                  <span className="font-mono text-sm tabular-nums w-24 text-right">{formatARS(Number(v))}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {groups.map((g) => (
         <div key={g.label} className="space-y-1.5">
           <p className="text-xs font-semibold text-muted-foreground">{g.label}</p>
