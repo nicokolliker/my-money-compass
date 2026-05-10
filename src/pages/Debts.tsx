@@ -26,6 +26,7 @@ import { MerchantLogo } from '@/components/MerchantLogo';
 import { formatUSD } from '@/lib/constants';
 import { parseBancoCiudad, parseBancoCiudadObSoc, extractCardTotal } from '@/lib/importers/bancoCiudadParser';
 import { parseSantander } from '@/lib/importers/santanderParser';
+import type { ParsedTransaction } from '@/lib/importers/arqParser';
 import { parseSplitwise, type SplitwiseRow } from '@/lib/importers/splitwiseParser';
 import { inferCategoryName } from '@/hooks/useRuleSuggestions';
 import { useImportLog } from '@/hooks/useImportLog';
