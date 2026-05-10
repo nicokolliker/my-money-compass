@@ -8,6 +8,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import Dashboard from "./pages/Dashboard";
 import Accounts from "./pages/Accounts";
 import DebtsPage from "./pages/Debts";
+import MonotributoPage from "./pages/Monotributo";
 import Transactions from "./pages/Transactions";
 import Analytics from "./pages/Analytics";
 import Planning from "./pages/Planning";
