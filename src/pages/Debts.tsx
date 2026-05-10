@@ -549,11 +549,11 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
           visaCiudadMama += vcARS + (vcUSD > 0 ? vcUSD / fxFallback : 0);
           allMama.push(...mamaRows);
         }
-        // Card 8157 (papá) — todos los gastos
-        const papaRows = parseBancoCiudad(text, fxFallback, '8157');
+        // Card 8157 (papá) — solo OB SOC / PODER JUD
+        const papaRows = parseBancoCiudad(text, fxFallback, '8157')
+          .filter((r) => /OB\s*SOC|PODER\s*JUD/i.test(r.description));
         if (papaRows.length > 0) {
-          const { ars: vcARS, usd: vcUSD } = extractCardTotal(text, '8157');
-          visaCiudadPapa += vcARS + (vcUSD > 0 ? vcUSD / fxFallback : 0);
+          visaCiudadPapa += papaRows.reduce((s, r) => s + r.amountARS, 0);
           allPapa.push(...papaRows);
         }
       }
