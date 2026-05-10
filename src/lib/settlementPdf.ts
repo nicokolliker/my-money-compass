@@ -22,6 +22,8 @@ export interface SettlementPdfData {
   papaRows?: SettlementPdfRow[];
   santRows?: SettlementPdfRow[];
   manualItems?: SettlementPdfItem[];
+  /** Optional: aggregated ARS totals per category name (already computed) */
+  categoryBreakdown?: Record<string, number>;
   totalARS: number;
   tcBlue: number;
   usdAPagar: number;
@@ -32,7 +34,7 @@ export interface SettlementPdfData {
 const BRAND = {
   primary: [79, 110, 247] as [number, number, number],   // #4F6EF7
   primaryDark: [59, 84, 207] as [number, number, number],
-  accent: [16, 185, 129] as [number, number, number],    // success green
+  accent: [16, 185, 129] as [number, number, number],
   ink: [17, 24, 39] as [number, number, number],
   muted: [107, 114, 128] as [number, number, number],
   light: [243, 244, 246] as [number, number, number],
@@ -40,6 +42,20 @@ const BRAND = {
   surface: [249, 250, 251] as [number, number, number],
   white: [255, 255, 255] as [number, number, number],
 };
+
+// Palette for category bars (HSL-equivalent hex)
+const CATEGORY_PALETTE: [number, number, number][] = [
+  [79, 110, 247],   // primary blue
+  [16, 185, 129],   // green
+  [249, 115, 22],   // orange
+  [217, 70, 239],   // fuchsia
+  [14, 165, 233],   // sky
+  [234, 179, 8],    // amber
+  [239, 68, 68],    // red
+  [139, 92, 246],   // violet
+  [20, 184, 166],   // teal
+  [236, 72, 153],   // pink
+];
 
 const fmtARS = (n: number) =>
   '$' + Math.round(n).toLocaleString('es-AR');
@@ -52,6 +68,60 @@ const fmtDate = (iso: string) => {
 
 function rgb(doc: jsPDF, fn: 'setFillColor' | 'setTextColor' | 'setDrawColor', c: [number, number, number]) {
   doc[fn](c[0], c[1], c[2]);
+}
+
+// ---------- Poppins font loader ----------
+const POPPINS_URLS = {
+  regular: 'https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/poppins/Poppins-Regular.ttf',
+  bold:    'https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/poppins/Poppins-Bold.ttf',
+};
+
+let poppinsCache: { regular: string; bold: string } | null = null;
+let poppinsLoading: Promise<{ regular: string; bold: string } | null> | null = null;
+
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  let binary = '';
+  const bytes = new Uint8Array(buffer);
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + chunk)) as any);
+  }
+  return btoa(binary);
+}
+
+async function fetchPoppins(): Promise<{ regular: string; bold: string } | null> {
+  if (poppinsCache) return poppinsCache;
+  if (poppinsLoading) return poppinsLoading;
+  poppinsLoading = (async () => {
+    try {
+      const [r, b] = await Promise.all([
+        fetch(POPPINS_URLS.regular).then((res) => res.arrayBuffer()),
+        fetch(POPPINS_URLS.bold).then((res) => res.arrayBuffer()),
+      ]);
+      poppinsCache = {
+        regular: arrayBufferToBase64(r),
+        bold: arrayBufferToBase64(b),
+      };
+      return poppinsCache;
+    } catch (e) {
+      console.warn('Poppins font load failed; falling back to helvetica.', e);
+      return null;
+    }
+  })();
+  return poppinsLoading;
+}
+
+function registerPoppins(doc: jsPDF, fonts: { regular: string; bold: string }): string {
+  try {
+    doc.addFileToVFS('Poppins-Regular.ttf', fonts.regular);
+    doc.addFont('Poppins-Regular.ttf', 'Poppins', 'normal');
+    doc.addFileToVFS('Poppins-Bold.ttf', fonts.bold);
+    doc.addFont('Poppins-Bold.ttf', 'Poppins', 'bold');
+    return 'Poppins';
+  } catch (e) {
+    console.warn('Failed to register Poppins; using helvetica.', e);
+    return 'helvetica';
+  }
 }
 
 function rowsToTableBody(rows: SettlementPdfRow[]) {
@@ -79,7 +149,7 @@ function ensureSpace(doc: jsPDF, y: number, needed: number, margin: number): num
   return y;
 }
 
-function drawSection(doc: jsPDF, section: SectionMeta, y: number, margin: number, pageW: number): number {
+function drawSection(doc: jsPDF, section: SectionMeta, y: number, margin: number, pageW: number, font: string): number {
   const { title, subtitle, rows, accent } = section;
   if (rows.length === 0) return y;
 
@@ -90,30 +160,27 @@ function drawSection(doc: jsPDF, section: SectionMeta, y: number, margin: number
   const subtotalARS = ars.reduce((s, r) => s + r.amountARS, 0);
   const subtotalUSD = usd.reduce((s, r) => s + r.amountUSD, 0);
 
-  // Colored accent bar
   rgb(doc, 'setFillColor', accent);
   doc.rect(margin, y - 4, 4, 22, 'F');
 
-  // Title
   rgb(doc, 'setTextColor', BRAND.ink);
-  doc.setFont('helvetica', 'bold');
+  doc.setFont(font, 'bold');
   doc.setFontSize(13);
   doc.text(title, margin + 12, y + 8);
 
   if (subtitle) {
     rgb(doc, 'setTextColor', BRAND.muted);
-    doc.setFont('helvetica', 'normal');
+    doc.setFont(font, 'normal');
     doc.setFontSize(9);
     doc.text(subtitle, margin + 12, y + 20);
   }
 
-  // Subtotals on the right
   const totalParts: string[] = [];
   if (subtotalARS > 0) totalParts.push(fmtARS(subtotalARS));
   if (subtotalUSD > 0) totalParts.push(fmtUSD(subtotalUSD));
   if (totalParts.length > 0) {
     rgb(doc, 'setTextColor', BRAND.ink);
-    doc.setFont('helvetica', 'bold');
+    doc.setFont(font, 'bold');
     doc.setFontSize(11);
     doc.text(totalParts.join('  ·  '), pageW - margin, y + 8, { align: 'right' });
   }
@@ -126,6 +193,7 @@ function drawSection(doc: jsPDF, section: SectionMeta, y: number, margin: number
     body: rowsToTableBody(rows),
     theme: 'plain',
     styles: {
+      font,
       fontSize: 9,
       cellPadding: { top: 6, right: 8, bottom: 6, left: 8 },
       textColor: BRAND.ink,
@@ -133,6 +201,7 @@ function drawSection(doc: jsPDF, section: SectionMeta, y: number, margin: number
       lineWidth: 0.4,
     },
     headStyles: {
+      font,
       fillColor: BRAND.surface,
       textColor: BRAND.muted,
       fontStyle: 'bold',
@@ -144,44 +213,138 @@ function drawSection(doc: jsPDF, section: SectionMeta, y: number, margin: number
       0: { cellWidth: 55, textColor: BRAND.muted },
       1: { cellWidth: 'auto' },
       2: { cellWidth: 90, textColor: BRAND.muted, fontSize: 8 },
-      3: { cellWidth: 80, halign: 'right', font: 'helvetica', fontStyle: 'bold' },
+      3: { cellWidth: 80, halign: 'right', fontStyle: 'bold' },
     },
     margin: { left: margin, right: margin },
-    didDrawPage: () => {
-      // Add header on new pages
-    },
   });
 
   return (doc as any).lastAutoTable.finalY + 22;
 }
 
-export function generateSettlementPdf(data: SettlementPdfData): jsPDF {
+function drawCategoryBreakdown(
+  doc: jsPDF,
+  breakdown: Record<string, number>,
+  totalARS: number,
+  y: number,
+  margin: number,
+  pageW: number,
+  font: string,
+): number {
+  const entries = Object.entries(breakdown)
+    .filter(([, v]) => Number(v) > 0)
+    .sort((a, b) => Number(b[1]) - Number(a[1]));
+  if (entries.length === 0) return y;
+
+  const sum = entries.reduce((s, [, v]) => s + Number(v), 0) || 1;
+  const rowH = 26;
+  const headerH = 38;
+  const blockH = headerH + entries.length * rowH + 16;
+
+  y = ensureSpace(doc, y, blockH + 20, margin);
+
+  // Header band
+  rgb(doc, 'setFillColor', BRAND.primary);
+  doc.rect(margin, y - 4, 4, 22, 'F');
+
+  rgb(doc, 'setTextColor', BRAND.ink);
+  doc.setFont(font, 'bold');
+  doc.setFontSize(13);
+  doc.text('Distribución por categoría', margin + 12, y + 8);
+
+  rgb(doc, 'setTextColor', BRAND.muted);
+  doc.setFont(font, 'normal');
+  doc.setFontSize(9);
+  doc.text('Cómo se reparte el total entre categorías', margin + 12, y + 20);
+
+  rgb(doc, 'setTextColor', BRAND.ink);
+  doc.setFont(font, 'bold');
+  doc.setFontSize(11);
+  doc.text(fmtARS(sum), pageW - margin, y + 8, { align: 'right' });
+
+  y += headerH;
+
+  // Card surface
+  const cardX = margin;
+  const cardW = pageW - margin * 2;
+  rgb(doc, 'setFillColor', BRAND.surface);
+  doc.roundedRect(cardX, y, cardW, entries.length * rowH + 12, 8, 8, 'F');
+
+  let ry = y + 6;
+  const labelX = cardX + 14;
+  const barX = cardX + 150;
+  const barMaxW = cardW - 150 - 14 - 130; // leave room for amount + %
+  const amountX = pageW - margin - 14;
+
+  entries.forEach(([name, val], idx) => {
+    const v = Number(val);
+    const pct = (v / sum) * 100;
+    const color = CATEGORY_PALETTE[idx % CATEGORY_PALETTE.length];
+
+    // Color dot
+    rgb(doc, 'setFillColor', color);
+    doc.circle(labelX + 4, ry + 11, 3.5, 'F');
+
+    // Label
+    rgb(doc, 'setTextColor', BRAND.ink);
+    doc.setFont(font, 'bold');
+    doc.setFontSize(10);
+    const labelText = name.length > 22 ? name.slice(0, 21) + '…' : name;
+    doc.text(labelText, labelX + 14, ry + 14);
+
+    // Bar background
+    rgb(doc, 'setFillColor', BRAND.border);
+    doc.roundedRect(barX, ry + 7, barMaxW, 8, 2, 2, 'F');
+    // Bar fill
+    rgb(doc, 'setFillColor', color);
+    const w = Math.max(2, (pct / 100) * barMaxW);
+    doc.roundedRect(barX, ry + 7, w, 8, 2, 2, 'F');
+
+    // % label
+    rgb(doc, 'setTextColor', BRAND.muted);
+    doc.setFont(font, 'normal');
+    doc.setFontSize(9);
+    doc.text(pct.toFixed(1) + '%', barX + barMaxW + 8, ry + 14);
+
+    // Amount
+    rgb(doc, 'setTextColor', BRAND.ink);
+    doc.setFont(font, 'bold');
+    doc.setFontSize(10);
+    doc.text(fmtARS(v), amountX, ry + 14, { align: 'right' });
+
+    ry += rowH;
+  });
+
+  return y + entries.length * rowH + 12 + 16;
+}
+
+export async function generateSettlementPdf(data: SettlementPdfData): Promise<jsPDF> {
   const doc = new jsPDF({ unit: 'pt', format: 'a4' });
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
   const margin = 40;
 
+  const fonts = await fetchPoppins();
+  const font = fonts ? registerPoppins(doc, fonts) : 'helvetica';
+  doc.setFont(font, 'normal');
+
   // ---------- COVER HEADER ----------
-  // Gradient-ish: solid primary + lighter band
   rgb(doc, 'setFillColor', BRAND.primary);
   doc.rect(0, 0, pageW, 130, 'F');
 
-  // Decorative circle
   rgb(doc, 'setFillColor', BRAND.primaryDark);
   doc.circle(pageW - 60, 40, 80, 'F');
 
   rgb(doc, 'setTextColor', BRAND.white);
-  doc.setFont('helvetica', 'normal');
+  doc.setFont(font, 'normal');
   doc.setFontSize(10);
   doc.text('LIQUIDACIÓN MENSUAL', margin, 50);
 
-  doc.setFont('helvetica', 'bold');
+  doc.setFont(font, 'bold');
   doc.setFontSize(26);
   doc.text('Cuenta con el Viejo', margin, 80);
 
-  doc.setFont('helvetica', 'normal');
+  doc.setFont(font, 'normal');
   doc.setFontSize(13);
-  // capitalize first letter of month
   const cap = data.monthLabel.charAt(0).toUpperCase() + data.monthLabel.slice(1);
   doc.text(cap, margin, 105);
 
@@ -197,12 +360,12 @@ export function generateSettlementPdf(data: SettlementPdfData): jsPDF {
   const drawStat = (idx: number, label: string, value: string, accent?: boolean) => {
     const cx = margin + cellW * idx + cellW / 2;
     rgb(doc, 'setTextColor', BRAND.muted);
-    doc.setFont('helvetica', 'normal');
+    doc.setFont(font, 'normal');
     doc.setFontSize(9);
     doc.text(label.toUpperCase(), cx, stripY + 22, { align: 'center' });
 
     rgb(doc, 'setTextColor', accent ? BRAND.primary : BRAND.ink);
-    doc.setFont('helvetica', 'bold');
+    doc.setFont(font, 'bold');
     doc.setFontSize(15);
     doc.text(value, cx, stripY + 48, { align: 'center' });
   };
@@ -211,13 +374,17 @@ export function generateSettlementPdf(data: SettlementPdfData): jsPDF {
   drawStat(1, 'TC Blue', fmtARS(data.tcBlue));
   drawStat(2, 'USD a pagar', fmtUSD(data.usdAPagar), true);
 
-  // Vertical dividers
   rgb(doc, 'setDrawColor', BRAND.border);
   doc.setLineWidth(0.5);
   doc.line(margin + cellW, stripY + 14, margin + cellW, stripY + stripH - 14);
   doc.line(margin + cellW * 2, stripY + 14, margin + cellW * 2, stripY + stripH - 14);
 
   y = stripY + stripH + 28;
+
+  // ---------- CATEGORY BREAKDOWN (highlighted, near the top) ----------
+  if (data.categoryBreakdown && Object.keys(data.categoryBreakdown).length > 0) {
+    y = drawCategoryBreakdown(doc, data.categoryBreakdown, data.totalARS, y, margin, pageW, font);
+  }
 
   // ---------- SECTIONS ----------
   const sections: SectionMeta[] = [
@@ -227,7 +394,7 @@ export function generateSettlementPdf(data: SettlementPdfData): jsPDF {
   ];
 
   for (const s of sections) {
-    y = drawSection(doc, s, y, margin, pageW);
+    y = drawSection(doc, s, y, margin, pageW, font);
   }
 
   // ---------- MANUAL ITEMS ----------
@@ -238,18 +405,18 @@ export function generateSettlementPdf(data: SettlementPdfData): jsPDF {
     doc.rect(margin, y - 4, 4, 22, 'F');
 
     rgb(doc, 'setTextColor', BRAND.ink);
-    doc.setFont('helvetica', 'bold');
+    doc.setFont(font, 'bold');
     doc.setFontSize(13);
     doc.text('Otros conceptos', margin + 12, y + 8);
 
     rgb(doc, 'setTextColor', BRAND.muted);
-    doc.setFont('helvetica', 'normal');
+    doc.setFont(font, 'normal');
     doc.setFontSize(9);
     doc.text('Expensas, Auto, Préstamo y demás', margin + 12, y + 20);
 
     const totalManual = data.manualItems.reduce((s, i) => s + i.amountARS, 0);
     rgb(doc, 'setTextColor', BRAND.ink);
-    doc.setFont('helvetica', 'bold');
+    doc.setFont(font, 'bold');
     doc.setFontSize(11);
     doc.text(fmtARS(totalManual), pageW - margin, y + 8, { align: 'right' });
 
@@ -261,6 +428,7 @@ export function generateSettlementPdf(data: SettlementPdfData): jsPDF {
       body: data.manualItems.map((i) => [i.label, i.categoryName || '—', fmtARS(i.amountARS)]),
       theme: 'plain',
       styles: {
+        font,
         fontSize: 9,
         cellPadding: { top: 6, right: 8, bottom: 6, left: 8 },
         textColor: BRAND.ink,
@@ -268,6 +436,7 @@ export function generateSettlementPdf(data: SettlementPdfData): jsPDF {
         lineWidth: 0.4,
       },
       headStyles: {
+        font,
         fillColor: BRAND.surface,
         textColor: BRAND.muted,
         fontStyle: 'bold',
@@ -293,21 +462,19 @@ export function generateSettlementPdf(data: SettlementPdfData): jsPDF {
   doc.roundedRect(margin, y, pageW - margin * 2, totalsH, 10, 10, 'F');
 
   rgb(doc, 'setTextColor', BRAND.white);
-  doc.setFont('helvetica', 'normal');
+  doc.setFont(font, 'normal');
   doc.setFontSize(10);
   doc.text('RESUMEN FINAL', margin + 20, y + 28);
 
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(11);
   let lineY = y + 56;
   const lineGap = 22;
 
   const drawTotalLine = (label: string, value: string, big?: boolean) => {
-    doc.setFont('helvetica', 'normal');
+    doc.setFont(font, 'normal');
     doc.setFontSize(big ? 12 : 10);
     rgb(doc, 'setTextColor', BRAND.white);
     doc.text(label, margin + 20, lineY);
-    doc.setFont('helvetica', 'bold');
+    doc.setFont(font, 'bold');
     doc.setFontSize(big ? 16 : 11);
     doc.text(value, pageW - margin - 20, lineY, { align: 'right' });
     lineY += big ? lineGap + 4 : lineGap;
@@ -318,14 +485,13 @@ export function generateSettlementPdf(data: SettlementPdfData): jsPDF {
   drawTotalLine('USD a pagar', fmtUSD(data.usdAPagar), true);
 
   if (data.vueltoARS > 0) {
-    // Subtle separator
     doc.setLineWidth(0.4);
     doc.setDrawColor(255, 255, 255);
     doc.line(margin + 20, lineY - 14, pageW - margin - 20, lineY - 14);
-    doc.setFont('helvetica', 'normal');
+    doc.setFont(font, 'normal');
     doc.setFontSize(10);
     doc.text('Vuelto en ARS', margin + 20, lineY);
-    doc.setFont('helvetica', 'bold');
+    doc.setFont(font, 'bold');
     doc.setFontSize(11);
     doc.text('+ ' + fmtARS(data.vueltoARS), pageW - margin - 20, lineY, { align: 'right' });
   }
@@ -341,7 +507,7 @@ export function generateSettlementPdf(data: SettlementPdfData): jsPDF {
     doc.line(margin, pageH - 30, pageW - margin, pageH - 30);
 
     rgb(doc, 'setTextColor', BRAND.muted);
-    doc.setFont('helvetica', 'normal');
+    doc.setFont(font, 'normal');
     doc.setFontSize(8);
     doc.text(
       `Generado el ${new Date().toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' })}`,
@@ -359,7 +525,7 @@ export function generateSettlementPdf(data: SettlementPdfData): jsPDF {
   return doc;
 }
 
-export function downloadSettlementPdf(data: SettlementPdfData, filename: string) {
-  const doc = generateSettlementPdf(data);
+export async function downloadSettlementPdf(data: SettlementPdfData, filename: string): Promise<void> {
+  const doc = await generateSettlementPdf(data);
   doc.save(filename);
 }
