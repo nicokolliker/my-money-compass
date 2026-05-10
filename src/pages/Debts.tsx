@@ -1086,9 +1086,23 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
             <div className="flex justify-between gap-2">
               <Button
                 variant="outline"
-                onClick={() => {
+                onClick={async () => {
                   const monthLabel = format(new Date(settlementMonth + '-01T00:00:00'), 'MMMM yyyy', { locale: es });
-                  downloadSettlementPdf({
+                  const allRows = [
+                    ...iebraRows.filter(r => r.selected),
+                    ...kollikerRows.filter(r => r.selected),
+                    ...santRows.filter(r => r.selected),
+                  ];
+                  const catBd: Record<string, number> = {};
+                  const addC = (n: string | undefined, v: number) => {
+                    if (!v || v <= 0) return;
+                    const k = (n && n.trim()) || 'Sin categoría';
+                    catBd[k] = (catBd[k] || 0) + v;
+                  };
+                  for (const r of allRows) addC(r.categoryName, r.amountARS);
+                  for (const i of items.filter(x => x.amountARS > 0)) addC(i.categoryName, i.amountARS);
+                  for (const e of extraItems.filter(x => x.amountARS > 0 && x.label.trim())) addC(e.categoryName, e.amountARS);
+                  await downloadSettlementPdf({
                     monthLabel,
                     mamaRows: iebraRows.filter(r => r.selected),
                     papaRows: kollikerRows.filter(r => r.selected),
@@ -1097,6 +1111,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
                       ...items.filter(i => i.editable && i.amountARS > 0).map(i => ({ label: i.label, amountARS: i.amountARS, categoryName: i.categoryName })),
                       ...extraItems.filter(e => e.amountARS > 0 && e.label.trim()).map(e => ({ label: e.label, amountARS: e.amountARS, categoryName: e.categoryName })),
                     ],
+                    categoryBreakdown: catBd,
                     totalARS, tcBlue, usdAPagar: resultUsd, vueltoARS: resultVuelto,
                   }, `liquidacion-${settlementMonth}.pdf`);
                 }}
