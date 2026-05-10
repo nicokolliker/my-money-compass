@@ -1306,7 +1306,7 @@ function SplitwiseSettlementWizard({ open, onOpenChange }: { open: boolean; onOp
 
         {step === 1 && (
           <div className="space-y-4">
-            <FileSlot label="CSV de Splitwise" file={file} onChange={(f) => { setFile(f); setRows([]); }} />
+            <FileSlot label="CSV de Splitwise" file={file} accept=".csv" onChange={(f) => { setFile(f); setRows([]); }} />
             {file && rows.length === 0 && (
               <Button onClick={handleProcess} disabled={processing}>{processing ? 'Procesando...' : 'Procesar CSV'}</Button>
             )}
