@@ -189,7 +189,7 @@ export default function MonotributoPage() {
       <Card>
         <CardHeader><h3 className="text-sm font-semibold">Historial de facturas</h3></CardHeader>
         <CardContent className="space-y-2">
-          {last12Months.slice().reverse().map(periodo => {
+          {last12Months.slice().reverse().filter(p => p >= '2025-11').map(periodo => {
             const inv = invoices.find(i => i.periodo === periodo);
             const label = format(new Date(periodo + '-15'), 'MMMM yyyy', { locale: es });
             const isPast = periodo < currentPeriodo;
