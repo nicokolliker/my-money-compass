@@ -41,6 +41,63 @@ export type Database = {
         }
         Relationships: []
       }
+      account_reconciliations: {
+        Row: {
+          balance_after_usd: number | null
+          created_at: string
+          from_account_id: string
+          id: string
+          import_log_id: string | null
+          period: string | null
+          reconciled_at: string | null
+          status: string
+          to_account_id: string
+          total_spent_usd: number | null
+          transfer_amount_usd: number
+          transfer_date: string
+          transfer_description: string | null
+          transfer_tx_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          balance_after_usd?: number | null
+          created_at?: string
+          from_account_id: string
+          id?: string
+          import_log_id?: string | null
+          period?: string | null
+          reconciled_at?: string | null
+          status?: string
+          to_account_id: string
+          total_spent_usd?: number | null
+          transfer_amount_usd?: number
+          transfer_date: string
+          transfer_description?: string | null
+          transfer_tx_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          balance_after_usd?: number | null
+          created_at?: string
+          from_account_id?: string
+          id?: string
+          import_log_id?: string | null
+          period?: string | null
+          reconciled_at?: string | null
+          status?: string
+          to_account_id?: string
+          total_spent_usd?: number | null
+          transfer_amount_usd?: number
+          transfer_date?: string
+          transfer_description?: string | null
+          transfer_tx_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       accounts: {
         Row: {
           created_at: string
