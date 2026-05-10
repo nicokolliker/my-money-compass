@@ -485,7 +485,12 @@ function ViejoSettlementWizard({ open, onOpenChange, onSantTotalDetected }: { op
   useEffect(() => {
     if (!open) {
       setStep(1);
-      setSettlementMonth(format(new Date(), 'yyyy-MM'));
+      setSettlementMonth((() => {
+        const today = new Date();
+        const d = new Date(today.getFullYear(), today.getMonth(), 1);
+        if (today.getDate() < 20) d.setMonth(d.getMonth() - 1);
+        return format(d, 'yyyy-MM');
+      })());
       setIebraFile(null); setKollikerFile(null); setSantFile(null); setAmexFile(null); setAmexARS(0);
       setBcTotalARS(0); setSantTotalARS(0); setVisaCiudadMamaARS(0); setVisaCiudadPapaARS(0);
       setExtraItems([]);
