@@ -52,7 +52,7 @@ export function useHomeAlerts() {
         .select('id,description,date')
         .ilike('description', '%Liquidación%')
         .gte('date', monthStart);
-      return data || [];
+      return Array.isArray(data) ? data : [];
     },
   });
 
