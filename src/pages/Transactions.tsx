@@ -398,22 +398,6 @@ export default function Transactions() {
       {hasDemoData && <DemoDataBanner onCleared={onDemoCleared} />}
       <h1 className="text-2xl font-bold text-foreground">Transactions</h1>
 
-      {/* Reconciliation Panel */}
-      {concilRows.length > 0 && (
-        <div className="rounded-xl border border-border bg-card p-4">
-          <div className="flex items-baseline justify-between mb-2">
-            <h2 className="text-sm font-semibold text-foreground">Transferencias entre cuentas</h2>
-            <span className="text-xs text-muted-foreground capitalize">
-              {format(new Date(), 'MMMM yyyy', { locale: es })}
-            </span>
-          </div>
-          <div className="divide-y divide-border">
-            {concilRows.map((row, i) => (
-              <ConcilRow key={i} row={row} onImport={() => setImportTarget(row)} />
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Filters */}
       <div className="space-y-2">
