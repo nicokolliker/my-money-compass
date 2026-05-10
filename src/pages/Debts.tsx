@@ -1809,6 +1809,25 @@ function SettlementDetail({ parsed }: { parsed: any }) {
   const sumExtras = extras.reduce((s: number, e: any) => s + Number(e.amountARS || 0), 0);
   const totalARS = Number(parsed.totalARS) > 0 ? Number(parsed.totalARS) : (sumBreakdown + sumExtras);
 
+  // Category breakdown (from saved cycle metadata)
+  const catBd: Record<string, number> = parsed.categoryBreakdown || {};
+  const catEntries = Object.entries(catBd)
+    .filter(([, v]) => Number(v) > 0)
+    .sort((a, b) => Number(b[1]) - Number(a[1]));
+  const catSum = catEntries.reduce((s, [, v]) => s + Number(v), 0) || 1;
+  const CAT_COLORS = [
+    'hsl(228, 91%, 64%)',  // primary
+    'hsl(160, 84%, 39%)',  // green
+    'hsl(24, 95%, 53%)',   // orange
+    'hsl(292, 84%, 61%)',  // fuchsia
+    'hsl(199, 89%, 48%)',  // sky
+    'hsl(45, 93%, 47%)',   // amber
+    'hsl(0, 84%, 60%)',    // red
+    'hsl(258, 90%, 66%)',  // violet
+    'hsl(173, 80%, 40%)',  // teal
+    'hsl(330, 81%, 60%)',  // pink
+  ];
+
   return (
     <div className="space-y-4">
       {groups.map((g) => (
