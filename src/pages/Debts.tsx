@@ -262,6 +262,32 @@ function SplitwiseDebtCard({ account, importLog, onOpen }: {
   const balance = Number(account?.computed_balance_usd || 0);
   const teDebenAVos = balance > 0.5;
   const vosDebes = balance < -0.5;
+  const alDia = !teDebenAVos && !vosDebes;
+
+  // Per-month breakdown of net balance contribution from Splitwise transactions
+  const { data: monthlyBreakdown } = useQuery({
+    queryKey: ['splitwise-monthly', account?.id],
+    enabled: !!account?.id,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('transactions')
+        .select('date, amount_usd, description')
+        .eq('account_id', account.id)
+        .order('date', { ascending: false });
+      const groups: Record<string, { net: number; count: number }> = {};
+      (data || []).forEach((t: any) => {
+        const ym = typeof t.date === 'string' ? t.date.slice(0, 7) : '';
+        if (!ym) return;
+        if (!groups[ym]) groups[ym] = { net: 0, count: 0 };
+        groups[ym].net += Number(t.amount_usd) || 0;
+        groups[ym].count += 1;
+      });
+      return Object.entries(groups)
+        .map(([ym, v]) => ({ ym, ...v }))
+        .sort((a, b) => b.ym.localeCompare(a.ym))
+        .slice(0, 6);
+    },
+  });
 
   return (
     <Card className="rounded-2xl overflow-hidden">
@@ -284,33 +310,54 @@ function SplitwiseDebtCard({ account, importLog, onOpen }: {
         )}
       </div>
 
-      <div className="px-5 py-4 space-y-3">
-        {(teDebenAVos || vosDebes) && (
-          <div className="grid grid-cols-1 gap-2">
-            <div className="rounded-xl bg-muted/50 px-3 py-2.5 flex items-center justify-between">
-              <p className="text-xs text-muted-foreground">
-                {teDebenAVos ? 'Te deben' : 'Debés'}
+      <div className="px-5 py-4 space-y-4">
+        <div className="text-center py-2">
+          {teDebenAVos && (
+            <>
+              <p className="text-xs text-muted-foreground mb-1">Te deben</p>
+              <p className="text-3xl font-mono font-bold text-success">
+                +${Math.abs(balance).toFixed(2)} <span className="text-base font-medium text-muted-foreground">USD</span>
               </p>
-              <p className={cn(
-                'text-sm font-mono font-bold',
-                teDebenAVos ? 'text-success' : 'text-destructive'
-              )}>
-                {teDebenAVos ? '+' : '-'}${Math.abs(balance).toFixed(2)}
+            </>
+          )}
+          {vosDebes && (
+            <>
+              <p className="text-xs text-muted-foreground mb-1">Debés</p>
+              <p className="text-3xl font-mono font-bold text-destructive">
+                -${Math.abs(balance).toFixed(2)} <span className="text-base font-medium text-muted-foreground">USD</span>
               </p>
-            </div>
+            </>
+          )}
+          {alDia && (
+            <p className="text-lg font-semibold text-muted-foreground">Al día ✓</p>
+          )}
+        </div>
+
+        {(monthlyBreakdown && monthlyBreakdown.length > 0) && (
+          <div className="rounded-xl border border-border/60 divide-y divide-border/60">
+            {monthlyBreakdown.map((g) => {
+              const label = format(new Date(g.ym + '-01T12:00:00'), 'MMMM yyyy', { locale: es });
+              const positive = g.net > 0;
+              return (
+                <div key={g.ym} className="flex items-center justify-between px-3 py-2">
+                  <div>
+                    <p className="text-xs font-medium capitalize text-foreground">{label}</p>
+                    <p className="text-[10px] text-muted-foreground">{g.count} {g.count === 1 ? 'mov.' : 'movs.'}</p>
+                  </div>
+                  <p className={cn(
+                    'text-xs font-mono font-semibold',
+                    Math.abs(g.net) < 0.5 ? 'text-muted-foreground' : positive ? 'text-success' : 'text-destructive',
+                  )}>
+                    {positive ? '+' : ''}${g.net.toFixed(2)}
+                  </p>
+                </div>
+              );
+            })}
           </div>
         )}
 
-        <p className="text-xs text-muted-foreground">
-          Cargá el CSV mensual para ver el detalle de gastos del grupo y saldar si corresponde.
-        </p>
-
-        <Button
-          variant={importadoEsteMes ? 'outline' : 'default'}
-          className="w-full"
-          onClick={onOpen}
-        >
-          {importadoEsteMes ? 'Actualizar / saldar →' : 'Cargar CSV →'}
+        <Button variant="outline" size="sm" onClick={onOpen}>
+          {importadoEsteMes ? 'Actualizar / saldar →' : 'Cargar CSV de Splitwise →'}
         </Button>
       </div>
     </Card>
