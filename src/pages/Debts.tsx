@@ -954,7 +954,8 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
               <Button onClick={() => setStep(3)} disabled={usdAPagar <= 0}>Continuar →</Button>
             </div>
           </div>
-        )}
+          );
+        })()}
 
         {step === 3 && (
           <div className="space-y-4 text-sm">
