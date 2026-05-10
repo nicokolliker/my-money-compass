@@ -454,6 +454,7 @@ function ViejoSettlementWizard({ open, onOpenChange, onSantTotalDetected }: { op
   const [resultUsd, setResultUsd] = useState(0);
   const [resultVuelto, setResultVuelto] = useState(0);
   const [expandedDetails, setExpandedDetails] = useState<Record<string, boolean>>({});
+  const [cardSubtotals, setCardSubtotals] = useState<Record<string, number>>({});
 
   const monthOptions = useMemo(() => {
     const arr: { ym: string; label: string }[] = [];
