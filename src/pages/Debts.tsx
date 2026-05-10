@@ -650,9 +650,9 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
         });
       }
 
-      // 2. Ítems manuales (todos los items con monto > 0, incluyendo los no editables)
+      // 2. Ítems manuales: solo los editables con monto > 0 (los autollenados de tarjeta vienen del PDF)
       const allItems = [
-        ...items.filter(i => i.amountARS > 0),
+        ...items.filter(i => i.editable && i.amountARS > 0),
         ...extraItems.filter(e => e.amountARS > 0 && e.label.trim()),
       ];
       for (const item of allItems) {
