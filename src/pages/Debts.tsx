@@ -589,39 +589,57 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
+
       const currentYM = format(new Date(), 'yyyy-MM');
       const isCurrentMonth = settlementMonth === currentYM;
-      // Use today's date for current month, otherwise last day of selected month
-      const settlementDate = (() => {
-        if (isCurrentMonth) return new Date().toISOString().split('T')[0];
-        const [y, m] = settlementMonth.split('-').map(Number);
-        const lastDay = new Date(y, m, 0).getDate();
-        return `${settlementMonth}-${String(lastDay).padStart(2, '0')}`;
-      })();
-      const monthLabel = format(new Date(settlementMonth + '-01T00:00:00'), 'MMMM yyyy', { locale: es });
+      const settlementDate = isCurrentMonth
+        ? new Date().toISOString().split('T')[0]
+        : (() => {
+            const [y, m] = settlementMonth.split('-').map(Number);
+            return `${settlementMonth}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`;
+          })();
+      const monthLabel = format(
+        new Date(settlementMonth + '-01T00:00:00'),
+        'MMMM yyyy',
+        { locale: es }
+      );
 
-      
-      const cashAcc = accounts.find((a: any) => /cash/i.test(a.name) && a.currency === 'USD');
-      const mpAcc = accounts.find((a: any) => /mercado.*pago|mercadopago/i.test(a.name));
-      if (!cashAcc || !mpAcc) {
-        toast.error('Faltan cuentas: Cash USD y Mercado Pago');
+      // ── Buscar las tres cuentas ──────────────────────────────────────
+      const tarjetaViejoAcc = accounts.find((a: any) => /viejo/i.test(a.name));
+      const cashAcc = accounts.find(
+        (a: any) => /cash/i.test(a.name) && a.currency === 'USD'
+      );
+      const mpAcc = accounts.find((a: any) =>
+        /mercado.*pago|mercadopago/i.test(a.name)
+      );
+
+      if (!tarjetaViejoAcc) {
+        toast.error('No se encontró la cuenta "Viejo". Creála en Accounts con tipo Debt.');
         setSubmitting(false);
         return;
       }
-      const fxArsUsd = arsToUsd || (tcBlue > 0 ? 1 / tcBlue : 0);
+      if (!cashAcc || !mpAcc) {
+        toast.error('Faltan cuentas: Cash USD y/o Mercado Pago');
+        setSubmitting(false);
+        return;
+      }
 
-      // Limpiar transacciones previas del mismo mes para evitar duplicados
+      const fxArsUsd = arsToUsd || (tcBlue > 0 ? 1 / tcBlue : 0.00072);
+
+      // ── Limpiar transacciones previas del mismo mes ──────────────────
+      await supabase
+        .from('transactions')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('account_id', tarjetaViejoAcc.id)
+        .gte('date', settlementMonth + '-01')
+        .lte('date', settlementMonth + '-31');
+
       await supabase
         .from('transactions')
         .delete()
         .eq('user_id', user.id)
         .eq('account_id', cashAcc.id)
-        .ilike('merchant', `Liquidación ${monthLabel} — viejo%`);
-
-      await supabase
-        .from('transactions')
-        .delete()
-        .eq('user_id', user.id)
         .ilike('description', `%${monthLabel}%`)
         .ilike('description', '%viejo%');
 
@@ -629,90 +647,94 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
         .from('transactions')
         .delete()
         .eq('user_id', user.id)
-        .ilike('notes', `%vuelto_settlement_${settlementMonth}%`);
+        .eq('account_id', mpAcc.id)
+        .ilike('description', `%${monthLabel}%`)
+        .ilike('description', '%viejo%');
 
-      // Construir lista unificada de ítems desglosados por categoría
-      type Line = { description: string; amountARS: number; categoryName: string; external_id?: string; date?: string };
-      const lines: Line[] = [];
-      for (const r of iebraRows.filter(r => r.selected)) {
-        lines.push({ description: r.description, amountARS: r.amountARS, categoryName: r.categoryName, external_id: r.external_id, date: r.date });
-      }
-      for (const r of kollikerRows.filter(r => r.selected)) {
-        lines.push({ description: r.description, amountARS: r.amountARS, categoryName: r.categoryName, external_id: r.external_id, date: r.date });
-      }
-      for (const r of santRows.filter(r => r.selected)) {
-        lines.push({ description: r.description, amountARS: r.amountARS, categoryName: r.categoryName, external_id: r.external_id, date: r.date });
-      }
-      for (const i of items.filter(i => i.editable && i.amountARS > 0)) {
-        lines.push({ description: `${i.label} — ${monthLabel}`, amountARS: i.amountARS, categoryName: i.categoryName });
-      }
-      for (const e of extraItems.filter(e => e.amountARS > 0 && e.label.trim())) {
-        lines.push({ description: `${e.label} — ${monthLabel}`, amountARS: e.amountARS, categoryName: e.categoryName });
+      // ── PASO 1: Filas del PDF → cuenta Viejo en ARS ─────────────────
+      const allPdfRows = [
+        ...iebraRows.filter(r => r.selected),
+        ...kollikerRows.filter(r => r.selected),
+        ...santRows.filter(r => r.selected),
+      ];
+
+      for (const row of allPdfRows) {
+        const cat = categories.find((c: any) => c.name === row.categoryName);
+        const isCuota = /cuota/i.test(row.description);
+        const txDate = isCuota ? settlementDate : (row.date || settlementDate);
+        const isUsdCharge = row.matched && row.amountUSD > 0 && row.amountARS === 0;
+
+        await supabase.from('transactions').insert({
+          user_id: user.id,
+          account_id: tarjetaViejoAcc.id,
+          date: txDate,
+          description: row.description,
+          amount: isUsdCharge ? -row.amountUSD : -row.amountARS,
+          currency: isUsdCharge ? 'USD' : 'ARS',
+          fx_rate: isUsdCharge ? 1 : fxArsUsd,
+          amount_usd: isUsdCharge
+            ? -row.amountUSD
+            : -(row.amountARS * fxArsUsd),
+          type: 'expense' as const,
+          category_id: cat?.id || null,
+          external_id: row.external_id
+            ? `viejo-${settlementMonth}-${row.external_id}`
+            : null,
+        });
       }
 
-      const sumLinesARS = lines.reduce((s, l) => s + l.amountARS, 0);
-      const sumLinesUSD = sumLinesARS * fxArsUsd;
-      const roundingUSD = Math.max(0, usdAPagar - sumLinesUSD);
+      // ── PASO 2: Ítems manuales → cuenta Viejo en ARS ────────────────
+      const manualLines = [
+        ...items.filter(i => i.amountARS > 0),
+        ...extraItems.filter(e => e.amountARS > 0 && e.label.trim()),
+      ];
 
+      for (const item of manualLines) {
+        const cat = categories.find((c: any) => c.name === item.categoryName);
+        await supabase.from('transactions').insert({
+          user_id: user.id,
+          account_id: tarjetaViejoAcc.id,
+          date: settlementDate,
+          description: `${item.label} — ${monthLabel}`,
+          amount: -item.amountARS,
+          currency: 'ARS',
+          fx_rate: fxArsUsd,
+          amount_usd: -(item.amountARS * fxArsUsd),
+          type: 'expense' as const,
+          category_id: cat?.id || null,
+        });
+      }
+
+      // ── PASO 3: Pago total al viejo → Cash USD ───────────────────────
       const settlementNotes = JSON.stringify({
         settlement: true,
         month: settlementMonth,
-        breakdown: Object.fromEntries(items.filter((i) => i.amountARS > 0).map((i) => [i.key, i.amountARS])),
-        extras: extraItems.filter(e => e.amountARS > 0 && e.label.trim()).map(e => ({ label: e.label, amountARS: e.amountARS, categoryName: e.categoryName })),
-        mamaRows: iebraRows.filter(r => r.selected).map(r => ({ date: r.date, description: r.description, amountARS: r.amountARS, amountUSD: r.amountUSD, matched: r.matched, categoryName: r.categoryName })),
-        papaRows: kollikerRows.filter(r => r.selected).map(r => ({ date: r.date, description: r.description, amountARS: r.amountARS, amountUSD: r.amountUSD, matched: r.matched, categoryName: r.categoryName })),
-        santRows: santRows.filter(r => r.selected).map(r => ({ date: r.date, description: r.description, amountARS: r.amountARS, amountUSD: r.amountUSD, matched: r.matched, categoryName: r.categoryName })),
-        tcBlue, totalARS, usdPagado: usdAPagar, vueltoARS,
+        tcBlue,
+        totalARS,
+        usdPagado: usdAPagar,
+        vueltoARS,
       });
 
-      // Insertar cada línea como expense en Cash USD con categoría (impacta en Activity desglosado)
-      for (let idx = 0; idx < lines.length; idx++) {
-        const l = lines[idx];
-        const cat = categories.find((c: any) => c.name === l.categoryName);
-        const usdAmount = +(l.amountARS * fxArsUsd).toFixed(2);
-        // Las cuotas usan la fecha del settlement, no la fecha original de compra
-        const isCuota = /cuota/i.test(l.description);
-        const txDate = isCuota ? settlementDate : (l.date || settlementDate);
-        await supabase.from('transactions').insert({
-          user_id: user.id,
-          account_id: cashAcc.id,
-          date: txDate,
-          description: l.description,
-          amount: -usdAmount,
-          currency: 'USD',
-          fx_rate: 1,
-          amount_usd: -usdAmount,
-          type: 'expense' as const,
-          category_id: cat?.id || null,
-          merchant: `Liquidación ${monthLabel} — viejo`,
-          external_id: l.external_id ? `viejo-${settlementMonth}-${l.external_id}` : null,
-          // El primer ítem lleva la metadata para el historial, sin prefijar "Liquidación" en la descripción
-          ...(idx === 0 ? { notes: settlementNotes } : {}),
-        });
-      }
+      await supabase.from('transactions').insert({
+        user_id: user.id,
+        account_id: cashAcc.id,
+        date: settlementDate,
+        description: `Liquidación ${monthLabel} — viejo`,
+        amount: -usdAPagar,
+        currency: 'USD',
+        fx_rate: 1,
+        amount_usd: -usdAPagar,
+        type: 'expense' as const,
+        notes: settlementNotes,
+      });
 
-      // Marker de redondeo (cuando usdAPagar > totalUSD_exact, el resto se va al viejo "de más")
-      if (roundingUSD > 0.005 || lines.length === 0) {
-        await supabase.from('transactions').insert({
-          user_id: user.id,
-          account_id: cashAcc.id,
-          date: settlementDate,
-          description: `Liquidación ${monthLabel} — viejo (redondeo)`,
-          amount: -roundingUSD,
-          currency: 'USD',
-          fx_rate: 1,
-          amount_usd: -roundingUSD,
-          type: 'expense' as const,
-          ...(lines.length === 0 ? { notes: settlementNotes } : {}),
-        });
-      }
-
+      // ── PASO 4: Vuelto esperado → Mercado Pago ───────────────────────
       if (vueltoARS > 0) {
         await supabase.from('transactions').insert({
           user_id: user.id,
           account_id: mpAcc.id,
           date: settlementDate,
-          description: `Vuelto ${monthLabel} — viejo (a recibir en MP)`,
+          description: `Vuelto ${monthLabel} — viejo`,
           amount: vueltoARS,
           currency: 'ARS',
           fx_rate: fxArsUsd,
@@ -721,18 +743,18 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
           notes: JSON.stringify({
             type: 'vuelto_settlement',
             month: settlementMonth,
-            info: 'Ingreso esperado del viejo como cambio de la liquidación. Confirmá cuando lo recibas.',
-          }) + ` vuelto_settlement_${settlementMonth}`,
+          }),
         });
       }
 
+      // ── Guardar defaults para el próximo mes ─────────────────────────
       const defaults: Record<string, any> = {};
-      items.filter((i) => i.editable).forEach((i) => {
+      items.filter(i => i.editable).forEach(i => {
         defaults[i.key] = i.amountARS;
       });
       defaults.extras = extraItems
-        .filter((e) => e.label.trim())
-        .map((e) => ({ label: e.label, categoryName: e.categoryName, emoji: e.emoji }));
+        .filter(e => e.label.trim())
+        .map(e => ({ label: e.label, categoryName: e.categoryName, emoji: e.emoji }));
       localStorage.setItem(STORAGE_KEY, JSON.stringify(defaults));
 
       qc.invalidateQueries({ queryKey: ['transactions'] });
