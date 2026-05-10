@@ -582,6 +582,17 @@ export default function Accounts() {
           balanceUsd={arqSheetAccount.computed_balance_usd}
         />
       )}
+      {/* MP/Galicia Reconciliation Sheet */}
+      {destSheetAccount && (
+        <AccountReconciliationSheet
+          open={!!destSheetAccount}
+          onClose={() => setDestSheetAccount(null)}
+          accountId={destSheetAccount.id}
+          accountName={destSheetAccount.name}
+          accountInstitution={(destSheetAccount as any).institution}
+          balanceUsd={destSheetAccount.computed_balance_usd}
+        />
+      )}
     </div>
   );
 }
