@@ -39,7 +39,7 @@ type HistoryRow = {
   tx?: any;
 };
 
-export function UnifiedCycleHistory() {
+export function UnifiedCycleHistory({ onRowClick }: { onRowClick?: (row: { parsed: any; monthLabel: string; tx: any }) => void }) {
   const [open, setOpen] = useState(false);
   const { data: importLog } = useImportLog();
 
