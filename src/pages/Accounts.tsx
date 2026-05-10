@@ -49,9 +49,9 @@ export default function Accounts() {
   const { data: importLog } = useImportLog();
   const { data: arqPending } = useArqPendingReconciliations();
 
-  /** Total USD pending reconciliation across all unreconciled Wise→ARQ transfers */
+  /** Total USD remaining (transferred - spent) for pending Wise→ARQ transfers */
   const arqPendingTotal = (arqPending || []).reduce(
-    (s, r) => s + Number(r.wise_amount_usd), 0
+    (s, r) => s + Math.max(0, Number(r.wise_amount_usd) - Number(r.total_spent_usd ?? 0)), 0
   );
   /** Most recent pending deposit date, for the badge subtitle */
   const arqPendingLatestDate = arqPending?.[0]?.wise_date ?? null;
@@ -88,13 +88,17 @@ export default function Accounts() {
     queryFn: async () => {
       const { data } = await supabase
         .from('account_reconciliations')
-        .select('to_account_id, transfer_amount_usd, transfer_date')
+        .select('to_account_id, transfer_amount_usd, total_spent_usd, transfer_date')
         .eq('status', 'pending');
       const map = new Map<string, { total: number; latest: string | null }>();
       for (const r of data || []) {
         const k = r.to_account_id as string;
         const cur = map.get(k) || { total: 0, latest: null };
-        cur.total += Number(r.transfer_amount_usd) || 0;
+        const remaining = Math.max(
+          0,
+          Number(r.transfer_amount_usd || 0) - Number((r as any).total_spent_usd || 0),
+        );
+        cur.total += remaining;
         const d = r.transfer_date as string;
         if (!cur.latest || d > cur.latest) cur.latest = d;
         map.set(k, cur);
