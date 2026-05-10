@@ -21,6 +21,7 @@ import {
   useReconciliationHistory,
 } from '@/hooks/useAccountReconciliation';
 import { formatUSD } from '@/lib/constants';
+import { RecentTransactionsList } from './RecentTransactionsList';
 
 interface Props {
   open: boolean;
