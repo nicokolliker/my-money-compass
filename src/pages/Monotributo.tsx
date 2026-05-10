@@ -338,25 +338,31 @@ function InvoiceForm({ open, onClose, onSaved }: { open: boolean; onClose: () =>
         filled.push(`Nº ${nroMatch[1]}`);
       }
 
-      // Parser robusto: detecta cuál separador es decimal según posición
+      // Parser robusto: detecta cuál separador es decimal según posición y magnitud
       const parseNum = (s: string) => {
-        const lastComma = s.lastIndexOf(',');
-        const lastDot = s.lastIndexOf('.');
-        let decSep = '';
-        if (lastComma > lastDot) decSep = ',';
-        else if (lastDot > lastComma) {
-          const after = s.length - lastDot - 1;
-          if (after >= 1 && after <= 2 && lastComma === -1 && s.indexOf('.') === lastDot) decSep = '.';
+        const compact = s.replace(/\s/g, '');
+        const lastComma = compact.lastIndexOf(',');
+        const lastDot = compact.lastIndexOf('.');
+        let cleaned = compact;
+
+        if (lastComma !== -1 && lastDot !== -1) {
+          cleaned = lastComma > lastDot
+            ? compact.replace(/\./g, '').replace(',', '.')
+            : compact.replace(/,/g, '');
+        } else if (lastComma !== -1 || lastDot !== -1) {
+          const sep = lastComma !== -1 ? ',' : '.';
+          const parts = compact.split(sep);
+          const last = parts[parts.length - 1];
+          const isThousandsOnly = last.length === 3 && parts.slice(0, -1).every((part, idx) => idx === 0 ? part.length <= 3 : part.length === 3);
+          cleaned = isThousandsOnly
+            ? parts.join('')
+            : parts.slice(0, -1).join('') + '.' + last;
         }
-        let cleaned = s;
-        if (decSep === ',') cleaned = s.replace(/\./g, '').replace(',', '.');
-        else if (decSep === '.') cleaned = s;
-        else cleaned = s.replace(/[.,]/g, '');
         return parseFloat(cleaned);
       };
 
-      // Captura UN número con formato válido (no runs interminables)
-      const NUM = '\\d{1,3}(?:[.,]\\d{3})*(?:[.,]\\d{1,4})?|\\d+(?:[.,]\\d{1,4})?';
+      // Captura números completos: 1396.000000, 1.396,00, 1500.00, 1.500, etc.
+      const NUM = '(?:\\d{1,3}(?:[.,]\\d{3})+(?:[.,]\\d{1,6})?|\\d+(?:[.,]\\d{1,6})?)';
 
       const tcMatch = norm.match(new RegExp(`Tipo\\s*de\\s*Cambio[^\\d-]{0,10}(${NUM})`, 'i'));
       if (tcMatch) {
