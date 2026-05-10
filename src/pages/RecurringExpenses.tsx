@@ -398,9 +398,8 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
               const group = grouped[c.id];
               if (!group || group.items.length === 0) return null;
               const activeCount = group.items.filter((i: any) => i.is_active).length;
-              // Default collapsed for categories with many items
-              const defaultCollapsed = group.items.length > 5;
-              const collapsed = collapsedGroups[c.id] === undefined ? defaultCollapsed : !!collapsedGroups[c.id];
+              // All cards collapsed by default; user expands manually
+              const collapsed = collapsedGroups[c.id] === undefined ? true : !!collapsedGroups[c.id];
 
               const renderItemRow = (item: any) => {
                 const acc = item.accounts;
