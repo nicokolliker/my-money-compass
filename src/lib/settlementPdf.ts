@@ -545,7 +545,7 @@ export async function generateSettlementPdf(data: SettlementPdfData): Promise<js
 
   // ---------- CATEGORY BREAKDOWN (highlighted, near the top) ----------
   if (data.categoryBreakdown && Object.keys(data.categoryBreakdown).length > 0) {
-    y = drawCategoryBreakdown(doc, data.categoryBreakdown, data.totalARS, y, margin, pageW, font);
+    y = drawCategoryBreakdown(doc, data.categoryBreakdown, data.totalARS, y, margin, pageW, font, emojiFontResolved);
   }
 
   // ---------- SECTIONS ----------
