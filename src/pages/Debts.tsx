@@ -28,7 +28,7 @@ import { formatUSD } from '@/lib/constants';
 import { parseBancoCiudad, extractCardTotal, extractAllCardSubtotals } from '@/lib/importers/bancoCiudadParser';
 import { parseSantander, parseSantanderWithSubtotals } from '@/lib/importers/santanderParser';
 import type { ParsedTransaction } from '@/lib/importers/arqParser';
-import { parseSplitwise, type SplitwiseRow } from '@/lib/importers/splitwiseParser';
+import { parseSplitwise } from '@/lib/importers/splitwiseParser';
 import { inferCategoryName } from '@/hooks/useRuleSuggestions';
 import { useImportLog } from '@/hooks/useImportLog';
 import { extractPdfText } from '@/lib/pdfReader';
@@ -1435,18 +1435,14 @@ function FileSlot({ label, file, onChange, accept = '.pdf' }: { label: string; f
 
 function SplitwiseSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
   const { data: accounts } = useAccountBalances();
-  const { data: categories } = useCategories();
   const arsToUsd = useLatestFxRate('ARS', 'USD');
   const qc = useQueryClient();
-  const createTransfer = useCreateTransfer();
 
   const [step, setStep] = useState<1 | 2>(1);
   const [file, setFile] = useState<File | null>(null);
-  const [rows, setRows] = useState<(SplitwiseRow & { categoryName?: string | null })[]>([]);
+  const [result, setResult] = useState<import('@/lib/importers/splitwiseParser').SplitwiseParseResult | null>(null);
   const [processing, setProcessing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [payFromId, setPayFromId] = useState<string>('');
-  const [splitwiseAccId, setSplitwiseAccId] = useState<string | null>(null);
 
   const splitwiseAcc = accounts?.find((a: any) => /splitwise/i.test(a.name));
 
@@ -1473,226 +1469,211 @@ function SplitwiseSettlementWizard({ open, onOpenChange }: { open: boolean; onOp
     if (error) throw error;
     return created.id;
   }
-  const splitwiseBalance = Number(splitwiseAcc?.computed_balance_usd || 0);
-  const splitwiseDebt = splitwiseBalance < 0 ? Math.abs(splitwiseBalance) : 0;
 
   useEffect(() => {
-    if (!open) {
-      setStep(1); setFile(null); setRows([]);
-    }
+    if (!open) { setStep(1); setFile(null); setResult(null); }
   }, [open]);
 
-  useEffect(() => {
-    if (!payFromId && accounts) {
-      const ars = accounts.find((a: any) => a.currency === 'ARS' && a.is_active);
-      if (ars) setPayFromId(ars.id);
-    }
-  }, [accounts, payFromId]);
+  function deriveGroupName(f: File | null): string {
+    if (!f) return '';
+    const base = f.name.replace(/\.csv$/i, '').replace(/[-_]+/g, ' ').trim();
+    return base || '';
+  }
 
   async function handleProcess() {
     if (!file) return;
     setProcessing(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
-      const accId = await ensureSplitwiseAccount(user.id);
-      setSplitwiseAccId(accId);
-      qc.invalidateQueries({ queryKey: ['account-balances'] });
       const text = await file.text();
-      const parsed = parseSplitwise(text, 'nicolaskolliker', arsToUsd || 0);
-      if (parsed.length === 0) {
-        toast.error('No se encontraron gastos');
-        setRows([]);
+      const parsed = parseSplitwise(text, 'nicolaskolliker', arsToUsd || 0, undefined, deriveGroupName(file));
+      if (parsed.rows.length === 0) {
+        toast.error('No se encontraron gastos en el CSV');
+        setResult(null);
         return;
       }
-      setRows(parsed.map((p) => ({ ...p, categoryName: inferCategoryName(p.description) })));
-      toast.success(`${parsed.length} filas detectadas`);
+      setResult(parsed);
+      toast.success(`${parsed.rows.length} gastos detectados`);
     } catch (e: any) {
-      toast.error(e.message || 'Error');
+      toast.error(e.message || 'Error procesando el CSV');
     } finally {
       setProcessing(false);
     }
   }
 
-  function updateCat(idx: number, name: string) {
-    setRows((rs) => rs.map((r, i) => (i === idx ? { ...r, categoryName: name } : r)));
-  }
-
-  async function doImport(alsoSettle: boolean) {
-    if (!accounts) return;
-    const cashUsd = accounts.find((a: any) => /cash/i.test(a.name) && a.currency === 'USD');
-    if (!cashUsd) { toast.error('No se encontró Cash USD'); return; }
+  async function handleConfirm() {
+    if (!result) return;
     setSubmitting(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
+      const accId = splitwiseAcc?.id || (await ensureSplitwiseAccount(user.id));
 
-      const expenses = rows.filter((r) => r.swType === 'expense');
-      const receivables = rows.filter((r) => r.swType === 'receivable');
+      const net = result.netBalance;
+      const absNet = Math.abs(net);
+      if (absNet < 0.01) {
+        toast.message('El saldo es 0 — no hay nada que registrar.');
+        onOpenChange(false);
+        return;
+      }
+      const isIncome = net > 0; // te deben → income; debés → expense
+      const groupLabel = result.groupName || 'grupo';
+      const description = `Splitwise — ${groupLabel} (saldo)`;
+      const today = new Date().toISOString().slice(0, 10);
 
-      const payload: any[] = [];
-      for (const r of expenses) {
-        const catId = r.categoryName ? (categories?.find((c: any) => c.name === r.categoryName)?.id || null) : null;
-        payload.push({
-          user_id: user.id,
-          account_id: cashUsd.id,
-          date: r.date,
-          description: r.description,
-          amount: -r.amountUSD,
-          currency: 'USD',
-          fx_rate: 1,
-          amount_usd: -r.amountUSD,
-          type: 'expense',
-          external_id: r.external_id,
-          category_id: catId,
-        });
-      }
-      if (splitwiseAccId) {
-        for (const r of receivables) {
-          const catId = r.categoryName ? (categories?.find((c: any) => c.name === r.categoryName)?.id || null) : null;
-          payload.push({
-            user_id: user.id,
-            account_id: splitwiseAccId,
-            date: r.date,
-            description: r.description,
-            amount: -r.amountUSD,
-            currency: 'USD',
-            fx_rate: 1,
-            amount_usd: -r.amountUSD,
-            type: 'expense',
-            external_id: r.external_id,
-            category_id: catId,
-          });
-        }
-      }
-      if (payload.length > 0) {
-        const { error } = await supabase.from('transactions').insert(payload);
-        if (error) throw error;
-      }
+      let amountUSD = 0;
+      if (result.currency === 'USD') amountUSD = absNet;
+      else if (result.currency === 'ARS') amountUSD = arsToUsd > 0 ? +(absNet * arsToUsd).toFixed(2) : 0;
+      else amountUSD = absNet;
 
-      if (alsoSettle && splitwiseAcc && splitwiseDebt > 0 && payFromId) {
-        const fromAcc = accounts.find((a: any) => a.id === payFromId);
-        const fromCurrency = fromAcc?.currency || 'USD';
-        const fxRate = fromCurrency === 'USD' ? 1 : (arsToUsd || 0);
-        const fromAmount = fromCurrency === 'USD' ? splitwiseDebt : (arsToUsd > 0 ? splitwiseDebt / arsToUsd : splitwiseDebt);
-        await createTransfer.mutateAsync({
-          fromAccountId: payFromId,
-          toAccountId: splitwiseAcc.id,
-          amount: fromAmount,
-          fromCurrency,
-          toCurrency: 'USD',
-          fxRate,
-          toAmount: splitwiseDebt,
-          date: new Date().toISOString().slice(0, 10),
-          description: 'Saldo Splitwise',
-        });
-      }
+      const signedAmt = isIncome ? absNet : -absNet;
+      const signedUsd = isIncome ? amountUSD : -amountUSD;
+
+      const { error } = await supabase.from('transactions').insert([{
+        user_id: user.id,
+        account_id: accId,
+        date: today,
+        description,
+        amount: signedAmt,
+        currency: result.currency,
+        fx_rate: result.currency === 'USD' ? 1 : (arsToUsd || 1),
+        amount_usd: signedUsd,
+        type: isIncome ? 'income' : 'expense',
+        external_id: `sw-balance-${today}-${groupLabel}`,
+      }]);
+      if (error) throw error;
+
+      // Log the import so it appears in Historial
+      await supabase.from('import_log').insert({
+        user_id: user.id,
+        source: 'splitwise',
+        month: today.slice(0, 7),
+        transaction_count: result.rows.length,
+      });
 
       qc.invalidateQueries({ queryKey: ['transactions'] });
       qc.invalidateQueries({ queryKey: ['account-balances'] });
-      toast.success(alsoSettle ? 'Importado y saldo cancelado' : 'Importado');
+      qc.invalidateQueries({ queryKey: ['import-log'] });
+
+      toast.success('Saldo registrado');
       onOpenChange(false);
     } catch (e: any) {
-      toast.error(e.message || 'Error');
+      toast.error(e.message || 'Error registrando saldo');
     } finally {
       setSubmitting(false);
     }
   }
 
-  const totalPaid = rows.filter((r) => r.swType === 'expense').reduce((s, r) => s + r.amountUSD, 0);
-  const totalOwed = rows.filter((r) => r.swType === 'receivable').reduce((s, r) => s + r.amountUSD, 0);
+  const net = result?.netBalance ?? 0;
+  const isPositive = net > 0.005;
+  const isNegative = net < -0.005;
+  const groupLabel = result?.groupName || 'grupo';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{step === 1 ? 'Splitwise — Subir CSV' : 'Splitwise — Confirmar'}</DialogTitle>
         </DialogHeader>
 
         {step === 1 && (
           <div className="space-y-4">
-            <FileSlot label="CSV de Splitwise" file={file} accept=".csv" onChange={(f) => { setFile(f); setRows([]); }} />
-            {file && rows.length === 0 && (
-              <Button onClick={handleProcess} disabled={processing}>{processing ? 'Procesando...' : 'Procesar CSV'}</Button>
+            <FileSlot label="CSV de Splitwise" file={file} accept=".csv" onChange={(f) => { setFile(f); setResult(null); }} />
+            {file && !result && (
+              <Button onClick={handleProcess} disabled={processing} className="w-full">
+                {processing ? 'Procesando...' : 'Procesar CSV'}
+              </Button>
             )}
-            {rows.length > 0 && (
-              <>
-                <div className="border rounded-lg overflow-hidden max-h-72 overflow-y-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="text-xs">Fecha</TableHead>
-                        <TableHead className="text-xs">Descripción</TableHead>
-                        <TableHead className="text-xs">Cat.</TableHead>
-                        <TableHead className="text-xs text-right">Monto</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {rows.map((r, idx) => (
-                        <TableRow key={idx}>
-                          <TableCell className="text-xs whitespace-nowrap">{r.date}</TableCell>
-                          <TableCell className="text-xs">
-                            <div className="truncate max-w-[140px]">{r.description}</div>
-                            <Badge variant={r.swType === 'expense' ? 'default' : 'secondary'} className="text-[9px] mt-0.5">
-                              {r.swType === 'expense' ? 'Vos pagaste' : 'Te deben'}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Select value={r.categoryName || ''} onValueChange={(v) => updateCat(idx, v)}>
-                              <SelectTrigger className="h-7 text-xs w-28"><SelectValue placeholder="—" /></SelectTrigger>
-                              <SelectContent>
-                                {(categories || []).map((c: any) => (<SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>))}
-                              </SelectContent>
-                            </Select>
-                          </TableCell>
-                          <TableCell className="text-xs text-right font-mono">${r.amountUSD.toFixed(2)}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+            {result && (
+              <div className="space-y-3">
+                <div className="rounded-xl border divide-y">
+                  <div className="flex justify-between px-3 py-2 text-sm">
+                    <span className="text-muted-foreground">Grupo</span>
+                    <span className="font-medium capitalize">{groupLabel}</span>
+                  </div>
+                  <div className="flex justify-between px-3 py-2 text-sm">
+                    <span className="text-muted-foreground">Balance neto</span>
+                    <span className={cn(
+                      'font-mono font-semibold',
+                      isPositive && 'text-success',
+                      isNegative && 'text-destructive',
+                    )}>
+                      {isPositive ? '+' : isNegative ? '−' : ''}
+                      {result.currency === 'ARS'
+                        ? '$' + Math.round(Math.abs(net)).toLocaleString('es-AR')
+                        : '$' + Math.abs(net).toFixed(2)}
+                      {' '}{result.currency}
+                    </span>
+                  </div>
+                  <div className="flex justify-between px-3 py-2 text-xs text-muted-foreground">
+                    <span>Transacciones</span>
+                    <span>
+                      {result.rows.length} gastos
+                      {result.earliestDate && ` · desde ${result.earliestDate}`}
+                    </span>
+                  </div>
+                  <div className="flex justify-between px-3 py-2 text-xs text-muted-foreground">
+                    <span>Moneda</span>
+                    <span>{result.currency}</span>
+                  </div>
                 </div>
-                <div className="flex justify-end">
-                  <Button onClick={() => setStep(2)}>Continuar →</Button>
-                </div>
-              </>
+                <p className="text-[11px] text-muted-foreground">
+                  {isPositive
+                    ? `Se va a registrar un ingreso a la cuenta Splitwise: "${groupLabel}" te debe.`
+                    : isNegative
+                    ? `Se va a registrar un gasto a la cuenta Splitwise: vos le debés a "${groupLabel}".`
+                    : 'El balance está en 0 — no hay nada que registrar.'}
+                </p>
+                <Button
+                  onClick={() => setStep(2)}
+                  className="w-full"
+                  disabled={!isPositive && !isNegative}
+                >
+                  Registrar saldo →
+                </Button>
+              </div>
             )}
           </div>
         )}
 
-        {step === 2 && (
-          <div className="space-y-4 text-sm">
-            <div className="space-y-1">
-              <p>Gastos donde vos pagaste: <span className="font-mono">${totalPaid.toFixed(2)}</span> (expense desde Cash USD)</p>
-              <p>Gastos donde otros pagaron: <span className="font-mono">${totalOwed.toFixed(2)}</span> (acumulado en Splitwise)</p>
-            </div>
-            {splitwiseAcc && splitwiseDebt > 0 && (
-              <div className="rounded-md border p-3 space-y-2">
-                <p className="text-xs">Saldo actual Splitwise: <span className="font-mono text-destructive">−${splitwiseDebt.toFixed(2)}</span></p>
-                <div>
-                  <Label className="text-xs">Pagar desde</Label>
-                  <Select value={payFromId} onValueChange={setPayFromId}>
-                    <SelectTrigger className="h-8 text-xs mt-1"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {(accounts || []).filter((a: any) => a.is_active && !/splitwise/i.test(a.name)).map((a: any) => (
-                        <SelectItem key={a.id} value={a.id}>{a.name} ({a.currency})</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Monto: ${splitwiseDebt.toFixed(2)} USD
-                  {arsToUsd > 0 && ` ≈ ARS ${(splitwiseDebt / arsToUsd).toLocaleString('es-AR', { maximumFractionDigits: 0 })}`}
-                </p>
+        {step === 2 && result && (
+          <div className="space-y-4">
+            <div className="rounded-xl border p-4 space-y-2 text-sm">
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">Transacción a crear</p>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Tipo</span>
+                <span className="font-medium">{isPositive ? 'Ingreso' : 'Gasto'}</span>
               </div>
-            )}
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Descripción</span>
+                <span className="font-medium truncate ml-2">Splitwise — {groupLabel} (saldo)</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Monto</span>
+                <span className={cn(
+                  'font-mono font-semibold',
+                  isPositive ? 'text-success' : 'text-destructive',
+                )}>
+                  {isPositive ? '+' : '−'}
+                  {result.currency === 'ARS'
+                    ? '$' + Math.round(Math.abs(net)).toLocaleString('es-AR')
+                    : '$' + Math.abs(net).toFixed(2)}
+                  {' '}{result.currency}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Cuenta</span>
+                <span className="font-medium">{splitwiseAcc?.name || 'Splitwise (se creará)'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Fecha</span>
+                <span className="font-mono">{new Date().toISOString().slice(0, 10)}</span>
+              </div>
+            </div>
             <div className="flex justify-between gap-2">
               <Button variant="outline" onClick={() => setStep(1)} disabled={submitting}>← Atrás</Button>
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={() => doImport(false)} disabled={submitting}>Solo importar</Button>
-                {splitwiseAcc && splitwiseDebt > 0 && (
-                  <Button onClick={() => doImport(true)} disabled={submitting || !payFromId}>Importar y saldar</Button>
-                )}
-              </div>
+              <Button onClick={handleConfirm} disabled={submitting}>
+                {submitting ? 'Registrando...' : 'Confirmar'}
+              </Button>
             </div>
           </div>
         )}
