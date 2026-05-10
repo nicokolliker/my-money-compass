@@ -32,10 +32,13 @@ import { parseSplitwise, type SplitwiseRow } from '@/lib/importers/splitwisePars
 import { inferCategoryName } from '@/hooks/useRuleSuggestions';
 import { useImportLog } from '@/hooks/useImportLog';
 import { extractPdfText } from '@/lib/pdfReader';
+import { parseAmexTotal } from '@/lib/importers/amexParser';
+import { usePendingCredits } from '@/hooks/usePendingCredits';
 
 export default function DebtsPage() {
   const { data: importLog } = useImportLog();
   const { data: accounts } = useAccountBalances();
+  const { data: pendingCredits } = usePendingCredits();
   const [openViejo, setOpenViejo] = useState(false);
   const [openSw, setOpenSw] = useState(false);
 
@@ -46,9 +49,25 @@ export default function DebtsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Deudas</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Deudas y créditos</h1>
         <p className="text-sm text-muted-foreground">Revisión y liquidación mensual</p>
       </div>
+
+      {(pendingCredits || []).map((pc) => (
+        <Card key={pc.id} className="rounded-2xl border-success/40 bg-success/10">
+          <CardContent className="p-4">
+            <p className="text-xs font-semibold text-success uppercase tracking-wide mb-1">
+              Saldo a favor pendiente
+            </p>
+            <p className="text-sm text-foreground">
+              <span className="font-mono font-semibold text-success">
+                +${Math.round(pc.amount_ars).toLocaleString('es-AR')}
+              </span>{' '}
+              de liquidación {pc.settlement_month} — llegará por MercadoPago
+            </p>
+          </CardContent>
+        </Card>
+      ))}
 
       <ViejoDebtCard
         importLog={importLog || []}
@@ -350,6 +369,8 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
   const [iebraFile, setIebraFile] = useState<File | null>(null);
   const [kollikerFile, setKollikerFile] = useState<File | null>(null);
   const [santFile, setSantFile] = useState<File | null>(null);
+  const [amexFile, setAmexFile] = useState<File | null>(null);
+  const [amexARS, setAmexARS] = useState(0);
   const [bcTotalARS, setBcTotalARS] = useState(0);
   const [santTotalARS, setSantTotalARS] = useState(0);
   const [visaCiudadMamaARS, setVisaCiudadMamaARS] = useState(0);
@@ -386,7 +407,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
     if (!open) {
       setStep(1);
       setSettlementMonth(format(new Date(), 'yyyy-MM'));
-      setIebraFile(null); setKollikerFile(null); setSantFile(null);
+      setIebraFile(null); setKollikerFile(null); setSantFile(null); setAmexFile(null); setAmexARS(0);
       setBcTotalARS(0); setSantTotalARS(0); setVisaCiudadMamaARS(0); setVisaCiudadPapaARS(0);
       setExtraItems([]);
       setItems([]);
@@ -404,7 +425,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
       { key: 'visa_ciudad_mama', label: 'VISA Ciudad — Mamá', emoji: '🏦', amountARS: visaCiudadMamaARS, editable: visaCiudadMamaARS === 0, categoryName: '' },
       { key: 'visa_ciudad_papa', label: 'VISA Ciudad — Papá', emoji: '🏦', amountARS: visaCiudadPapaARS, editable: visaCiudadPapaARS === 0, categoryName: '' },
       { key: 'visa_santander', label: 'VISA Santander',    emoji: '🏦', amountARS: santTotalARS || saved.visa_santander || 0, editable: santTotalARS === 0, categoryName: '' },
-      { key: 'amex',           label: 'AMEX Santander',    emoji: '💳', amountARS: saved.amex || 0,        editable: true, categoryName: 'Casa' },
+      { key: 'amex',           label: 'AMEX Santander',    emoji: '💳', amountARS: amexARS || saved.amex || 0, editable: true, categoryName: 'Casa' },
       { key: 'expensas',       label: 'Expensas',          emoji: '🏠', amountARS: saved.expensas || 0,    editable: true, categoryName: 'Casa' },
       { key: 'prestamo',       label: 'Préstamo + Seguro', emoji: '🚗', amountARS: saved.prestamo || 0,    editable: true, categoryName: 'Auto' },
       { key: 'cochera',        label: 'Cochera + Lavado',  emoji: '🅿️', amountARS: saved.cochera || 0,     editable: true, categoryName: 'Auto' },
@@ -423,7 +444,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
       setExtraItems([]);
     }
     setTcBlue(defaultBlueRate);
-  }, [step, bcTotalARS, santTotalARS, visaCiudadMamaARS, visaCiudadPapaARS, defaultBlueRate]);
+  }, [step, bcTotalARS, santTotalARS, visaCiudadMamaARS, visaCiudadPapaARS, amexARS, defaultBlueRate]);
 
   const totalARS = items.reduce((s, i) => s + (i.amountARS || 0), 0) + extraItems.reduce((s, i) => s + (i.amountARS || 0), 0);
   const usdExacto = tcBlue > 0 ? totalARS / tcBlue : 0;
@@ -499,6 +520,13 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
       setSantTotalARS(sant);
       setVisaCiudadMamaARS(visaCiudadMama);
       setVisaCiudadPapaARS(visaCiudadPapa);
+
+      if (amexFile) {
+        const text = await extractPdfText(amexFile);
+        const total = parseAmexTotal(text);
+        setAmexARS(total);
+      }
+
       setStep(2);
     } catch (e: any) {
       toast.error(e.message || 'Error procesando PDFs');
@@ -693,23 +721,26 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
         notes: settlementNotes,
       });
 
-      // ── PASO 4: Vuelto esperado → Mercado Pago ───────────────────────
+      // ── PASO 4: Vuelto esperado → pending_credit (no auto tx) ─────────
+      // Clear prior pending credit for the same source+month, then insert.
+      await supabase
+        .from('pending_credits' as any)
+        .delete()
+        .eq('user_id', user.id)
+        .eq('source', 'viejo_settlement')
+        .eq('settlement_month', settlementMonth);
+
       if (vueltoARS > 0) {
-        await supabase.from('transactions').insert({
+        await supabase.from('pending_credits' as any).insert({
           user_id: user.id,
-          account_id: mpAcc.id,
-          date: settlementDate,
-          description: `Vuelto ${monthLabel} — viejo`,
-          amount: vueltoARS,
-          currency: 'ARS',
-          fx_rate: fxArsUsd,
+          amount_ars: vueltoARS,
           amount_usd: vueltoARS * fxArsUsd,
-          type: 'income' as const,
-          notes: JSON.stringify({
-            type: 'vuelto_settlement',
-            month: settlementMonth,
-          }),
-        });
+          source: 'viejo_settlement',
+          expected_via_account_id: mpAcc.id,
+          settlement_month: settlementMonth,
+          status: 'pending',
+        } as any);
+        qc.invalidateQueries({ queryKey: ['pending-credits'] });
       }
 
       // ── Guardar defaults para el próximo mes ─────────────────────────
@@ -770,6 +801,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
               <FileSlot label="BC mamá (resumen)" file={iebraFile} onChange={setIebraFile} />
               <FileSlot label="BC papá (resumen)" file={kollikerFile} onChange={setKollikerFile} />
               <FileSlot label="Santander VISA" file={santFile} onChange={setSantFile} />
+              <FileSlot label="AMEX Santander" file={amexFile} onChange={setAmexFile} />
             </div>
             <DialogFooter className="border-t pt-4 mt-4 min-w-0">
               <Button onClick={handleProcessFiles} disabled={processing}>

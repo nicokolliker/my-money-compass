@@ -569,6 +569,48 @@ export type Database = {
         }
         Relationships: []
       }
+      pending_credits: {
+        Row: {
+          amount_ars: number
+          amount_usd: number
+          created_at: string
+          expected_via_account_id: string | null
+          id: string
+          matched_transaction_id: string | null
+          notes: string | null
+          settlement_month: string | null
+          source: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          amount_ars?: number
+          amount_usd?: number
+          created_at?: string
+          expected_via_account_id?: string | null
+          id?: string
+          matched_transaction_id?: string | null
+          notes?: string | null
+          settlement_month?: string | null
+          source: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          amount_ars?: number
+          amount_usd?: number
+          created_at?: string
+          expected_via_account_id?: string | null
+          id?: string
+          matched_transaction_id?: string | null
+          notes?: string | null
+          settlement_month?: string | null
+          source?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
