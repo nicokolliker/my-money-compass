@@ -1090,7 +1090,8 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
   );
 }
 
-function FileSlot({ label, file, onChange }: { label: string; file: File | null; onChange: (f: File | null) => void }) {
+function FileSlot({ label, file, onChange, accept = '.pdf' }: { label: string; file: File | null; onChange: (f: File | null) => void; accept?: string }) {
+  const acceptLabel = accept.replace(/^\./, '').toUpperCase().split(',')[0];
   return (
     <div className="overflow-hidden min-w-0 w-full" style={{ maxWidth: '100%' }}>
       <Label className="text-xs">{label}</Label>
