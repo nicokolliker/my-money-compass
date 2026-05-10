@@ -149,44 +149,60 @@ export function UnifiedCycleHistory({ onRowClick }: { onRowClick?: (row: { parse
                   Sin registros aún.
                 </div>
               )}
-              {rows.map((r) => (
-                <div key={r.id} className="flex items-center gap-3 px-5 py-3">
-                  <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center shrink-0">
-                    {r.kind === 'viejo' ? (
-                      <span className="text-base leading-none">👴</span>
+              {rows.map((r) => {
+                const clickable = r.kind === 'viejo' && !!r.parsed && !!onRowClick;
+                return (
+                  <div
+                    key={r.id}
+                    className={cn(
+                      'flex items-center gap-3 px-5 py-3 transition-colors',
+                      clickable && 'cursor-pointer hover:bg-muted/30',
+                    )}
+                    onClick={clickable
+                      ? () => onRowClick?.({
+                          parsed: r.parsed,
+                          monthLabel: format(new Date((r.parsed?.month || r.date.slice(0, 7)) + '-01T12:00:00'), 'MMMM yyyy', { locale: es }),
+                          tx: r.tx,
+                        })
+                      : undefined}
+                  >
+                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center shrink-0">
+                      {r.kind === 'viejo' ? (
+                        <span className="text-base leading-none">👴</span>
+                      ) : (
+                        <MerchantLogo name="Splitwise" domain="splitwise.com" size={28} />
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-medium text-foreground truncate capitalize">{r.title}</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {format(new Date(r.date + 'T12:00:00'), "d 'de' MMM yyyy", { locale: es })}
+                        {r.count != null && ` · ${r.count} movs`}
+                      </p>
+                    </div>
+                    {r.amountUsd != null && r.amountUsd > 0 && (
+                      <p className="text-sm font-mono font-semibold text-foreground tabular-nums shrink-0">
+                        {formatUSD(r.amountUsd)}
+                      </p>
+                    )}
+                    {r.kind === 'viejo' && r.parsed ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 shrink-0"
+                        onClick={(e) => { e.stopPropagation(); downloadPdfFor(r); }}
+                        title="Descargar PDF"
+                        aria-label="Descargar PDF"
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                      </Button>
                     ) : (
-                      <MerchantLogo name="Splitwise" domain="splitwise.com" size={28} />
+                      <span className="w-7 shrink-0" />
                     )}
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-medium text-foreground truncate capitalize">{r.title}</p>
-                    <p className="text-[10px] text-muted-foreground">
-                      {format(new Date(r.date + 'T12:00:00'), "d 'de' MMM yyyy", { locale: es })}
-                      {r.count != null && ` · ${r.count} movs`}
-                    </p>
-                  </div>
-                  {r.amountUsd != null && r.amountUsd > 0 && (
-                    <p className="text-sm font-mono font-semibold text-foreground tabular-nums shrink-0">
-                      {formatUSD(r.amountUsd)}
-                    </p>
-                  )}
-                  {r.kind === 'viejo' && r.parsed ? (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 shrink-0"
-                      onClick={() => downloadPdfFor(r)}
-                      title="Descargar PDF"
-                      aria-label="Descargar PDF"
-                    >
-                      <Download className="h-3.5 w-3.5" />
-                    </Button>
-                  ) : (
-                    <span className="w-7 shrink-0" />
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           </CardContent>
         </CollapsibleContent>
