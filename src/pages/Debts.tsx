@@ -32,10 +32,13 @@ import { parseSplitwise, type SplitwiseRow } from '@/lib/importers/splitwisePars
 import { inferCategoryName } from '@/hooks/useRuleSuggestions';
 import { useImportLog } from '@/hooks/useImportLog';
 import { extractPdfText } from '@/lib/pdfReader';
+import { parseAmexTotal } from '@/lib/importers/amexParser';
+import { usePendingCredits } from '@/hooks/usePendingCredits';
 
 export default function DebtsPage() {
   const { data: importLog } = useImportLog();
   const { data: accounts } = useAccountBalances();
+  const { data: pendingCredits } = usePendingCredits();
   const [openViejo, setOpenViejo] = useState(false);
   const [openSw, setOpenSw] = useState(false);
 
@@ -46,9 +49,25 @@ export default function DebtsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Deudas</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Deudas y créditos</h1>
         <p className="text-sm text-muted-foreground">Revisión y liquidación mensual</p>
       </div>
+
+      {(pendingCredits || []).map((pc) => (
+        <Card key={pc.id} className="rounded-2xl border-success/40 bg-success/10">
+          <CardContent className="p-4">
+            <p className="text-xs font-semibold text-success uppercase tracking-wide mb-1">
+              Saldo a favor pendiente
+            </p>
+            <p className="text-sm text-foreground">
+              <span className="font-mono font-semibold text-success">
+                +${Math.round(pc.amount_ars).toLocaleString('es-AR')}
+              </span>{' '}
+              de liquidación {pc.settlement_month} — llegará por MercadoPago
+            </p>
+          </CardContent>
+        </Card>
+      ))}
 
       <ViejoDebtCard
         importLog={importLog || []}
