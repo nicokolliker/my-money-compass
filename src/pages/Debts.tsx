@@ -728,13 +728,17 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
           user_id: user.id,
           account_id: mpAcc.id,
           date: settlementDate,
-          description: `Vuelto liquidación ${monthLabel} — viejo`,
+          description: `Vuelto ${monthLabel} — viejo (a recibir en MP)`,
           amount: vueltoARS,
           currency: 'ARS',
           fx_rate: fxArsUsd,
           amount_usd: vueltoARS * fxArsUsd,
           type: 'income' as const,
-          notes: `vuelto_settlement_${settlementMonth}`,
+          notes: JSON.stringify({
+            type: 'vuelto_settlement',
+            month: settlementMonth,
+            info: 'Ingreso esperado del viejo como cambio de la liquidación. Confirmá cuando lo recibas.',
+          }) + ` vuelto_settlement_${settlementMonth}`,
         });
       }
 
