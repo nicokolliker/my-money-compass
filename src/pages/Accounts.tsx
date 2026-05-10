@@ -26,6 +26,7 @@ import { useImportLog } from '@/hooks/useImportLog';
 import { useArqPendingReconciliations } from '@/hooks/useArqReconciliation';
 import { ArqReconciliationSheet } from '@/components/accounts/ArqReconciliationSheet';
 import { AccountReconciliationSheet } from '@/components/accounts/AccountReconciliationSheet';
+import { AccountDetailSheet } from '@/components/accounts/AccountDetailSheet';
 import { useQuery } from '@tanstack/react-query';
 import { useUserId } from '@/hooks/useAuthUser';
 import { useUserSettings } from '@/hooks/useUserSettings';
@@ -79,6 +80,7 @@ export default function Accounts() {
   const [showPostCreate, setShowPostCreate] = useState(false);
   const [arqSheetAccount, setArqSheetAccount] = useState<any>(null);
   const [destSheetAccount, setDestSheetAccount] = useState<any>(null);
+  const [detailAccount, setDetailAccount] = useState<any>(null);
 
   // Pending counts per destination account (MP/Galicia) for badges
   const userId = useUserId();
