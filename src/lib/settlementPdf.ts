@@ -525,7 +525,9 @@ export async function generateSettlementPdf(data: SettlementPdfData): Promise<js
   rgb(doc, 'setFillColor', BRAND.surface);
   doc.roundedRect(margin, stripY, pageW - margin * 2, stripH, 8, 8, 'F');
 
-  const cellW = (pageW - margin * 2) / 3;
+  const showVuelto = data.vueltoARS > 0;
+  const cellCount = showVuelto ? 4 : 3;
+  const cellW = (pageW - margin * 2) / cellCount;
   const drawStat = (idx: number, label: string, value: string, accent?: boolean) => {
     const cx = margin + cellW * idx + cellW / 2;
     rgb(doc, 'setTextColor', BRAND.muted);
@@ -535,18 +537,20 @@ export async function generateSettlementPdf(data: SettlementPdfData): Promise<js
 
     rgb(doc, 'setTextColor', accent ? BRAND.primary : BRAND.ink);
     doc.setFont(font, 'bold');
-    doc.setFontSize(15);
+    doc.setFontSize(showVuelto ? 13 : 15);
     doc.text(value, cx, stripY + 48, { align: 'center' });
   };
 
   drawStat(0, 'Total ARS', fmtARS(data.totalARS));
   drawStat(1, 'TC Blue', fmtARS(data.tcBlue));
   drawStat(2, 'USD a pagar', fmtUSD(data.usdAPagar), true);
+  if (showVuelto) drawStat(3, 'Vuelto ARS', '+' + fmtARS(data.vueltoARS));
 
   rgb(doc, 'setDrawColor', BRAND.border);
   doc.setLineWidth(0.5);
-  doc.line(margin + cellW, stripY + 14, margin + cellW, stripY + stripH - 14);
-  doc.line(margin + cellW * 2, stripY + 14, margin + cellW * 2, stripY + stripH - 14);
+  for (let i = 1; i < cellCount; i++) {
+    doc.line(margin + cellW * i, stripY + 14, margin + cellW * i, stripY + stripH - 14);
+  }
 
   y = stripY + stripH + 28;
 
@@ -595,7 +599,7 @@ export async function generateSettlementPdf(data: SettlementPdfData): Promise<js
     autoTable(doc, {
       startY: y,
       head: [['Concepto', 'Categoría', 'Monto']],
-      body: data.manualItems.map((i) => [i.label, i.categoryName || 'Otros', fmtARS(i.amountARS)]),
+      body: data.manualItems.map((i) => [stripEmoji(i.label), stripEmoji(i.categoryName || 'Otros'), fmtARS(i.amountARS)]),
       theme: 'plain',
       styles: {
         font,
