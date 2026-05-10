@@ -754,15 +754,20 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
             </p>
             {(iebraRows.length > 0 || kollikerRows.length > 0 || santRows.length > 0) && (
               <div className="space-y-2 border rounded-xl overflow-hidden">
-                <div className="px-4 py-2.5 bg-muted/50 border-b">
-                  <p className="text-xs font-semibold text-foreground uppercase tracking-wide">
-                    Líneas de tarjeta — desde PDFs
-                  </p>
-                  <p className="text-xs text-muted-foreground">Revisá y ajustá la categoría de cada gasto</p>
+                <div className="px-4 py-2.5 bg-muted/50 border-b flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-semibold text-foreground uppercase tracking-wide">
+                      Líneas de tarjeta — desde PDFs
+                    </p>
+                    <p className="text-xs text-muted-foreground">Revisá y ajustá la categoría de cada gasto</p>
+                  </div>
+                  <span className="text-xs text-muted-foreground">
+                    {[...iebraRows, ...kollikerRows, ...santRows].filter(r => r.selected).length} seleccionadas
+                  </span>
                 </div>
-                <div className="divide-y divide-border/50 max-h-64 overflow-y-auto">
+                <div className="max-h-72 overflow-y-auto">
                   {[...iebraRows, ...kollikerRows, ...santRows].map((row, i) => (
-                    <div key={i} className="flex items-center gap-2 px-4 py-2.5">
+                    <div key={i} className="flex items-center gap-2 px-3 py-2 border-b border-border/40 last:border-0">
                       <input
                         type="checkbox"
                         checked={row.selected}
@@ -777,13 +782,13 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
                             setSantRows(prev => prev.map((r, idx) => idx === j ? { ...r, selected: e.target.checked } : r));
                           }
                         }}
-                        className="shrink-0"
+                        className="shrink-0 accent-primary"
                       />
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs text-foreground truncate">{row.description}</p>
+                        <p className="text-xs text-foreground truncate font-medium">{row.description}</p>
                         <p className="text-[10px] text-muted-foreground">{row.date}</p>
                       </div>
-                      <span className="text-xs font-mono text-foreground shrink-0">
+                      <span className="text-xs font-mono text-foreground shrink-0 min-w-[80px] text-right">
                         {'$' + Math.round(row.amountARS).toLocaleString('es-AR')}
                       </span>
                       <Select
@@ -800,7 +805,9 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
                           }
                         }}
                       >
-                        <SelectTrigger className="w-28 h-7 text-[11px]"><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="w-24 h-7 text-[11px] shrink-0">
+                          <SelectValue />
+                        </SelectTrigger>
                         <SelectContent>
                           {(categories || []).map((c: any) => (
                             <SelectItem key={c.id} value={c.name} className="text-xs">{c.name}</SelectItem>
