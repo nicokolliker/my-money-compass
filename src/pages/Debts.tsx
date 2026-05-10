@@ -181,39 +181,20 @@ function ViejoDebtCard({ account, importLog, onOpen }: {
   });
 
   const yaLiquidado = (liquidacionTxs || []).length > 0;
-  const liquidadoUSD = yaLiquidado
-    ? Math.abs(Number(liquidacionTxs?.[0]?.amount_usd || 0))
-    : 0;
 
-  const steps = [
-    {
-      n: 1,
-      label: 'Cargar resúmenes',
-      sublabel: 'Banco Ciudad + Santander',
-      done: bcImportado,
-      status: bcImportado ? 'Importado este mes' : 'Pendiente',
+  const { data: vueltoTx } = useQuery({
+    queryKey: ['vuelto-check', currentMonth],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('transactions')
+        .select('id, amount')
+        .ilike('notes', `%vuelto_settlement_${currentMonth}%`)
+        .maybeSingle();
+      return data;
     },
-    {
-      n: 2,
-      label: 'Completar gastos manuales',
-      sublabel: 'Expensas, Obra Social, Préstamo, Cochera...',
-      done: bcImportado && yaLiquidado,
-      status: yaLiquidado ? 'Completado' : bcImportado ? 'Listo para completar' : 'Esperando paso 1',
-    },
-    {
-      n: 3,
-      label: 'Pagar en Cash USD',
-      sublabel: 'Vuelto ARS pendiente en Mercado Pago',
-      done: yaLiquidado,
-      status: yaLiquidado ? `Liquidado: ${formatUSD(liquidadoUSD)}` : 'Pendiente',
-    },
-  ];
+  });
 
-  const ctaLabel = yaLiquidado
-    ? 'Ver liquidación del mes'
-    : bcImportado
-      ? 'Continuar — completar y liquidar →'
-      : 'Empezar ciclo del mes →';
+  const monthLabel = format(new Date(), 'MMMM yyyy', { locale: es });
 
   return (
     <Card>
@@ -224,35 +205,35 @@ function ViejoDebtCard({ account, importLog, onOpen }: {
             <div className="min-w-0">
               <p className="font-semibold text-base">Viejo</p>
               <p className="text-xs text-muted-foreground capitalize">
-                Ciclo {format(new Date(), 'MMMM yyyy', { locale: es })}
+                Ciclo {monthLabel}
               </p>
             </div>
           </div>
         </div>
 
-        <div className="divide-y divide-border border-y">
-          {steps.map(step => (
-            <div key={step.n} className="flex items-center gap-3 py-3">
-              <div className={cn(
-                'shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold',
-                step.done ? 'bg-success/20 text-success' : 'bg-muted text-muted-foreground'
-              )}>
-                {step.done ? '✓' : step.n}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className={cn('text-sm font-medium', step.done ? 'text-foreground' : 'text-foreground')}>
-                  {step.label}
+        {yaLiquidado ? (
+          <div className="space-y-3">
+            <div className="flex items-center gap-3 rounded-xl bg-success/10 px-4 py-3">
+              <CheckCircle2 className="h-5 w-5 text-success shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-foreground capitalize">
+                  {monthLabel} liquidado ✓
                 </p>
-                <p className="text-xs text-muted-foreground">{step.sublabel}</p>
+                <p className="text-xs text-muted-foreground">
+                  Pagaste {formatUSD(Math.abs(Number(liquidacionTxs?.[0]?.amount_usd || 0)))} USD
+                  {vueltoTx && ` · Vuelto ARS ${Math.round(Number(vueltoTx.amount)).toLocaleString('es-AR')} en MP`}
+                </p>
               </div>
-              <Badge variant={step.done ? 'secondary' : 'outline'} className="text-[10px] shrink-0">
-                {step.status}
-              </Badge>
             </div>
-          ))}
-        </div>
-
-        <Button onClick={onOpen} className="w-full">{ctaLabel}</Button>
+            <Button variant="outline" className="w-full" onClick={onOpen}>
+              Ver detalle / Reliquidar →
+            </Button>
+          </div>
+        ) : (
+          <Button className="w-full" onClick={onOpen}>
+            Empezar liquidación de {monthLabel} →
+          </Button>
+        )}
       </CardContent>
     </Card>
   );
