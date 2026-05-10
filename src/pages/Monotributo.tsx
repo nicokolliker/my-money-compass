@@ -390,29 +390,44 @@ function InvoiceForm({ open, onClose, onSaved }: { open: boolean; onClose: () =>
           <DialogTitle>Registrar factura de exportación</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
-          <label className="block">
-            <span className="text-xs text-muted-foreground mb-1.5 block">Subir PDF de la factura</span>
-            <div className="border-2 border-dashed border-border rounded-lg p-4 text-center cursor-pointer hover:border-primary hover:bg-accent/30 transition-colors">
-              {pdfLoading ? (
-                <p className="text-sm text-muted-foreground">Leyendo PDF...</p>
-              ) : (
-                <>
-                  <Upload className="h-6 w-6 mx-auto mb-1.5 text-muted-foreground" />
-                  <p className="text-sm">Arrastrá o hacé click para subir la factura</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Los campos se completan solos</p>
-                </>
-              )}
-              <input
-                type="file"
-                accept="application/pdf"
-                className="hidden"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) handlePdfUpload(f);
-                }}
-              />
+          {pdfFile ? (
+            <div className="flex items-start gap-3 rounded-lg border border-success/30 bg-success/10 px-4 py-3">
+              <CheckCircle2 className="h-5 w-5 text-success shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">{pdfFile.name}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {pdfFile.fields.length > 0
+                    ? `Datos extraídos: ${pdfFile.fields.join(' · ')}`
+                    : 'No se pudieron extraer campos automáticamente — completá manualmente'}
+                </p>
+              </div>
+              <Button size="sm" variant="ghost" onClick={() => setPdfFile(null)}>Cambiar</Button>
             </div>
-          </label>
+          ) : (
+            <label className="block">
+              <span className="text-xs text-muted-foreground mb-1.5 block">Subir PDF de la factura</span>
+              <div className="border-2 border-dashed border-border rounded-lg p-4 text-center cursor-pointer hover:border-primary hover:bg-accent/30 transition-colors">
+                {pdfLoading ? (
+                  <p className="text-sm text-muted-foreground">Leyendo PDF...</p>
+                ) : (
+                  <>
+                    <Upload className="h-6 w-6 mx-auto mb-1.5 text-muted-foreground" />
+                    <p className="text-sm">Arrastrá o hacé click para subir la factura</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Los campos se completan solos</p>
+                  </>
+                )}
+                <input
+                  type="file"
+                  accept="application/pdf"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) handlePdfUpload(f);
+                  }}
+                />
+              </div>
+            </label>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs text-muted-foreground">Período</label>
