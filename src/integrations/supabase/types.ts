@@ -45,6 +45,7 @@ export type Database = {
         Row: {
           created_at: string
           currency: string
+          exclude_from_net_worth: boolean
           group_id: string | null
           id: string
           institution: string | null
@@ -65,6 +66,7 @@ export type Database = {
         Insert: {
           created_at?: string
           currency?: string
+          exclude_from_net_worth?: boolean
           group_id?: string | null
           id?: string
           institution?: string | null
@@ -85,6 +87,7 @@ export type Database = {
         Update: {
           created_at?: string
           currency?: string
+          exclude_from_net_worth?: boolean
           group_id?: string | null
           id?: string
           institution?: string | null
