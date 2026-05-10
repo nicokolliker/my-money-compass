@@ -1542,9 +1542,35 @@ function ViejoCycleHistory({ importLog }: { importLog: any[] }) {
       ym,
       label: format(new Date(ym + '-01T00:00:00'), 'MMMM yyyy', { locale: es }),
       shortLabel: format(new Date(ym + '-01T00:00:00'), "MMM ''yy", { locale: es }),
-      hasImport, liquidado, manualCount, usd,
+      hasImport, liquidado, manualCount, usd, parsed: liq?.parsed, tx: liq?.tx,
     };
   }), [filteredMonths, byMonth, importLog]);
+
+  function downloadPdfFor(ym: string, parsed: any, tx: any) {
+    const monthLabel = format(new Date(ym + '-01T00:00:00'), 'MMMM yyyy', { locale: es });
+    const p = parsed || {};
+    const breakdown: Record<string, number> = p.breakdown || {};
+    const manualItems: any[] = Object.entries(breakdown)
+      .filter(([k, v]) => !CARD_KEYS.includes(k) && Number(v) > 0)
+      .map(([k, v]) => ({ label: ITEM_META[k]?.label || k, amountARS: Number(v) }));
+    if (Array.isArray(p.extras)) {
+      for (const e of p.extras) manualItems.push({ label: e.label, amountARS: e.amountARS, categoryName: e.categoryName });
+    }
+    const sumBreakdown = Object.values(breakdown).reduce((s: number, v) => s + Number(v || 0), 0);
+    const sumExtras = (p.extras || []).reduce((s: number, e: any) => s + Number(e.amountARS || 0), 0);
+    const totalARS = Number(p.totalARS) > 0 ? Number(p.totalARS) : (sumBreakdown + sumExtras);
+    downloadSettlementPdf({
+      monthLabel,
+      mamaRows: p.mamaRows || [],
+      papaRows: p.papaRows || [],
+      santRows: p.santRows || [],
+      manualItems,
+      totalARS,
+      tcBlue: Number(p.tcBlue) || 0,
+      usdAPagar: Number(p.usdPagado) || Math.abs(Number(tx?.amount_usd) || 0),
+      vueltoARS: Number(p.vueltoARS) || 0,
+    }, `liquidacion-${ym}.pdf`);
+  }
 
   const chartData = useMemo(() => [...rows].reverse().map((r) => ({
     month: r.shortLabel, usd: r.liquidado ? Math.round(r.usd) : 0, ym: r.ym, liquidado: r.liquidado,
