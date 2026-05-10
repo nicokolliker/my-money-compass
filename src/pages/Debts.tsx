@@ -592,6 +592,7 @@ function ViejoSettlementWizard({ open, onOpenChange, onSantTotalDetected }: { op
 
       setBcTotalARS(visaCiudadMama + visaCiudadPapa);
       setSantTotalARS(sant);
+      if (sant > 0) onSantTotalDetected?.(sant);
       setVisaCiudadMamaARS(visaCiudadMama);
       setVisaCiudadPapaARS(visaCiudadPapa);
 
