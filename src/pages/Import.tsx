@@ -612,7 +612,15 @@ export default function ImportPage() {
         );
         qc.invalidateQueries({ queryKey: ['import-log'] });
       }
-      const dups = galiciaRows.filter((r) => r.duplicate).length;
+      await closeAccountReconciliations({
+        userId: user.id,
+        accountId: galiciaAccount.id,
+        month: galiciaMonth,
+        spentUsd: toImport
+          .filter(r => r.type !== 'income' && r.type !== 'transfer')
+          .reduce((s, r) => s + (r.amountUSD || 0), 0),
+      });
+      qc.invalidateQueries({ queryKey: ['account-reconciliations'] });
       setGaliciaResultMsg(`${toImport.length} transacciones importadas, ${dups} duplicados ignorados`);
       toast.success('Importación completa');
       setGaliciaRows([]);
