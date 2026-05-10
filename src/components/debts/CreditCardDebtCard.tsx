@@ -147,7 +147,13 @@ export function CreditCardDebtCard() {
       </div>
 
       <CardContent className="p-5 space-y-4">
-        {!hasData && (
+        {ownCardAccounts.length === 0 && (
+          <p className="text-xs text-muted-foreground">
+            Configurá tus tarjetas en Accounts → Mi tarjeta personal
+          </p>
+        )}
+
+        {ownCardAccounts.length > 0 && cardBalances.length === 0 && pendingCuotas.length === 0 && (
           <p className="text-xs text-muted-foreground">Subí los PDFs de tarjeta para ver el resumen</p>
         )}
 
@@ -155,13 +161,16 @@ export function CreditCardDebtCard() {
           <div className="rounded-xl border border-border/60 divide-y divide-border/60">
             {cardBalances.map(c => (
               <div key={c.key} className="flex items-center justify-between px-3 py-2.5">
-                <p className="text-xs font-medium text-foreground">{c.label}</p>
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-foreground truncate">{c.label}</p>
+                  {c.note && <p className="text-[10px] text-muted-foreground">({c.note})</p>}
+                </div>
                 <p className="text-sm font-mono font-semibold text-foreground tabular-nums">
                   {formatARS(c.ars)}
                 </p>
               </div>
             ))}
-            {cardBalances.length > 1 && (
+            {cardBalances.length >= 2 && (
               <div className="flex items-center justify-between px-3 py-2.5 bg-muted/30">
                 <p className="text-xs font-semibold text-foreground">Total</p>
                 <p className="text-sm font-mono font-bold text-foreground tabular-nums">
