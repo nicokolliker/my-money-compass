@@ -54,18 +54,12 @@ export function CreditCardDebtCard() {
     },
   });
 
-  // Accounts that have my_card_suffix set or are flagged as own card
-  const { data: ownCardAccounts } = useQuery({
-    queryKey: ['own-card-accounts'],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('accounts')
-        .select('id, name, my_card_suffix, is_own_card, type')
-        .eq('type', 'credit_card')
-        .eq('is_active', true);
-      return data || [];
-    },
-  });
+  // Own credit card accounts (is_own_card = true)
+  const { data: balances } = useAccountBalances();
+  const ownCardAccounts = useMemo(
+    () => (balances || []).filter((a: any) => a.type === 'credit_card' && a.is_own_card && a.is_active !== false),
+    [balances]
+  );
 
   const { settlementParsed, settlementCardSubs } = useMemo(() => {
     if (!lastSettlement?.notes) return { settlementParsed: null, settlementCardSubs: {} as Record<string, number> };
@@ -76,43 +70,31 @@ export function CreditCardDebtCard() {
   }, [lastSettlement]);
 
   const cardBalances = useMemo(() => {
-    const bd = settlementParsed?.breakdown || {};
     const subs = settlementCardSubs;
-    const rows: { key: string; label: string; ars: number }[] = [];
+    const rows: { key: string; label: string; ars: number; note?: string }[] = [];
 
-    // 1) Per-account rows using my_card_suffix (preferred)
-    const suffixesUsed = new Set<string>();
-    for (const a of (ownCardAccounts || []) as any[]) {
+    for (const a of ownCardAccounts as any[]) {
       const suf = a.my_card_suffix as string | null;
       if (suf && subs[suf] != null) {
-        suffixesUsed.add(suf);
         rows.push({
           key: `acct-${a.id}`,
           label: `${a.name} (tarjeta •••• ${suf})`,
           ars: Number(subs[suf] || 0),
         });
-      } else if (a.is_own_card) {
-        // Fallback to full balance — read computed balance separately would require another query;
-        // for now use the legacy breakdown key if it loosely matches the account name.
-        const guess = Object.keys(bd).find(k => a.name.toLowerCase().includes(k.replace(/_/g, ' ')));
+      } else {
+        // No suffix or no settlement data — fall back to computed balance (debt is negative)
+        const bal = Math.abs(Number(a.computed_balance) || 0);
         rows.push({
           key: `acct-${a.id}`,
           label: a.name,
-          ars: guess ? Number(bd[guess] || 0) : 0,
+          ars: bal,
+          note: 'tarjeta completa',
         });
       }
     }
 
-    // 2) Legacy fallback — show breakdown keys that aren't already covered by an account suffix
-    Object.keys(CARD_LABELS).forEach(k => {
-      const ars = Number(bd[k] || 0);
-      if (ars > 0 && !rows.some(r => r.label.includes(CARD_LABELS[k]))) {
-        rows.push({ key: k, label: CARD_LABELS[k], ars });
-      }
-    });
-
     return rows.filter(r => r.ars > 0);
-  }, [settlementParsed, settlementCardSubs, ownCardAccounts]);
+  }, [settlementCardSubs, ownCardAccounts]);
 
   const pendingCuotas = useMemo(() => {
     if (!cuotaTxs) return [];
