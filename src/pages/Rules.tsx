@@ -51,6 +51,7 @@ export default function Rules({ initialTab }: { initialTab?: RulesTab } = {}) {
 
 function SuggestionsPanel() {
   const suggestions = useRuleSuggestions();
+  const { ignore: ignoreSuggestion } = useIgnoredSuggestions();
   const { data: categories } = useCategories();
   const createRule = useCreateRule();
   const navigate = useNavigate();
