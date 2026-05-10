@@ -209,42 +209,92 @@ export default function CalendarPage({ embedded = false }: { embedded?: boolean 
                 const hasMissing = events.some((e: any) => e.isMissing);
                 const hasReview = events.some((e: any) => e.isNeedsReview);
                 const accent = hasMissing ? 'border-destructive/40' : hasReview ? 'border-amber-500/40' : allPaid ? 'border-success/40' : events.length ? 'border-primary/30' : 'border-border/50';
+                const monthsEs = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+                const hasEvents = events.length > 0;
                 return (
-                  <div
-                    key={key}
-                    className={cn(
-                      'min-h-[88px] p-1.5 rounded-lg border bg-card flex flex-col gap-1 text-left',
-                      accent,
-                      isToday(day) && 'bg-primary/5 ring-1 ring-primary/40',
-                      allPaid && 'opacity-70',
-                    )}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className={cn('text-[11px] font-semibold tabular-nums', isToday(day) ? 'text-primary' : 'text-foreground')}>{format(day, 'd')}</span>
-                      {events.length > 0 && (
-                        <span className="text-[9px] tabular-nums text-muted-foreground">{formatUSD(dayTotalUsd)}</span>
-                      )}
-                    </div>
-                    <div className="flex flex-col gap-0.5 flex-1">
-                      {events.slice(0, 3).map((e: any) => {
-                        const name = e.recurring_expenses?.name || 'Recurring';
-                        const dotColor = e.isPaid ? 'bg-success' : e.isMissing ? 'bg-destructive' : e.isNeedsReview ? 'bg-amber-500' : 'bg-primary';
-                        return (
-                          <div
-                            key={e.id}
-                            className={cn('flex items-center gap-1 px-1 py-0.5 rounded bg-muted/40', e.isPaid && 'line-through opacity-60')}
-                            title={`${name} · ${e.derived} · ${formatCurrency(Number(e.expected_amount), e.expected_currency)}`}
-                          >
-                            <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', dotColor)} />
-                            <span className="text-[9px] text-foreground truncate flex-1">{name}</span>
+                  <Popover key={key}>
+                    <PopoverTrigger asChild disabled={!hasEvents}>
+                      <button
+                        type="button"
+                        className={cn(
+                          'min-h-[88px] p-1.5 rounded-lg border bg-card flex flex-col gap-1 text-left transition-all',
+                          accent,
+                          isToday(day) && 'bg-primary/5 ring-1 ring-primary/40',
+                          allPaid && 'opacity-70',
+                          hasEvents && 'cursor-pointer hover:bg-muted/40 hover:border-primary/50 hover:shadow-sm hover:-translate-y-0.5',
+                          !hasEvents && 'cursor-default',
+                        )}
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <span className={cn('text-[11px] font-semibold tabular-nums', isToday(day) ? 'text-primary' : 'text-foreground')}>{format(day, 'd')}</span>
+                          {hasEvents && (
+                            <span className="text-[9px] tabular-nums text-muted-foreground">{formatUSD(dayTotalUsd)}</span>
+                          )}
+                        </div>
+                        <div className="flex flex-col gap-0.5 flex-1 w-full">
+                          {events.slice(0, 3).map((e: any) => {
+                            const name = e.recurring_expenses?.name || 'Recurring';
+                            const dotColor = e.isPaid ? 'bg-success' : e.isMissing ? 'bg-destructive' : e.isNeedsReview ? 'bg-amber-500' : 'bg-primary';
+                            return (
+                              <div
+                                key={e.id}
+                                className={cn('flex items-center gap-1 px-1 py-0.5 rounded bg-muted/40', e.isPaid && 'line-through opacity-60')}
+                              >
+                                <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', dotColor)} />
+                                <span className="text-[9px] text-foreground truncate flex-1">{name}</span>
+                              </div>
+                            );
+                          })}
+                          {events.length > 3 && (
+                            <span className="text-[9px] text-muted-foreground px-1">+{events.length - 3} más</span>
+                          )}
+                        </div>
+                      </button>
+                    </PopoverTrigger>
+                    {hasEvents && (
+                      <PopoverContent className="w-80 p-0" align="center">
+                        <div className="px-4 py-3 border-b flex items-center justify-between">
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-xl font-bold text-foreground tabular-nums">{format(day, 'd')}</span>
+                            <span className="text-xs text-muted-foreground capitalize">{monthsEs[day.getMonth()]}</span>
+                            {isToday(day) && <span className="text-[10px] text-primary font-medium">hoy</span>}
                           </div>
-                        );
-                      })}
-                      {events.length > 3 && (
-                        <span className="text-[9px] text-muted-foreground px-1">+{events.length - 3} más</span>
-                      )}
-                    </div>
-                  </div>
+                          <span className="text-sm font-bold text-foreground tabular-nums">{formatUSD(dayTotalUsd)}</span>
+                        </div>
+                        <div className="max-h-80 overflow-y-auto divide-y divide-border/60">
+                          {events.map((item: any) => {
+                            const r = item.recurring_expenses;
+                            const name = r?.name || 'Recurring';
+                            const cat = r?.categories;
+                            return (
+                              <div key={item.id} className={cn('flex items-center gap-3 px-4 py-2.5', item.isPaid && 'opacity-70')}>
+                                <MerchantLogo name={name} size={28} />
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs font-medium text-foreground truncate">{name}</p>
+                                  {cat && <p className="text-[10px] text-muted-foreground">{cat.icon} {cat.name}</p>}
+                                </div>
+                                <div className="text-right shrink-0 space-y-0.5">
+                                  <p className="text-xs font-semibold text-foreground tabular-nums">
+                                    {formatCurrency(Number(item.expected_amount), item.expected_currency)}
+                                  </p>
+                                  <RecurringStatusBadge state={item.derived} />
+                                </div>
+                                {!item.isPaid && (
+                                  <Button
+                                    size="sm" variant="ghost" className="h-7 w-7 p-0 shrink-0"
+                                    onClick={() => markPaid.mutateAsync(item.id).then(() => toast.success('Marked paid'))}
+                                    title="Mark paid"
+                                  >
+                                    <CheckCircle2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </PopoverContent>
+                    )}
+                  </Popover>
                 );
               })}
             </div>
