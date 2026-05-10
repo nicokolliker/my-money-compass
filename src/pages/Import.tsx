@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAccounts } from '@/hooks/useAccounts';
 import { useLatestFxRate } from '@/hooks/useFxRates';
-import { parseArqStatements, type ParsedTransaction } from '@/lib/importers/arqParser';
+import { parseArqStatements, type ParsedTransaction, type ParsedArqResult } from '@/lib/importers/arqParser';
 import { parseMercadoPago } from '@/lib/importers/mercadoPagoParser';
 import { useImportLog } from '@/hooks/useImportLog';
 import { MerchantLogo } from '@/components/MerchantLogo';
@@ -195,13 +195,16 @@ export default function ImportPage() {
   const arqAccount = useMemo(() => {
     if (!accounts) return null;
     return (
-      accounts.find((a) => a.currency === 'ARS' && /arq|dolarapp/i.test(a.name)) ||
+      // PR3: prefer USD account (ARQ holds USD, not ARS)
+      accounts.find((a) => a.currency === 'USD' && /arq|dolarapp/i.test(a.name)) ||
       accounts.find((a) => /arq|dolarapp/i.test(a.name)) ||
       null
     );
   }, [accounts]);
 
   const [arqMonth, setArqMonth] = useState<string>('');
+  /** Balance final USD del extracto — actualiza official_balance al importar */
+  const [arqBalanceFinal, setArqBalanceFinal] = useState<number | null>(null);
   const qc = useQueryClient();
 
   async function handleProcess() {
@@ -216,7 +219,11 @@ export default function ImportPage() {
         extractPdfText(arsFile),
         usdFile ? extractPdfText(usdFile) : Promise.resolve(''),
       ]);
-      const parsed = parseArqStatements(usdText, arsText, arsToUsd || 0);
+      // PR3+PR4: parseArqStatements now returns ParsedArqResult
+      const result: ParsedArqResult = parseArqStatements(usdText, arsText, arsToUsd || 0);
+      const parsed = result.transactions;
+      setArqBalanceFinal(result.balanceFinalUsd);
+
       if (parsed.length === 0) {
         toast.error('No se encontraron transacciones en el PDF');
         setRows([]);
@@ -266,20 +273,29 @@ export default function ImportPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
+      // PR3: store USD amounts — ARQ is a USD account
       const payload = toImport.map((r) => {
-        const fxRate = r.amountARS > 0 ? r.amountUSD / r.amountARS : (arsToUsd || 0);
+        const isIncome   = r.type === 'income';
         const isTransfer = r.type === 'transfer';
+        const sign       = isIncome ? 1 : -1;
+        // fx_rate = ARS per USD implied by this transaction
+        const fxRate =
+          r.amountARS > 0 && r.amountUSD > 0
+            ? r.amountARS / r.amountUSD
+            : arsToUsd && arsToUsd > 0
+              ? 1 / arsToUsd
+              : 1000;
         return {
           user_id: user.id,
           account_id: arqAccount.id,
           date: r.date,
           description: r.description,
           merchant: r.transferTarget || r.description,
-          amount: -r.amountARS,
-          currency: 'ARS',
+          amount: sign * r.amountUSD,
+          currency: 'USD',
           fx_rate: fxRate,
-          amount_usd: -r.amountUSD,
-          type: isTransfer ? ('transfer' as const) : ('expense' as const),
+          amount_usd: sign * r.amountUSD,
+          type: (isIncome ? 'income' : isTransfer ? 'transfer' : 'expense') as any,
           external_id: r.external_id,
           raw_imported_description: r.description,
         };
@@ -287,6 +303,18 @@ export default function ImportPage() {
 
       const { error } = await supabase.from('transactions').insert(payload);
       if (error) throw error;
+
+      // PR3: update official_balance so Accounts reflects the real statement balance
+      if (arqBalanceFinal !== null) {
+        await supabase
+          .from('accounts')
+          .update({
+            official_balance: arqBalanceFinal,
+            official_balance_updated_at: new Date().toISOString(),
+          })
+          .eq('id', arqAccount.id);
+        qc.invalidateQueries({ queryKey: ['account-balances'] });
+      }
 
       if (arqMonth) {
         await supabase.from('import_log').upsert(
@@ -588,7 +616,9 @@ export default function ImportPage() {
                   {r.duplicate ? (
                     <Badge variant="outline" className="text-[10px] h-4 px-1.5">Ya importado</Badge>
                   ) : r.type === 'income' ? (
-                    <Badge className="text-[10px] h-4 px-1.5 bg-green-600 hover:bg-green-600/90">Ingreso</Badge>
+                    <Badge className={`text-[10px] h-4 px-1.5 ${(r as any).isWiseDeposit ? 'bg-blue-600 hover:bg-blue-600/90' : 'bg-green-600 hover:bg-green-600/90'}`}>
+                      {(r as any).isWiseDeposit ? '⚡ Wise' : 'Ingreso'}
+                    </Badge>
                   ) : r.type === 'transfer' ? (
                     <Badge className="text-[10px] h-4 px-1.5 bg-orange-500 hover:bg-orange-500/90">Transfer</Badge>
                   ) : r.type === 'fee' ? (
@@ -639,7 +669,13 @@ export default function ImportPage() {
             )}
             {!arqAccount && (
               <Badge variant="outline" className="text-amber-600">
-                No se encontró cuenta ARQ/DolarApp
+                No se encontró cuenta ARQ/DolarApp (USD)
+              </Badge>
+            )}
+            {/* PR3: balance del extracto */}
+            {arqBalanceFinal !== null && (
+              <Badge className="bg-emerald-600 hover:bg-emerald-600/90 text-white gap-1">
+                Balance extracto: ${arqBalanceFinal.toFixed(2)} USD
               </Badge>
             )}
           </div>

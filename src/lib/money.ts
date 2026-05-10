@@ -8,6 +8,11 @@
  *   - recurring instance status semantics
  *
  * NEVER duplicate this logic in components. Always import from here.
+ *
+ * PR3 change: AccountForBalance now includes optional official_balance.
+ * computeBalance and computeBalanceUsd use official_balance as the source
+ * of truth when it is set — this is how statement-driven accounts (ARQ,
+ * MercadoPago) reflect the real balance after a PDF/Excel import.
  */
 
 // ---------- FX ----------
@@ -50,6 +55,15 @@ export type AccountForBalance = {
   id: string;
   currency: string;
   opening_balance: number;
+  /**
+   * When set (non-null), this is the authoritative balance from the most
+   * recently imported bank statement. computeBalance returns this value
+   * directly, ignoring the transaction-derived sum.
+   *
+   * Set by the Import page after a successful ARQ / MercadoPago import.
+   * Also set by sync-wise for Wise accounts.
+   */
+  official_balance?: number | null;
 };
 
 export type TxForBalance = {
@@ -59,10 +73,16 @@ export type TxForBalance = {
 };
 
 /**
- * Compute an account's native-currency balance from opening_balance + sum(tx).
- * This is the ONLY way balances should be derived.
+ * Compute an account's native-currency balance.
+ *
+ * Priority:
+ *  1. official_balance (set after statement import) — source of truth
+ *  2. opening_balance + sum(transactions.amount)    — derived
  */
 export function computeBalance(account: AccountForBalance, txs: TxForBalance[]): number {
+  if (account.official_balance !== null && account.official_balance !== undefined) {
+    return Number(account.official_balance);
+  }
   const sum = txs
     .filter(t => t.account_id === account.id)
     .reduce((s, t) => s + Number(t.amount), 0);
@@ -71,13 +91,19 @@ export function computeBalance(account: AccountForBalance, txs: TxForBalance[]):
 
 /**
  * Compute an account's USD-equivalent balance.
- * Opening balance is converted via FX; transactions use their stored amount_usd.
+ *
+ * Priority:
+ *  1. official_balance converted to USD (when set)
+ *  2. opening_balance (converted) + sum(transactions.amount_usd)
  */
 export function computeBalanceUsd(
   account: AccountForBalance,
   txs: TxForBalance[],
   rates?: FxRateRow[] | null,
 ): number {
+  if (account.official_balance !== null && account.official_balance !== undefined) {
+    return toUSD(Number(account.official_balance), account.currency, rates);
+  }
   const openingUsd = toUSD(Number(account.opening_balance), account.currency, rates);
   const txSumUsd = txs
     .filter(t => t.account_id === account.id)
