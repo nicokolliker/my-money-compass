@@ -818,11 +818,11 @@ function ViejoSettlementWizard({ open, onOpenChange, onSantTotalDetected }: { op
         .eq('source', 'viejo_settlement')
         .eq('settlement_month', settlementMonth);
 
-      if (vueltoARS > 0) {
+      if (diferencia > 0) {
         await supabase.from('pending_credits' as any).insert({
           user_id: user.id,
-          amount_ars: vueltoARS,
-          amount_usd: vueltoARS * fxArsUsd,
+          amount_ars: diferencia,
+          amount_usd: diferencia * fxArsUsd,
           source: 'viejo_settlement',
           expected_via_account_id: mpAcc.id,
           settlement_month: settlementMonth,
