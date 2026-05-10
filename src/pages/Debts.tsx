@@ -73,25 +73,13 @@ async function extractPdfText(file: File): Promise<string> {
 }
 
 export default function DebtsPage() {
-  const { data: accounts } = useAccountBalances();
   const { data: importLog } = useImportLog();
+  const { data: accounts } = useAccountBalances();
   const [openViejo, setOpenViejo] = useState(false);
   const [openSw, setOpenSw] = useState(false);
-  const [transferTarget, setTransferTarget] = useState<any>(null);
-
-  const viejoAccount = useMemo(() =>
-    accounts?.find((a: any) => /viejo/i.test(a.name)) || null,
-  [accounts]);
 
   const splitwiseAccount = useMemo(() =>
     accounts?.find((a: any) => /splitwise/i.test(a.name)) || null,
-  [accounts]);
-
-  const otherDebts = useMemo(() =>
-    (accounts || []).filter((a: any) =>
-      ['debt', 'credit_card'].includes(a.type) &&
-      !/viejo|splitwise/i.test(a.name)
-    ),
   [accounts]);
 
   return (
@@ -101,16 +89,11 @@ export default function DebtsPage() {
         <p className="text-sm text-muted-foreground">Revisión y liquidación mensual</p>
       </div>
 
-      {viejoAccount && (
-        <>
-          <ViejoDebtCard
-            account={viejoAccount}
-            importLog={importLog || []}
-            onOpen={() => setOpenViejo(true)}
-          />
-          <ViejoCycleHistory importLog={importLog || []} />
-        </>
-      )}
+      <ViejoDebtCard
+        importLog={importLog || []}
+        onOpen={() => setOpenViejo(true)}
+      />
+      <ViejoCycleHistory importLog={importLog || []} />
 
       {splitwiseAccount ? (
         <SplitwiseDebtCard
@@ -138,21 +121,8 @@ export default function DebtsPage() {
         </Card>
       )}
 
-      {otherDebts.map((a: any) => (
-        <SimpleDebtCard key={a.id} account={a} onTransfer={() => setTransferTarget(a)} />
-      ))}
-
-      {!viejoAccount && !splitwiseAccount && otherDebts.length === 0 && (
-        <Card>
-          <CardContent className="p-6 text-sm text-muted-foreground text-center">
-            No tenés cuentas de deuda activas. Creá una en Accounts con tipo "Debt".
-          </CardContent>
-        </Card>
-      )}
-
       <ViejoSettlementWizard open={openViejo} onOpenChange={setOpenViejo} />
       <SplitwiseSettlementWizard open={openSw} onOpenChange={setOpenSw} />
-      <TransferDialog account={transferTarget} onClose={() => setTransferTarget(null)} />
     </div>
   );
 }
