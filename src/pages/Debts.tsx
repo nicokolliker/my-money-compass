@@ -484,6 +484,7 @@ function ViejoSettlementWizard({ open, onOpenChange, onSantTotalDetected }: { op
       setIebraRows([]); setKollikerRows([]); setSantRows([]);
       setUsdAPagar(0);
       setResultUsd(0); setResultVuelto(0);
+      setCardSubtotals({});
     }
   }, [open]);
 
