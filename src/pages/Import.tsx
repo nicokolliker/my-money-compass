@@ -494,7 +494,6 @@ export default function ImportPage() {
         );
         qc.invalidateQueries({ queryKey: ['import-log'] });
       }
-      // Close pending account_reconciliations for this account + period
       await closeAccountReconciliations({
         userId: user.id,
         accountId: mpAccount.id,
@@ -503,6 +502,9 @@ export default function ImportPage() {
           .filter(r => r.type !== 'income' && r.type !== 'transfer')
           .reduce((s, r) => s + (r.amountUSD || 0), 0),
       });
+      qc.invalidateQueries({ queryKey: ['account-reconciliations'] });
+      const dups = mpRows.filter((r) => r.duplicate).length;
+      setMpResultMsg(`${toImport.length} transacciones importadas, ${dups} duplicados ignorados`);
       toast.success('Importación completa');
       setMpRows([]);
       setMpMonth('');
