@@ -24,7 +24,12 @@ export function useNetWorth() {
       a.currency === 'USD' ? a.computed_balance : a.computed_balance_usd;
 
     // Exclude tracking accounts that should not affect net worth
-    const included = list.filter(a => !(a as any).exclude_from_net_worth);
+    // Fallback name-based guard ensures consistency even if DB flag isn't set
+    const included = list.filter(a =>
+      !(a as any).exclude_from_net_worth &&
+      !/deel/i.test(a.name) &&
+      !/splitwise/i.test(a.name)
+    );
 
     const assets      = included.filter(a => ASSET_TYPES.includes(a.type));
     const liabilities = included.filter(a => LIABILITY_TYPES.includes(a.type));
