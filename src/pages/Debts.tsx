@@ -753,73 +753,85 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
             <p className="text-xs text-muted-foreground">
               BC: {formatARS(bcTotalARS)} ARS detectados · Santander: {formatARS(santTotalARS)} ARS detectados
             </p>
-            {(iebraRows.length > 0 || kollikerRows.length > 0 || santRows.length > 0) && (
-              <div className="space-y-2 border rounded-xl overflow-hidden">
-                <div className="px-4 py-2.5 bg-muted/50 border-b flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-semibold text-foreground uppercase tracking-wide">
-                      Líneas de tarjeta — desde PDFs
-                    </p>
-                    <p className="text-xs text-muted-foreground">Revisá y ajustá la categoría de cada gasto</p>
+            {(iebraRows.length > 0 || kollikerRows.length > 0 || santRows.length > 0) && (() => {
+              type RowRef = { row: ParsedTransaction & { categoryName: string; selected: boolean }; src: 'iebra' | 'kolliker' | 'sant'; idx: number };
+              const allRefs: RowRef[] = [
+                ...iebraRows.map((row, idx) => ({ row, src: 'iebra' as const, idx })),
+                ...kollikerRows.map((row, idx) => ({ row, src: 'kolliker' as const, idx })),
+                ...santRows.map((row, idx) => ({ row, src: 'sant' as const, idx })),
+              ];
+              const arsRefs = allRefs.filter(r => !r.row.matched);
+              const usdRefs = allRefs.filter(r => r.row.matched);
+              const setSelected = (ref: RowRef, checked: boolean) => {
+                const setter = ref.src === 'iebra' ? setIebraRows : ref.src === 'kolliker' ? setKollikerRows : setSantRows;
+                setter(prev => prev.map((r, i) => i === ref.idx ? { ...r, selected: checked } : r));
+              };
+              const setCategory = (ref: RowRef, val: string) => {
+                const setter = ref.src === 'iebra' ? setIebraRows : ref.src === 'kolliker' ? setKollikerRows : setSantRows;
+                setter(prev => prev.map((r, i) => i === ref.idx ? { ...r, categoryName: val } : r));
+              };
+              const renderRow = (ref: RowRef, key: string) => (
+                <div key={key} className="flex items-center gap-2 px-3 py-2 border-b border-border/40 last:border-0">
+                  <input
+                    type="checkbox"
+                    checked={ref.row.selected}
+                    onChange={e => setSelected(ref, e.target.checked)}
+                    className="shrink-0 accent-primary"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-foreground truncate font-medium">{ref.row.description}</p>
+                    <p className="text-[10px] text-muted-foreground">{ref.row.date}</p>
                   </div>
-                  <span className="text-xs text-muted-foreground">
-                    {[...iebraRows, ...kollikerRows, ...santRows].filter(r => r.selected).length} seleccionadas
+                  <span className="text-xs font-mono text-foreground shrink-0 min-w-[80px] text-right">
+                    {ref.row.matched
+                      ? 'US$' + ref.row.amountUSD.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                      : '$' + Math.round(ref.row.amountARS).toLocaleString('es-AR')}
                   </span>
+                  <Select value={ref.row.categoryName} onValueChange={val => setCategory(ref, val)}>
+                    <SelectTrigger className="w-24 h-7 text-[11px] shrink-0">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(categories || []).map((c: any) => (
+                        <SelectItem key={c.id} value={c.name} className="text-xs">{c.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-                <div className="max-h-72 overflow-y-auto">
-                  {[...iebraRows, ...kollikerRows, ...santRows].map((row, i) => (
-                    <div key={i} className="flex items-center gap-2 px-3 py-2 border-b border-border/40 last:border-0">
-                      <input
-                        type="checkbox"
-                        checked={row.selected}
-                        onChange={e => {
-                          if (i < iebraRows.length) {
-                            setIebraRows(prev => prev.map((r, idx) => idx === i ? { ...r, selected: e.target.checked } : r));
-                          } else if (i < iebraRows.length + kollikerRows.length) {
-                            const j = i - iebraRows.length;
-                            setKollikerRows(prev => prev.map((r, idx) => idx === j ? { ...r, selected: e.target.checked } : r));
-                          } else {
-                            const j = i - iebraRows.length - kollikerRows.length;
-                            setSantRows(prev => prev.map((r, idx) => idx === j ? { ...r, selected: e.target.checked } : r));
-                          }
-                        }}
-                        className="shrink-0 accent-primary"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs text-foreground truncate font-medium">{row.description}</p>
-                        <p className="text-[10px] text-muted-foreground">{row.date}</p>
-                      </div>
-                      <span className="text-xs font-mono text-foreground shrink-0 min-w-[80px] text-right">
-                        {'$' + Math.round(row.amountARS).toLocaleString('es-AR')}
-                      </span>
-                      <Select
-                        value={row.categoryName}
-                        onValueChange={val => {
-                          if (i < iebraRows.length) {
-                            setIebraRows(prev => prev.map((r, idx) => idx === i ? { ...r, categoryName: val } : r));
-                          } else if (i < iebraRows.length + kollikerRows.length) {
-                            const j = i - iebraRows.length;
-                            setKollikerRows(prev => prev.map((r, idx) => idx === j ? { ...r, categoryName: val } : r));
-                          } else {
-                            const j = i - iebraRows.length - kollikerRows.length;
-                            setSantRows(prev => prev.map((r, idx) => idx === j ? { ...r, categoryName: val } : r));
-                          }
-                        }}
-                      >
-                        <SelectTrigger className="w-24 h-7 text-[11px] shrink-0">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {(categories || []).map((c: any) => (
-                            <SelectItem key={c.id} value={c.name} className="text-xs">{c.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+              );
+              const totalSelected = allRefs.filter(r => r.row.selected).length;
+              return (
+                <div className="space-y-2 border rounded-xl overflow-hidden">
+                  <div className="px-4 py-2.5 bg-muted/50 border-b flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-semibold text-foreground uppercase tracking-wide">
+                        Líneas de tarjeta — desde PDFs
+                      </p>
+                      <p className="text-xs text-muted-foreground">Revisá y ajustá la categoría de cada gasto</p>
                     </div>
-                  ))}
+                    <span className="text-xs text-muted-foreground">{totalSelected} seleccionadas</span>
+                  </div>
+                  <div className="max-h-72 overflow-y-auto">
+                    {arsRefs.length > 0 && (
+                      <>
+                        <div className="px-3 py-1.5 bg-muted/30 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground border-b">
+                          En ARS · {arsRefs.length}
+                        </div>
+                        {arsRefs.map((ref, i) => renderRow(ref, `ars-${i}`))}
+                      </>
+                    )}
+                    {usdRefs.length > 0 && (
+                      <>
+                        <div className="px-3 py-1.5 bg-muted/30 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground border-b border-t">
+                          En USD · {usdRefs.length}
+                        </div>
+                        {usdRefs.map((ref, i) => renderRow(ref, `usd-${i}`))}
+                      </>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
             <div className="space-y-1">
               {ITEM_GROUPS.map((group) => {
                 const groupItems = group.items
