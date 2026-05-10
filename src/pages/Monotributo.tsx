@@ -300,7 +300,7 @@ function InvoiceForm({ open, onClose, onSaved }: { open: boolean; onClose: () =>
         monto_usd: Number(montoUSD),
         tc_ars: Number(tcARS),
         numero_factura: nroFactura || null,
-        cliente: 'Empresa UY',
+        cliente: 'Pulsaclass SAS',
         estado: 'emitida',
       }, { onConflict: 'user_id,periodo' });
       if (error) throw error;
