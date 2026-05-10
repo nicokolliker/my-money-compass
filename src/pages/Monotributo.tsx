@@ -287,6 +287,7 @@ function InvoiceForm({ open, onClose, onSaved }: { open: boolean; onClose: () =>
   const [nroFactura, setNroFactura] = useState('');
   const [saving, setSaving] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [pdfFile, setPdfFile] = useState<{ name: string; fields: string[] } | null>(null);
 
   const montoARS = Number(montoUSD) * Number(tcARS);
 
@@ -314,27 +315,44 @@ function InvoiceForm({ open, onClose, onSaved }: { open: boolean; onClose: () =>
         const content = await page.getTextContent();
         text += content.items.map((item: any) => item.str).join(' ') + '\n';
       }
+      // Normalize whitespace (incluye nbsp) para regex robustas
+      const norm = text.replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
 
-      const fechaMatch = text.match(/Fecha de Emisi[oó]n[:\s]+(\d{2})\/(\d{2})\/(\d{4})/i);
+      const filled: string[] = [];
+
+      // Fecha — match cualquier dd/mm/yyyy cerca de "Emisión" o primero del doc
+      const fechaMatch =
+        norm.match(/Fecha\s*de\s*Emisi[oó]n[^\d]{0,15}(\d{2})\/(\d{2})\/(\d{4})/i)
+        || norm.match(/(\d{2})\/(\d{2})\/(20\d{2})/);
       if (fechaMatch) {
         const [, dd, mm, yyyy] = fechaMatch;
         setFecha(`${yyyy}-${mm}-${dd}`);
         setPeriodo(`${yyyy}-${mm}`);
+        filled.push(`Período ${mm}/${yyyy}`, `Fecha ${dd}/${mm}/${yyyy}`);
       }
 
-      const nroMatch = text.match(/Compr(?:\.\s*|\s+)Nro[:\s]+(\d{5}-\d{8})/i);
-      if (nroMatch) setNroFactura(nroMatch[1]);
+      const nroMatch = norm.match(/Compr(?:\.|obante)?\s*Nro[^\d]{0,10}(\d{4,5}-?\d{6,8})/i)
+        || norm.match(/(\d{5}-\d{8})/);
+      if (nroMatch) {
+        setNroFactura(nroMatch[1]);
+        filled.push(`Nº ${nroMatch[1]}`);
+      }
 
-      const tcMatch = text.match(/Tipo de Cambio[:\s]+([\d.]+)/i);
-      if (tcMatch) setTcARS(String(parseFloat(tcMatch[1])));
+      const tcMatch = norm.match(/Tipo\s*de\s*Cambio[^\d]{0,10}([\d.,]+)/i);
+      if (tcMatch) {
+        const tc = parseFloat(tcMatch[1].replace(/\./g, '').replace(',', '.'));
+        if (!isNaN(tc)) { setTcARS(String(tc)); filled.push(`TC ${tc}`); }
+      }
 
-      const totalMatch = text.match(/Importe Total[:\s]+USD\s+([\d.,]+)/i)
-        || text.match(/Importe Total[:\s]+([\d.,]+)/i);
+      const totalMatch = norm.match(/Importe\s*Total[^\d]{0,15}USD\s*([\d.,]+)/i)
+        || norm.match(/Importe\s*Total[^\d]{0,15}([\d.,]+)/i);
       if (totalMatch) {
         const raw = totalMatch[1].replace(/,/g, '');
-        setMontoUSD(String(parseFloat(raw)));
+        const usd = parseFloat(raw);
+        if (!isNaN(usd)) { setMontoUSD(String(usd)); filled.push(`USD ${usd}`); }
       }
 
+      setPdfFile({ name: file.name, fields: filled });
       toast.success('PDF leído correctamente');
     } catch (e: any) {
       toast.error('No se pudo leer el PDF: ' + (e.message || 'error desconocido'));
