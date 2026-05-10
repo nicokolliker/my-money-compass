@@ -92,35 +92,57 @@ export function AccountReconciliationSheet({
             </div>
 
             <div className="space-y-2">
-              {pending.map(r => (
-                <div
-                  key={r.id}
-                  className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 p-3"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="space-y-0.5">
-                      <p className="text-sm font-semibold text-foreground tabular-nums">
-                        {formatUSD(Number(r.transfer_amount_usd))}
-                      </p>
-                      <p className="text-[11px] text-muted-foreground flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {formatDate(r.transfer_date)}
-                      </p>
-                      {r.transfer_description && (
-                        <p className="text-[10px] text-muted-foreground truncate max-w-[200px]">
-                          {r.transfer_description}
+              {pending.map(r => {
+                const transferred = Number(r.transfer_amount_usd);
+                const spent = Number(r.total_spent_usd ?? 0);
+                const remaining = Math.max(0, transferred - spent);
+                const pct = transferred > 0 ? Math.min(100, (spent / transferred) * 100) : 0;
+                return (
+                  <div
+                    key={r.id}
+                    className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 p-3 space-y-2"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="space-y-0.5 min-w-0">
+                        <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          {formatDate(r.transfer_date)}
                         </p>
-                      )}
+                        {r.transfer_description && (
+                          <p className="text-[10px] text-muted-foreground truncate max-w-[220px]">
+                            {r.transfer_description}
+                          </p>
+                        )}
+                      </div>
+                      <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-300 shrink-0">
+                        {spent > 0 ? 'Parcial' : 'Pendiente'}
+                      </Badge>
                     </div>
-                    <Badge
-                      variant="outline"
-                      className="text-[10px] text-amber-600 border-amber-300 shrink-0"
-                    >
-                      Pendiente
-                    </Badge>
+
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-muted-foreground">Transferido</span>
+                        <span className="font-mono font-semibold tabular-nums">{formatUSD(transferred)}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-muted-foreground">Conciliado</span>
+                        <span className="font-mono font-semibold tabular-nums text-foreground">{formatUSD(spent)}</span>
+                      </div>
+                      <Progress value={pct} className="h-1.5" />
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-amber-600 font-medium">Resta</span>
+                        <span className="font-mono font-bold tabular-nums text-amber-600">{formatUSD(remaining)}</span>
+                      </div>
+                    </div>
+
+                    {remaining > 0 && r.last_import_date && (
+                      <p className="text-[10px] text-muted-foreground italic border-t border-amber-200/50 dark:border-amber-800/50 pt-1.5">
+                        Conciliaste {formatUSD(spent)} el {r.last_import_date}. Podés tener más gastos desde entonces.
+                      </p>
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <Button className="w-full mt-3 gap-2" onClick={goToImport}>
