@@ -1999,7 +1999,7 @@ function SettlementDetail({ parsed }: { parsed: any }) {
         {Number(parsed.vueltoARS) > 0 && (
           <div className="flex justify-between">
             <span className="text-muted-foreground">Vuelto ARS</span>
-            <span className="font-mono">{formatARS(parsed.vueltoARS)}</span>
+            <span className="font-mono font-semibold text-success">+{formatARS(parsed.vueltoARS)}</span>
           </div>
         )}
       </div>
