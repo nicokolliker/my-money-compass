@@ -533,7 +533,8 @@ function ViejoSettlementWizard({ open, onOpenChange, onSantTotalDetected }: { op
   const totalARS = items.reduce((s, i) => s + (i.amountARS || 0), 0) + extraItems.reduce((s, i) => s + (i.amountARS || 0), 0);
   const usdExacto = tcBlue > 0 ? totalARS / tcBlue : 0;
   useEffect(() => { setUsdAPagar(Math.round(usdExacto / 100) * 100); }, [usdExacto]);
-  const vueltoARS = Math.max(0, usdAPagar * tcBlue - totalARS);
+  const diferencia = usdAPagar * tcBlue - totalARS;
+  const vueltoARS = Math.max(0, diferencia);
 
   function updateItem(key: string, patch: Partial<SettlementItem>) {
     setItems((rows) => rows.map((r) => (r.key === key ? { ...r, ...patch } : r)));
