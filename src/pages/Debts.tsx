@@ -792,6 +792,7 @@ function ViejoSettlementWizard({ open, onOpenChange, onSantTotalDetected }: { op
         breakdown,
         extras: extrasForNotes,
         categoryBreakdown,
+        cardSubtotals,
       });
 
       await supabase.from('transactions').insert({
