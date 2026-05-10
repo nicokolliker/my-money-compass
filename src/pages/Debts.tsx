@@ -41,10 +41,19 @@ export default function DebtsPage() {
   const { data: pendingCredits } = usePendingCredits();
   const [openViejo, setOpenViejo] = useState(false);
   const [openSw, setOpenSw] = useState(false);
+  const [santPreviewARS, setSantPreviewARS] = useState<number>(() => {
+    const v = Number(sessionStorage.getItem('viejo_santTotalARS') || 0);
+    return Number.isFinite(v) ? v : 0;
+  });
 
   const splitwiseAccount = useMemo(() =>
     accounts?.find((a: any) => /splitwise/i.test(a.name)) || null,
   [accounts]);
+
+  const handleSantDetected = (n: number) => {
+    setSantPreviewARS(n);
+    try { sessionStorage.setItem('viejo_santTotalARS', String(n)); } catch {}
+  };
 
   return (
     <div className="space-y-6">
@@ -53,27 +62,31 @@ export default function DebtsPage() {
         <p className="text-sm text-muted-foreground">Revisión y liquidación mensual</p>
       </div>
 
-      {(pendingCredits || []).map((pc) => (
-        <Card key={pc.id} className="rounded-2xl border-success/40 bg-success/10">
-          <CardContent className="p-4">
-            <p className="text-xs font-semibold text-success uppercase tracking-wide mb-1">
-              Saldo a favor pendiente
-            </p>
-            <p className="text-sm text-foreground">
-              <span className="font-mono font-semibold text-success">
-                +${Math.round(pc.amount_ars).toLocaleString('es-AR')}
-              </span>{' '}
-              de liquidación {pc.settlement_month} — llegará por MercadoPago
-            </p>
+      {(pendingCredits || []).length > 0 && (
+        <Card className="rounded-2xl border-success/40 bg-success/10">
+          <CardContent className="p-4 space-y-2">
+            {(pendingCredits || []).map((pc) => (
+              <p key={pc.id} className="text-sm text-foreground leading-snug">
+                <span className="mr-1">💚</span>
+                <span className="font-semibold">Saldo a favor:</span>{' '}
+                <span className="font-mono font-semibold text-success">
+                  +{formatARS(pc.amount_ars)}
+                </span>
+                {pc.settlement_month && (
+                  <> de liquidación <span className="capitalize">{pc.settlement_month}</span></>
+                )}{' '}
+                <span className="text-muted-foreground">— llegará por MercadoPago</span>
+              </p>
+            ))}
           </CardContent>
         </Card>
-      ))}
+      )}
 
       <ViejoDebtCard
         importLog={importLog || []}
+        santPreviewARS={santPreviewARS}
         onOpen={() => setOpenViejo(true)}
       />
-      <ViejoCycleHistory importLog={importLog || []} />
 
       {splitwiseAccount ? (
         <SplitwiseDebtCard
@@ -94,21 +107,23 @@ export default function DebtsPage() {
             <p className="text-xs text-muted-foreground mb-3">
               Cargá tu primer CSV para empezar a trackear los gastos del grupo.
             </p>
-            <Button variant="outline" className="w-full" onClick={() => setOpenSw(true)}>
+            <Button variant="outline" size="sm" onClick={() => setOpenSw(true)}>
               Cargar CSV de Splitwise →
             </Button>
           </CardContent>
         </Card>
       )}
 
-      <ViejoSettlementWizard open={openViejo} onOpenChange={setOpenViejo} />
+      <ViejoCycleHistory importLog={importLog || []} />
+
+      <ViejoSettlementWizard open={openViejo} onOpenChange={setOpenViejo} onSantTotalDetected={handleSantDetected} />
       <SplitwiseSettlementWizard open={openSw} onOpenChange={setOpenSw} />
     </div>
   );
 }
 
-function ViejoDebtCard({ importLog, onOpen }: {
-  importLog: any[]; onOpen: () => void;
+function ViejoDebtCard({ importLog, santPreviewARS, onOpen }: {
+  importLog: any[]; santPreviewARS: number; onOpen: () => void;
 }) {
   const currentMonth = format(new Date(), 'yyyy-MM');
   const monthLabel = format(new Date(), 'MMMM yyyy', { locale: es });
@@ -155,6 +170,7 @@ function ViejoDebtCard({ importLog, onOpen }: {
   const lastMonth = lastLiquidacion
     ? format(new Date(lastLiquidacion.date + 'T12:00:00'), 'MMMM yyyy', { locale: es })
     : null;
+  const lastUsd = lastLiquidacion ? Math.abs(Number(lastLiquidacion.amount_usd) || 0) : 0;
 
   return (
     <Card className="rounded-2xl overflow-hidden">
@@ -166,8 +182,8 @@ function ViejoDebtCard({ importLog, onOpen }: {
           <div>
             <p className="text-sm font-semibold text-foreground">Viejo</p>
             <p className="text-xs text-muted-foreground">
-              {lastMonth
-                ? `Último mes liquidado: ${lastMonth}`
+              {lastMonth && lastUsd > 0
+                ? <>Última liquidación: <span className="font-mono">{formatUSD(lastUsd)}</span> · <span className="capitalize">{lastMonth}</span></>
                 : 'Sin liquidaciones anteriores'}
             </p>
           </div>
@@ -202,16 +218,27 @@ function ViejoDebtCard({ importLog, onOpen }: {
                 </p>
               </div>
             </div>
-            <Button variant="outline" className="w-full" size="sm" onClick={onOpen}>
+            <Button variant="outline" size="sm" onClick={onOpen}>
               Reliquidar o ver otro mes →
             </Button>
           </>
         ) : (
           <>
-            <p className="text-xs text-muted-foreground">
-              Subí los resúmenes de BC + Santander y completá los gastos del mes para liquidar.
-            </p>
-            <Button className="w-full" onClick={onOpen}>
+            <div className="rounded-xl bg-muted/40 px-3 py-2.5">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">
+                Estimado {monthLabel}
+              </p>
+              {santPreviewARS > 0 ? (
+                <p className="text-sm font-mono text-foreground">
+                  VISA Sant. <span className="font-semibold">{formatARS(santPreviewARS)}</span>
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Subí los resúmenes para ver el total.
+                </p>
+              )}
+            </div>
+            <Button variant="secondary" size="sm" onClick={onOpen}>
               Liquidar →
             </Button>
           </>
@@ -235,6 +262,32 @@ function SplitwiseDebtCard({ account, importLog, onOpen }: {
   const balance = Number(account?.computed_balance_usd || 0);
   const teDebenAVos = balance > 0.5;
   const vosDebes = balance < -0.5;
+  const alDia = !teDebenAVos && !vosDebes;
+
+  // Per-month breakdown of net balance contribution from Splitwise transactions
+  const { data: monthlyBreakdown } = useQuery({
+    queryKey: ['splitwise-monthly', account?.id],
+    enabled: !!account?.id,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('transactions')
+        .select('date, amount_usd, description')
+        .eq('account_id', account.id)
+        .order('date', { ascending: false });
+      const groups: Record<string, { net: number; count: number }> = {};
+      (data || []).forEach((t: any) => {
+        const ym = typeof t.date === 'string' ? t.date.slice(0, 7) : '';
+        if (!ym) return;
+        if (!groups[ym]) groups[ym] = { net: 0, count: 0 };
+        groups[ym].net += Number(t.amount_usd) || 0;
+        groups[ym].count += 1;
+      });
+      return Object.entries(groups)
+        .map(([ym, v]) => ({ ym, ...v }))
+        .sort((a, b) => b.ym.localeCompare(a.ym))
+        .slice(0, 6);
+    },
+  });
 
   return (
     <Card className="rounded-2xl overflow-hidden">
@@ -257,33 +310,54 @@ function SplitwiseDebtCard({ account, importLog, onOpen }: {
         )}
       </div>
 
-      <div className="px-5 py-4 space-y-3">
-        {(teDebenAVos || vosDebes) && (
-          <div className="grid grid-cols-1 gap-2">
-            <div className="rounded-xl bg-muted/50 px-3 py-2.5 flex items-center justify-between">
-              <p className="text-xs text-muted-foreground">
-                {teDebenAVos ? 'Te deben' : 'Debés'}
+      <div className="px-5 py-4 space-y-4">
+        <div className="text-center py-2">
+          {teDebenAVos && (
+            <>
+              <p className="text-xs text-muted-foreground mb-1">Te deben</p>
+              <p className="text-3xl font-mono font-bold text-success">
+                +${Math.abs(balance).toFixed(2)} <span className="text-base font-medium text-muted-foreground">USD</span>
               </p>
-              <p className={cn(
-                'text-sm font-mono font-bold',
-                teDebenAVos ? 'text-success' : 'text-destructive'
-              )}>
-                {teDebenAVos ? '+' : '-'}${Math.abs(balance).toFixed(2)}
+            </>
+          )}
+          {vosDebes && (
+            <>
+              <p className="text-xs text-muted-foreground mb-1">Debés</p>
+              <p className="text-3xl font-mono font-bold text-destructive">
+                -${Math.abs(balance).toFixed(2)} <span className="text-base font-medium text-muted-foreground">USD</span>
               </p>
-            </div>
+            </>
+          )}
+          {alDia && (
+            <p className="text-lg font-semibold text-muted-foreground">Al día ✓</p>
+          )}
+        </div>
+
+        {(monthlyBreakdown && monthlyBreakdown.length > 0) && (
+          <div className="rounded-xl border border-border/60 divide-y divide-border/60">
+            {monthlyBreakdown.map((g) => {
+              const label = format(new Date(g.ym + '-01T12:00:00'), 'MMMM yyyy', { locale: es });
+              const positive = g.net > 0;
+              return (
+                <div key={g.ym} className="flex items-center justify-between px-3 py-2">
+                  <div>
+                    <p className="text-xs font-medium capitalize text-foreground">{label}</p>
+                    <p className="text-[10px] text-muted-foreground">{g.count} {g.count === 1 ? 'mov.' : 'movs.'}</p>
+                  </div>
+                  <p className={cn(
+                    'text-xs font-mono font-semibold',
+                    Math.abs(g.net) < 0.5 ? 'text-muted-foreground' : positive ? 'text-success' : 'text-destructive',
+                  )}>
+                    {positive ? '+' : ''}${g.net.toFixed(2)}
+                  </p>
+                </div>
+              );
+            })}
           </div>
         )}
 
-        <p className="text-xs text-muted-foreground">
-          Cargá el CSV mensual para ver el detalle de gastos del grupo y saldar si corresponde.
-        </p>
-
-        <Button
-          variant={importadoEsteMes ? 'outline' : 'default'}
-          className="w-full"
-          onClick={onOpen}
-        >
-          {importadoEsteMes ? 'Actualizar / saldar →' : 'Cargar CSV →'}
+        <Button variant="outline" size="sm" onClick={onOpen}>
+          {importadoEsteMes ? 'Actualizar / saldar →' : 'Cargar CSV de Splitwise →'}
         </Button>
       </div>
     </Card>
@@ -355,7 +429,7 @@ const ITEM_GROUPS: { label: string; items: string[] }[] = [
   { label: '🚗 Auto', items: ['prestamo', 'cochera', 'patente', 'multa'] },
 ];
 
-function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
+function ViejoSettlementWizard({ open, onOpenChange, onSantTotalDetected }: { open: boolean; onOpenChange: (v: boolean) => void; onSantTotalDetected?: (n: number) => void }) {
   const { data: accounts } = useAccountBalances();
   const { data: categories } = useCategories();
   const { data: blueRate } = useBlueDollarRate();
@@ -518,6 +592,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
 
       setBcTotalARS(visaCiudadMama + visaCiudadPapa);
       setSantTotalARS(sant);
+      if (sant > 0) onSantTotalDetected?.(sant);
       setVisaCiudadMamaARS(visaCiudadMama);
       setVisaCiudadPapaARS(visaCiudadPapa);
 
@@ -1631,7 +1706,18 @@ function ViejoCycleHistory({ importLog }: { importLog: any[] }) {
             <CollapsibleTrigger asChild>
               <button type="button" className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-muted/40 transition-colors">
                 <div>
-                  <p className="text-sm font-semibold">Historial de ciclos</p>
+                  <p className="text-sm font-semibold">
+                    Historial de ciclos
+                    {(() => {
+                      const lastLiq = rows.find((r) => r.liquidado);
+                      if (!lastLiq) return null;
+                      return (
+                        <span className="font-normal text-muted-foreground">
+                          {' · '}último: <span className="font-mono text-foreground">{formatUSD(lastLiq.usd)}</span> · <span className="capitalize">{lastLiq.label}</span>
+                        </span>
+                      );
+                    })()}
+                  </p>
                   <p className="text-xs text-muted-foreground">{allMonths.length} meses registrados</p>
                 </div>
                 <ChevronDown className={cn('h-4 w-4 transition-transform shrink-0', open && 'rotate-180')} />
