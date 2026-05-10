@@ -4,10 +4,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
-import { useLinkInstanceToTransaction, type RecurringInstance } from '@/hooks/useRecurringInstances';
+import { useLinkInstanceToTransaction, useMarkInstancePaid, type RecurringInstance } from '@/hooks/useRecurringInstances';
 import { formatCurrency } from '@/lib/constants';
 import { format } from 'date-fns';
-import { Link2, Search } from 'lucide-react';
+import { Link2, Search, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Props {
