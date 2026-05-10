@@ -80,10 +80,12 @@ export default function CalendarPage({ embedded = false }: { embedded?: boolean 
           <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refresh.isPending}>
             <RefreshCw className={`h-3.5 w-3.5 ${refresh.isPending ? 'animate-spin' : ''}`} />
           </Button>
-          <div className="flex rounded-xl overflow-hidden border">
-            <Button variant={view === 'timeline' ? 'secondary' : 'ghost'} size="sm" className="rounded-none h-8 text-xs" onClick={() => setView('timeline')}>Timeline</Button>
-            <Button variant={view === 'calendar' ? 'secondary' : 'ghost'} size="sm" className="rounded-none h-8 text-xs" onClick={() => setView('calendar')}>Calendar</Button>
-          </div>
+          {!embedded && (
+            <div className="flex rounded-xl overflow-hidden border">
+              <Button variant={view === 'timeline' ? 'secondary' : 'ghost'} size="sm" className="rounded-none h-8 text-xs" onClick={() => setView('timeline')}>Timeline</Button>
+              <Button variant={view === 'calendar' ? 'secondary' : 'ghost'} size="sm" className="rounded-none h-8 text-xs" onClick={() => setView('calendar')}>Calendar</Button>
+            </div>
+          )}
         </div>
       </div>
 
