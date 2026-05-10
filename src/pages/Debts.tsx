@@ -472,13 +472,12 @@ function ViejoSettlementWizard({ open, onOpenChange, onSantTotalDetected }: { op
 
   const monthOptions = useMemo(() => {
     const arr: { ym: string; label: string }[] = [];
-    const d = new Date();
-    d.setDate(1);
-    // 2 future months + current + 11 past
-    d.setMonth(d.getMonth() + 2);
-    for (let i = 0; i < 14; i++) {
+    const today = new Date();
+    const start = new Date(today.getFullYear(), today.getMonth(), 1);
+    if (today.getDate() < 20) start.setMonth(start.getMonth() - 1);
+    for (let i = 0; i < 12; i++) {
+      const d = new Date(start.getFullYear(), start.getMonth() - i, 1);
       arr.push({ ym: format(d, 'yyyy-MM'), label: format(d, 'MMMM yyyy', { locale: es }) });
-      d.setMonth(d.getMonth() - 1);
     }
     return arr;
   }, []);
