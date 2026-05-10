@@ -241,6 +241,17 @@ export function ArqReconciliationSheet({ open, onClose, accountId, accountName, 
           )}
         </section>
 
+        <Separator className="my-4" />
+
+        <section>
+          <h3 className="text-sm font-semibold mb-3">Últimas transacciones</h3>
+          <RecentTransactionsList
+            accountId={accountId}
+            accountCurrency="USD"
+            onNavigate={onClose}
+          />
+        </section>
+
       </SheetContent>
     </Sheet>
   );
