@@ -8,6 +8,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import Dashboard from "./pages/Dashboard";
 import Accounts from "./pages/Accounts";
 import DebtsPage from "./pages/Debts";
+import MonotributoPage from "./pages/Monotributo";
 import Transactions from "./pages/Transactions";
 import Analytics from "./pages/Analytics";
 import Planning from "./pages/Planning";
@@ -40,6 +41,7 @@ function ProtectedRoutes() {
         <Route path="/" element={<Dashboard />} />
         <Route path="/accounts" element={<Accounts />} />
         <Route path="/debts" element={<DebtsPage />} />
+        <Route path="/monotributo" element={<MonotributoPage />} />
         <Route path="/transactions" element={<Transactions />} />
         <Route path="/analytics" element={<Analytics />} />
         <Route path="/planning" element={<Navigate to="/planning/recurring" replace />} />
