@@ -190,22 +190,12 @@ export default function CalendarPage({ embedded = false }: { embedded?: boolean 
                         {item.isPaid ? (
                           <CheckCircle2 className="h-5 w-5 text-success shrink-0" />
                         ) : (
-                          <div className="flex items-center gap-1 shrink-0">
-                            <Button
-                              size="sm" variant="ghost" className="h-7 w-7 p-0"
-                              onClick={() => setMatchInstance(item as any)}
-                              title="Match transaction"
-                            >
-                              <Link2 className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              size="sm" variant="ghost" className="h-7 w-7 p-0"
-                              onClick={() => markPaid.mutateAsync(item.id).then(() => toast.success('Marked paid'))}
-                              title="Mark paid"
-                            >
-                              <CheckCircle2 className="h-4 w-4" />
-                            </Button>
-                          </div>
+                          <Button
+                            size="sm" variant="outline" className="h-7 px-2 text-[11px] shrink-0"
+                            onClick={() => setMatchInstance(item as any)}
+                          >
+                            Registrar pago →
+                          </Button>
                         )}
                       </div>
                     );
