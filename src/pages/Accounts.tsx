@@ -520,8 +520,6 @@ export default function Accounts() {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
-
       {/* ARQ Reconciliation Sheet */}
       {arqSheetAccount && (
         <ArqReconciliationSheet
@@ -531,5 +529,6 @@ export default function Accounts() {
           balanceUsd={arqSheetAccount.computed_balance_usd}
         />
       )}
+    </div>
   );
 }
