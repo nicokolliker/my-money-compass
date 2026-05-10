@@ -48,6 +48,7 @@ export type Database = {
           from_account_id: string
           id: string
           import_log_id: string | null
+          last_import_date: string | null
           period: string | null
           reconciled_at: string | null
           status: string
@@ -66,6 +67,7 @@ export type Database = {
           from_account_id: string
           id?: string
           import_log_id?: string | null
+          last_import_date?: string | null
           period?: string | null
           reconciled_at?: string | null
           status?: string
@@ -84,6 +86,7 @@ export type Database = {
           from_account_id?: string
           id?: string
           import_log_id?: string | null
+          last_import_date?: string | null
           period?: string | null
           reconciled_at?: string | null
           status?: string
@@ -178,6 +181,7 @@ export type Database = {
           created_at: string
           id: string
           import_log_id: string | null
+          last_import_date: string | null
           period: string | null
           reconciled_at: string | null
           status: string
@@ -194,6 +198,7 @@ export type Database = {
           created_at?: string
           id?: string
           import_log_id?: string | null
+          last_import_date?: string | null
           period?: string | null
           reconciled_at?: string | null
           status?: string
@@ -210,6 +215,7 @@ export type Database = {
           created_at?: string
           id?: string
           import_log_id?: string | null
+          last_import_date?: string | null
           period?: string | null
           reconciled_at?: string | null
           status?: string
