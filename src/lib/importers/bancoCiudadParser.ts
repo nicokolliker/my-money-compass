@@ -79,7 +79,11 @@ function parseBlock(
     if (usdRaw) amountUSD = parseArsAmount(usdRaw);
     else if (fxRate > 0) amountUSD = +(amountARS * fxRate).toFixed(2);
 
-    const description = cuota ? `${desc} (Cuota ${cuota})` : desc;
+    const cleanDesc = desc
+      .replace(/\s+\d{10,}\s*/g, ' ')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+    const description = cuota ? `${cleanDesc} (Cuota ${cuota})` : cleanDesc;
 
     out.push({
       date,
