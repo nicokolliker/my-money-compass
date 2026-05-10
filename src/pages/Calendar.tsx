@@ -75,18 +75,33 @@ export default function CalendarPage({ embedded = false }: { embedded?: boolean 
 
   if (isLoading) return <div className="flex items-center justify-center h-64 text-muted-foreground">Loading...</div>;
 
+  const monthsEs = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+
   return (
     <div className={embedded ? 'space-y-4' : 'space-y-5'}>
-      <div className={embedded ? 'flex items-center justify-end' : 'flex items-center justify-between'}>
-        {!embedded && <h1 className="text-2xl font-bold text-foreground">Payments Calendar</h1>}
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refresh.isPending}>
-            <RefreshCw className={`h-3.5 w-3.5 ${refresh.isPending ? 'animate-spin' : ''}`} />
+      {!embedded && <h1 className="text-2xl font-bold text-foreground">Payments Calendar</h1>}
+
+      {/* Month nav + view toggle + refresh, single row */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setCurrentMonth(m => subMonths(m, 1))}>
+            <ChevronLeft className="h-4 w-4" />
           </Button>
+          <span className="text-sm font-semibold text-foreground capitalize tabular-nums min-w-[110px] text-center">
+            {monthsEs[currentMonth.getMonth()]} {currentMonth.getFullYear()}
+          </span>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setCurrentMonth(m => addMonths(m, 1))}>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+        <div className="flex items-center gap-2">
           <div className="flex rounded-xl overflow-hidden border">
             <Button variant={view === 'timeline' ? 'secondary' : 'ghost'} size="sm" className="rounded-none h-8 text-xs" onClick={() => setView('timeline')}>Timeline</Button>
             <Button variant={view === 'calendar' ? 'secondary' : 'ghost'} size="sm" className="rounded-none h-8 text-xs" onClick={() => setView('calendar')}>Calendar</Button>
           </div>
+          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refresh.isPending} className="h-8 w-8 p-0">
+            <RefreshCw className={`h-3.5 w-3.5 ${refresh.isPending ? 'animate-spin' : ''}`} />
+          </Button>
         </div>
       </div>
 
