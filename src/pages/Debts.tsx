@@ -1717,27 +1717,8 @@ function ViejoCycleHistory({ importLog }: { importLog: any[] }) {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => {
-                    const p = selected.parsed || {};
-                    const monthLabel = format(new Date(selectedMonth + '-01T00:00:00'), 'MMMM yyyy', { locale: es });
-                    const breakdown: Record<string, number> = p.breakdown || {};
-                    const manualItems = Object.entries(breakdown)
-                      .filter(([k, v]) => !CARD_KEYS.includes(k) && Number(v) > 0)
-                      .map(([k, v]) => ({ label: ITEM_META[k]?.label || k, amountARS: Number(v) }));
-                    if (Array.isArray(p.extras)) {
-                      for (const e of p.extras) manualItems.push({ label: e.label, amountARS: e.amountARS, categoryName: e.categoryName } as any);
-                    }
-                    downloadSettlementPdf({
-                      monthLabel,
-                      mamaRows: p.mamaRows || [],
-                      papaRows: p.papaRows || [],
-                      santRows: p.santRows || [],
-                      manualItems,
-                      totalARS: p.totalARS || 0,
-                      tcBlue: p.tcBlue || 0,
-                      usdAPagar: p.usdPagado || Math.abs(Number(selected.tx?.amount_usd) || 0),
-                      vueltoARS: p.vueltoARS || 0,
-                    }, `liquidacion-${selectedMonth}.pdf`);
+                  onClick={() => selectedMonth && downloadPdfFor(selectedMonth, selected.parsed, selected.tx)}
+                >
                   }}
                 >
                   <Download className="h-4 w-4 mr-1.5" /> Descargar PDF
