@@ -16,6 +16,8 @@ import { useCategoryTree } from '@/hooks/useCategoryTree';
 import { formatUSD } from '@/lib/constants';
 import { toMonthlyAmount, isDerivedPaid, toUSD, type FxRateRow, type DerivedInstanceState } from '@/lib/money';
 import { Plus, Trash2, Pencil, Repeat, ChevronDown } from 'lucide-react';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RTooltip } from 'recharts';
+import { getCategoryHex } from '@/lib/categoryColors';
 import { toast } from 'sonner';
 import { format, addMonths, addYears, addWeeks } from 'date-fns';
 import { DemoDataBanner } from '@/components/DemoDataBanner';
