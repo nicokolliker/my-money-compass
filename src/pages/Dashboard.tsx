@@ -213,6 +213,25 @@ export default function Dashboard() {
                   <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
                     <div className="h-full rounded-full transition-all duration-500" style={{ width: `${barPct}%`, backgroundColor: colors.hex }} />
                   </div>
+                  {cat.isDigital && cat.children.length > 0 && (
+                    <div className="pl-7 pt-1.5 space-y-1.5">
+                      {cat.children.map(child => {
+                        const childPct = cat.total > 0 ? (child.total / cat.total * 100) : 0;
+                        const childBarPct = (child.total / maxCatSpend) * 100;
+                        return (
+                          <div key={child.name} className="space-y-0.5">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-muted-foreground">↳ {child.name}</span>
+                              <span className="text-foreground tabular-nums font-medium">{formatUSD(child.total)} <span className="text-muted-foreground">({childPct.toFixed(0)}%)</span></span>
+                            </div>
+                            <div className="w-full h-1 bg-muted rounded-full overflow-hidden">
+                              <div className="h-full rounded-full transition-all duration-500" style={{ width: `${childBarPct}%`, backgroundColor: colors.hex, opacity: 0.6 }} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               );
             })}
