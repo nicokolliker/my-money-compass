@@ -485,12 +485,18 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                     return s + cat.recurringMonthly + (isPast(i) ? getActualSpending(cat.id, i) : getBudgetAmount(cat.id, i));
                   }, 0);
                   return (
+                    <React.Fragment key={`c-frag-${cat.id}`}>
                     <tr key={`c-${cat.id}`} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
                       <td className="px-4 py-2.5 sticky left-0 z-10 bg-card"
                         style={{ boxShadow: '2px 0 4px -2px rgba(0,0,0,0.06)' }}>
                         <div className="flex items-center gap-1.5">
                           <span>{cat.icon}</span>
                           <span className="font-medium text-foreground">{cat.name}</span>
+                          {cat.isDigital && (
+                            <button onClick={() => toggleDigital()} className="ml-0.5">
+                              <ChevronDown className={cn('h-3 w-3 text-muted-foreground transition-transform', digitalExpanded && 'rotate-180')} />
+                            </button>
+                          )}
                         </div>
                       </td>
                       {MONTHS.map((_, i) => {
@@ -505,6 +511,30 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                       })}
                       <td className="px-4 py-2.5 text-right tabular-nums font-medium">{yearTotal > 0 ? fmt(yearTotal) : '—'}</td>
                     </tr>
+                    {cat.isDigital && digitalExpanded && cat.children.map(child => (
+                      <tr key={`c-dig-${child.id}`} className="border-b border-border/30 hover:bg-muted/10 transition-colors bg-muted/20">
+                        <td className="px-4 py-1.5 pl-12 sticky left-0 z-10 bg-muted/20"
+                          style={{ boxShadow: '2px 0 4px -2px rgba(0,0,0,0.06)' }}>
+                          <span className="text-xs text-muted-foreground">↳ {child.name}</span>
+                        </td>
+                        {MONTHS.map((_, i) => {
+                          const actual = getActualSpending(child.id, i);
+                          const budgeted = getBudgetAmount(child.id, i);
+                          const total = isPast(i) ? actual : budgeted;
+                          return (
+                            <td key={i} className={cn('px-2 py-1.5 text-center tabular-nums text-xs', isCurrent(i) && 'bg-primary/5')}>
+                              {total > 0 ? (
+                                <span className={isPast(i) ? 'text-foreground' : 'text-muted-foreground'}>{fmt(total)}</span>
+                              ) : <span className="text-muted-foreground/40">—</span>}
+                            </td>
+                          );
+                        })}
+                        <td className="px-4 py-1.5 text-right tabular-nums text-xs text-muted-foreground">
+                          {fmt(MONTHS.reduce((s, _, i) => s + (isPast(i) ? getActualSpending(child.id, i) : getBudgetAmount(child.id, i)), 0))}
+                        </td>
+                      </tr>
+                    ))}
+                    </React.Fragment>
                   );
                 })}
 

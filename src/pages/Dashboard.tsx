@@ -55,13 +55,20 @@ export default function Dashboard() {
   const monthSavings = monthIncome - totalMonthSpending;
 
   const topCategories = useMemo(() => {
-    const map: Record<string, { name: string; total: number; icon: string | null; color: string | null }> = {};
+    const map: Record<string, { name: string; total: number; icon: string | null; color: string | null; isDigital: boolean; children: { name: string; total: number }[] }> = {};
     monthExpenses.forEach(t => {
       const cat = (t as any).categories;
       const catName = cat?.name || 'Sin categoría';
-      if (!map[catName]) map[catName] = { name: catName, total: 0, icon: cat?.icon || null, color: cat?.color || null };
+      if (!map[catName]) map[catName] = { name: catName, total: 0, icon: cat?.icon || null, color: cat?.color || null, isDigital: catName === 'Digital', children: [] };
       map[catName].total += Math.abs(Number(t.amount_usd));
+      if (catName === 'Digital') {
+        const subName = (t as any).subcategories?.name || 'Otros';
+        const existing = map[catName].children.find(c => c.name === subName);
+        if (existing) existing.total += Math.abs(Number(t.amount_usd));
+        else map[catName].children.push({ name: subName, total: Math.abs(Number(t.amount_usd)) });
+      }
     });
+    Object.values(map).forEach(c => c.children.sort((a, b) => b.total - a.total));
     return Object.values(map).sort((a, b) => b.total - a.total).slice(0, 5);
   }, [monthExpenses]);
 
@@ -206,6 +213,25 @@ export default function Dashboard() {
                   <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
                     <div className="h-full rounded-full transition-all duration-500" style={{ width: `${barPct}%`, backgroundColor: colors.hex }} />
                   </div>
+                  {cat.isDigital && cat.children.length > 0 && (
+                    <div className="pl-7 pt-1.5 space-y-1.5">
+                      {cat.children.map(child => {
+                        const childPct = cat.total > 0 ? (child.total / cat.total * 100) : 0;
+                        const childBarPct = (child.total / maxCatSpend) * 100;
+                        return (
+                          <div key={child.name} className="space-y-0.5">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-muted-foreground">↳ {child.name}</span>
+                              <span className="text-foreground tabular-nums font-medium">{formatUSD(child.total)} <span className="text-muted-foreground">({childPct.toFixed(0)}%)</span></span>
+                            </div>
+                            <div className="w-full h-1 bg-muted rounded-full overflow-hidden">
+                              <div className="h-full rounded-full transition-all duration-500" style={{ width: `${childBarPct}%`, backgroundColor: colors.hex, opacity: 0.6 }} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               );
             })}
