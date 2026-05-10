@@ -7,7 +7,8 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Upload, CheckCircle2, X, Plus, ChevronDown } from 'lucide-react';
+import { Upload, CheckCircle2, X, Plus, ChevronDown, Download } from 'lucide-react';
+import { downloadSettlementPdf } from '@/lib/settlementPdf';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
@@ -685,6 +686,10 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
           settlement: true,
           month: settlementMonth,
           breakdown: Object.fromEntries(items.filter((i) => i.amountARS > 0).map((i) => [i.key, i.amountARS])),
+          extras: extraItems.filter(e => e.amountARS > 0 && e.label.trim()).map(e => ({ label: e.label, amountARS: e.amountARS, categoryName: e.categoryName })),
+          mamaRows: iebraRows.filter(r => r.selected).map(r => ({ date: r.date, description: r.description, amountARS: r.amountARS, amountUSD: r.amountUSD, matched: r.matched, categoryName: r.categoryName })),
+          papaRows: kollikerRows.filter(r => r.selected).map(r => ({ date: r.date, description: r.description, amountARS: r.amountARS, amountUSD: r.amountUSD, matched: r.matched, categoryName: r.categoryName })),
+          santRows: santRows.filter(r => r.selected).map(r => ({ date: r.date, description: r.description, amountARS: r.amountARS, amountUSD: r.amountUSD, matched: r.matched, categoryName: r.categoryName })),
           tcBlue, totalARS, usdPagado: usdAPagar, vueltoARS,
         }),
       });
@@ -877,6 +882,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
                     </p>
                     {groupItems.map((it) => {
                       const autoFilled = !it.editable;
+                      const isCard = CARD_KEYS.includes(it.key);
                       return (
                         <div key={it.key}>
                           <div className="flex items-center gap-3 py-2.5">
@@ -897,7 +903,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
                                 placeholder="0"
                               />
                             )}
-                            {!autoFilled ? (
+                            {!autoFilled && !isCard ? (
                               <Select value={it.categoryName} onValueChange={(v) => updateItem(it.key, { categoryName: v })}>
                                 <SelectTrigger className="w-28 h-8 text-xs shrink-0"><SelectValue /></SelectTrigger>
                                 <SelectContent>
@@ -1031,7 +1037,26 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
               <p>Pagaste ${resultUsd.toLocaleString()} USD al viejo</p>
               {resultVuelto > 0 && <p>{formatARS(resultVuelto)} ARS pendientes de ingresar a Mercado Pago</p>}
             </div>
-            <div className="flex justify-end">
+            <div className="flex justify-between gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  const monthLabel = format(new Date(settlementMonth + '-01T00:00:00'), 'MMMM yyyy', { locale: es });
+                  downloadSettlementPdf({
+                    monthLabel,
+                    mamaRows: iebraRows.filter(r => r.selected),
+                    papaRows: kollikerRows.filter(r => r.selected),
+                    santRows: santRows.filter(r => r.selected),
+                    manualItems: [
+                      ...items.filter(i => i.editable && i.amountARS > 0).map(i => ({ label: i.label, amountARS: i.amountARS, categoryName: i.categoryName })),
+                      ...extraItems.filter(e => e.amountARS > 0 && e.label.trim()).map(e => ({ label: e.label, amountARS: e.amountARS, categoryName: e.categoryName })),
+                    ],
+                    totalARS, tcBlue, usdAPagar: resultUsd, vueltoARS: resultVuelto,
+                  }, `liquidacion-${settlementMonth}.pdf`);
+                }}
+              >
+                <Download className="h-4 w-4 mr-1.5" /> Descargar PDF
+              </Button>
               <Button onClick={() => onOpenChange(false)}>Cerrar</Button>
             </div>
           </div>
@@ -1625,7 +1650,39 @@ function ViejoCycleHistory({ importLog }: { importLog: any[] }) {
             </DialogTitle>
           </DialogHeader>
           {selected?.parsed ? (
-            <SettlementDetail parsed={selected.parsed} />
+            <>
+              <SettlementDetail parsed={selected.parsed} />
+              <div className="flex justify-end pt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const p = selected.parsed;
+                    const monthLabel = format(new Date(selectedMonth + '-01T00:00:00'), 'MMMM yyyy', { locale: es });
+                    const breakdown: Record<string, number> = p.breakdown || {};
+                    const manualItems = Object.entries(breakdown)
+                      .filter(([k, v]) => !CARD_KEYS.includes(k) && Number(v) > 0)
+                      .map(([k, v]) => ({ label: ITEM_META[k]?.label || k, amountARS: Number(v) }));
+                    if (Array.isArray(p.extras)) {
+                      for (const e of p.extras) manualItems.push({ label: e.label, amountARS: e.amountARS, categoryName: e.categoryName } as any);
+                    }
+                    downloadSettlementPdf({
+                      monthLabel,
+                      mamaRows: p.mamaRows || [],
+                      papaRows: p.papaRows || [],
+                      santRows: p.santRows || [],
+                      manualItems,
+                      totalARS: p.totalARS || 0,
+                      tcBlue: p.tcBlue || 0,
+                      usdAPagar: p.usdPagado || 0,
+                      vueltoARS: p.vueltoARS || 0,
+                    }, `liquidacion-${selectedMonth}.pdf`);
+                  }}
+                >
+                  <Download className="h-4 w-4 mr-1.5" /> Descargar PDF
+                </Button>
+              </div>
+            </>
           ) : (
             <p className="text-sm text-muted-foreground">No hay detalles guardados para este mes.</p>
           )}
