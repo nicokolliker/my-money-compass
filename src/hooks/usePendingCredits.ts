@@ -33,10 +33,12 @@ export function usePendingCredits() {
 export function useResolvePendingCredit() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, transactionId }: { id: string; transactionId: string }) => {
+    mutationFn: async ({ id, transactionId }: { id: string; transactionId?: string | null }) => {
+      const update: any = { status: 'matched' };
+      if (transactionId) update.matched_transaction_id = transactionId;
       const { error } = await supabase
         .from('pending_credits' as any)
-        .update({ status: 'matched', matched_transaction_id: transactionId } as any)
+        .update(update)
         .eq('id', id);
       if (error) throw error;
     },
