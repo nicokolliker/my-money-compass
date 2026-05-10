@@ -1036,7 +1036,26 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
               <p>Pagaste ${resultUsd.toLocaleString()} USD al viejo</p>
               {resultVuelto > 0 && <p>{formatARS(resultVuelto)} ARS pendientes de ingresar a Mercado Pago</p>}
             </div>
-            <div className="flex justify-end">
+            <div className="flex justify-between gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  const monthLabel = format(new Date(settlementMonth + '-01T00:00:00'), 'MMMM yyyy', { locale: es });
+                  downloadSettlementPdf({
+                    monthLabel,
+                    mamaRows: iebraRows.filter(r => r.selected),
+                    papaRows: kollikerRows.filter(r => r.selected),
+                    santRows: santRows.filter(r => r.selected),
+                    manualItems: [
+                      ...items.filter(i => i.editable && i.amountARS > 0).map(i => ({ label: i.label, amountARS: i.amountARS, categoryName: i.categoryName })),
+                      ...extraItems.filter(e => e.amountARS > 0 && e.label.trim()).map(e => ({ label: e.label, amountARS: e.amountARS, categoryName: e.categoryName })),
+                    ],
+                    totalARS, tcBlue, usdAPagar: resultUsd, vueltoARS: resultVuelto,
+                  }, `liquidacion-${settlementMonth}.pdf`);
+                }}
+              >
+                <Download className="h-4 w-4 mr-1.5" /> Descargar PDF
+              </Button>
               <Button onClick={() => onOpenChange(false)}>Cerrar</Button>
             </div>
           </div>
