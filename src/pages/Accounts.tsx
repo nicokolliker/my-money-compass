@@ -15,11 +15,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { ACCOUNT_TYPE_LABELS, CURRENCIES, formatCurrency, formatUSD } from '@/lib/constants';
 import { MerchantLogo } from '@/components/MerchantLogo';
 import { getAccountStyle } from '@/lib/accountIcons';
-import { Plus, ChevronDown, FolderPlus, Pencil, Trash2, FileUp, PenLine, Wifi, Clock, AlertTriangle } from 'lucide-react';
+import { Plus, ChevronDown, FolderPlus, Pencil, Trash2, FileUp, PenLine, Wifi, Clock, AlertTriangle, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { DemoDataBanner } from '@/components/DemoDataBanner';
 import { useDemoData } from '@/hooks/useDemoData';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import { useQueryClient } from '@tanstack/react-query';
 import { useImportLog } from '@/hooks/useImportLog';
 import { useArqPendingReconciliations } from '@/hooks/useArqReconciliation';
@@ -64,7 +65,7 @@ export default function Accounts() {
   const binanceTotalUsd = binanceBalances.reduce((s: number, b: any) => s + (b.value_usd || 0), 0);
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: '', type: 'bank' as string, institution: '', currency: 'USD', opening_balance: '0', notes: '', group_id: '' });
+  const [form, setForm] = useState({ name: '', type: 'bank' as string, institution: '', currency: 'USD', opening_balance: '0', notes: '', group_id: '', exclude_from_net_worth: false });
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [showGroupForm, setShowGroupForm] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
@@ -132,7 +133,7 @@ export default function Accounts() {
 
   const handleSave = async () => {
     try {
-      const payload: any = { name: form.name, type: form.type, institution: form.institution || null, currency: form.currency, opening_balance: parseFloat(form.opening_balance), notes: form.notes || null };
+      const payload: any = { name: form.name, type: form.type, institution: form.institution || null, currency: form.currency, opening_balance: parseFloat(form.opening_balance), notes: form.notes || null, exclude_from_net_worth: form.exclude_from_net_worth };
       payload.group_id = form.group_id || null;
 
       if (editId) {
@@ -149,7 +150,7 @@ export default function Accounts() {
   };
 
   const openEdit = (a: any) => {
-    setForm({ name: a.name, type: a.type, institution: a.institution || '', currency: a.currency, opening_balance: String(a.opening_balance), notes: a.notes || '', group_id: a.group_id || '' });
+    setForm({ name: a.name, type: a.type, institution: a.institution || '', currency: a.currency, opening_balance: String(a.opening_balance), notes: a.notes || '', group_id: a.group_id || '', exclude_from_net_worth: !!(a as any).exclude_from_net_worth });
     setEditId(a.id);
     setShowForm(true);
   };
@@ -250,6 +251,7 @@ export default function Accounts() {
                               <p className="text-sm font-semibold text-foreground truncate">{a.name}</p>
                               {(a as any).source === 'csv' && <Badge variant="outline" className="text-[9px] h-4 px-1.5 shrink-0"><FileUp className="h-2.5 w-2.5 mr-0.5" />CSV</Badge>}
                               {(a as any).source === 'manual' && <Badge variant="outline" className="text-[9px] h-4 px-1.5 shrink-0 text-muted-foreground"><PenLine className="h-2.5 w-2.5 mr-0.5" />Manual</Badge>}
+                              {(a as any).exclude_from_net_worth && <Badge variant="outline" className="text-[9px] h-4 px-1.5 shrink-0 text-muted-foreground"><EyeOff className="h-2.5 w-2.5 mr-0.5" />Excluido</Badge>}
                             </div>
                             {a.institution && <p className="text-xs text-muted-foreground">{a.institution}</p>}
                             {IMPORTABLE.some(k => a.name.toLowerCase().includes(k)) && (
@@ -419,6 +421,20 @@ export default function Accounts() {
               </Select>
             </div>
             <div><Label>Opening Balance</Label><Input type="number" value={form.opening_balance} onChange={e => setForm(f => ({ ...f, opening_balance: e.target.value }))} className="mt-1 rounded-xl" /></div>
+            {/* PR1: exclude from net worth */}
+            <div className="flex items-center justify-between rounded-xl border border-border px-3 py-2.5">
+              <div className="flex items-center gap-2">
+                <EyeOff className="h-3.5 w-3.5 text-muted-foreground" />
+                <div>
+                  <Label className="text-sm cursor-pointer">Excluir del Net Worth</Label>
+                  <p className="text-[11px] text-muted-foreground">Para cuentas de seguimiento (ej: Viejo)</p>
+                </div>
+              </div>
+              <Switch
+                checked={form.exclude_from_net_worth}
+                onCheckedChange={v => setForm(f => ({ ...f, exclude_from_net_worth: v }))}
+              />
+            </div>
             <div><Label>Notes</Label><Input value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} className="mt-1 rounded-xl" /></div>
             <Button className="w-full h-12 rounded-xl" onClick={handleSave} disabled={createAccount.isPending || updateAccount.isPending}>Save</Button>
           </div>
@@ -445,7 +461,7 @@ export default function Accounts() {
               </div>
             </div>
             <button
-              onClick={() => { setShowAddChoice(false); setEditId(null); setForm({ name: '', type: 'bank', institution: '', currency: 'USD', opening_balance: '0', notes: '', group_id: '' }); setShowForm(true); }}
+              onClick={() => { setShowAddChoice(false); setEditId(null); setForm({ name: '', type: 'bank', institution: '', currency: 'USD', opening_balance: '0', notes: '', group_id: '', exclude_from_net_worth: false }); setShowForm(true); }}
               className="w-full flex items-center gap-4 p-4 rounded-xl border hover:border-primary/40 hover:bg-accent/50 transition-colors text-left"
             >
               <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0">

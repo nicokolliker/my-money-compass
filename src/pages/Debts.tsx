@@ -569,6 +569,15 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
 
       // ── Obtener o crear cuenta virtual "Viejo" (oculta en Accounts) ──
       let tarjetaViejoAcc: any = accounts.find((a: any) => /viejo/i.test(a.name));
+
+      // PR1: ensure existing Viejo account is excluded from net worth
+      if (tarjetaViejoAcc && !tarjetaViejoAcc.exclude_from_net_worth) {
+        await supabase
+          .from('accounts')
+          .update({ exclude_from_net_worth: true } as any)
+          .eq('id', tarjetaViejoAcc.id);
+      }
+
       if (!tarjetaViejoAcc) {
         const { data: newAcc, error: accErr } = await supabase
           .from('accounts')
@@ -579,7 +588,8 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
             currency: 'ARS',
             opening_balance: 0,
             is_active: true,
-          })
+            exclude_from_net_worth: true,   // PR1: tracking-only, impact captured in Cash USD
+          } as any)
           .select()
           .single();
         if (accErr) throw accErr;
