@@ -26,6 +26,7 @@ import { MerchantLogo } from '@/components/MerchantLogo';
 import { formatUSD } from '@/lib/constants';
 import { parseBancoCiudad, parseBancoCiudadObSoc, extractCardTotal } from '@/lib/importers/bancoCiudadParser';
 import { parseSantander } from '@/lib/importers/santanderParser';
+import type { ParsedTransaction } from '@/lib/importers/arqParser';
 import { parseSplitwise, type SplitwiseRow } from '@/lib/importers/splitwiseParser';
 import { inferCategoryName } from '@/hooks/useRuleSuggestions';
 import { useImportLog } from '@/hooks/useImportLog';
@@ -456,6 +457,10 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
   const [obSocARS, setObSocARS] = useState(0);
   const [processing, setProcessing] = useState(false);
 
+  const [iebraRows, setIebraRows] = useState<(ParsedTransaction & { categoryName: string; selected: boolean })[]>([]);
+  const [kollikerRows, setKollikerRows] = useState<(ParsedTransaction & { categoryName: string; selected: boolean })[]>([]);
+  const [santRows, setSantRows] = useState<(ParsedTransaction & { categoryName: string; selected: boolean })[]>([]);
+
   const [items, setItems] = useState<SettlementItem[]>([]);
   const [extraItems, setExtraItems] = useState<ExtraItem[]>([]);
   const [tcBlue, setTcBlue] = useState(defaultBlueRate);
@@ -484,6 +489,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
       setIebraFile(null); setKollikerFile(null); setSantFile(null);
       setBcTotalARS(0); setSantTotalARS(0); setVisaCiudadARS(0); setObSocARS(0);
       setExtraItems([]);
+      setIebraRows([]); setKollikerRows([]); setSantRows([]);
     }
   }, [open]);
 
@@ -528,28 +534,45 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
   async function handleProcessFiles() {
     setProcessing(true);
     try {
-      let bc = 0, sant = 0;
-      let visaCiudad = 0;
-      let obSoc = 0;
       const fxFallback = arsToUsd || 0.00072;
+      let bc = 0, sant = 0, visaCiudad = 0, obSoc = 0;
+
       if (iebraFile) {
-        const iebraText = await extractPdfText(iebraFile);
-        const rows = parseBancoCiudad(iebraText, arsToUsd || 0);
-        bc += rows.reduce((s, r) => s + r.amountARS, 0);
-        const { ars: visaCiudadARSExtract, usd: visaCiudadUSD } = extractCardTotal(iebraText, '1689');
-        visaCiudad = visaCiudadARSExtract + (visaCiudadUSD > 0 ? visaCiudadUSD / fxFallback : 0);
+        const text = await extractPdfText(iebraFile);
+        const rows = parseBancoCiudad(text, fxFallback);
+        const { ars: vcARS, usd: vcUSD } = extractCardTotal(text, '1689');
+        visaCiudad = vcARS + (vcUSD > 0 ? vcUSD / fxFallback : 0);
+        bc += visaCiudad;
+        setIebraRows(rows.map(r => ({
+          ...r,
+          categoryName: inferCategoryName(r.description) || 'Casa',
+          selected: true,
+        })));
       }
+
       if (kollikerFile) {
-        const kollikerText = await extractPdfText(kollikerFile);
-        const rows = parseBancoCiudadObSoc(kollikerText, fxFallback);
-        bc += rows.reduce((s, r) => s + r.amountARS, 0);
-        obSoc = rows.reduce((s, t) => s + t.amountARS, 0);
+        const text = await extractPdfText(kollikerFile);
+        const rows = parseBancoCiudadObSoc(text, fxFallback);
+        obSoc = rows.reduce((s, r) => s + r.amountARS, 0);
+        bc += obSoc;
+        setKollikerRows(rows.map(r => ({
+          ...r,
+          categoryName: 'Salud',
+          selected: true,
+        })));
       }
+
       if (santFile) {
         const text = await extractPdfText(santFile);
-        const rows = parseSantander(text, arsToUsd || 0);
+        const rows = parseSantander(text, fxFallback);
         sant = rows.reduce((s, r) => s + r.amountARS, 0);
+        setSantRows(rows.map(r => ({
+          ...r,
+          categoryName: inferCategoryName(r.description) || 'Casa',
+          selected: true,
+        })));
       }
+
       setBcTotalARS(bc);
       setSantTotalARS(sant);
       setVisaCiudadARS(visaCiudad);
@@ -587,16 +610,33 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
         setSubmitting(false);
         return;
       }
-      const editableItems = items.filter((i) => i.editable && i.amountARS > 0);
-      const validExtras = extraItems.filter((e) => e.amountARS > 0 && e.label.trim());
       const fxArsUsd = arsToUsd || (tcBlue > 0 ? 1 / tcBlue : 0);
 
-      const allManualItems: { label: string; amountARS: number; categoryName: string }[] = [
-        ...editableItems.map((i) => ({ label: i.label, amountARS: i.amountARS, categoryName: i.categoryName })),
-        ...validExtras.map((e) => ({ label: e.label, amountARS: e.amountARS, categoryName: e.categoryName })),
-      ];
+      // 1. Transacciones individuales de las filas del PDF
+      const pdfRows = [...iebraRows, ...kollikerRows, ...santRows].filter(r => r.selected);
+      for (const row of pdfRows) {
+        const cat = categories.find((c: any) => c.name === row.categoryName);
+        await supabase.from('transactions').insert({
+          user_id: user.id,
+          account_id: tarjetaViejoAcc.id,
+          date: row.date,
+          description: row.description,
+          amount: -row.amountARS,
+          currency: 'ARS',
+          fx_rate: fxArsUsd,
+          amount_usd: -(row.amountARS * fxArsUsd),
+          type: 'expense' as const,
+          category_id: cat?.id || null,
+          external_id: row.external_id,
+        });
+      }
 
-      for (const item of allManualItems) {
+      // 2. Ítems manuales (todos los items con monto > 0, incluyendo los no editables)
+      const allItems = [
+        ...items.filter(i => i.amountARS > 0),
+        ...extraItems.filter(e => e.amountARS > 0 && e.label.trim()),
+      ];
+      for (const item of allItems) {
         const cat = categories.find((c: any) => c.name === item.categoryName);
         await supabase.from('transactions').insert({
           user_id: user.id,
@@ -712,6 +752,66 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
             <p className="text-xs text-muted-foreground">
               BC: {formatARS(bcTotalARS)} ARS detectados · Santander: {formatARS(santTotalARS)} ARS detectados
             </p>
+            {(iebraRows.length > 0 || kollikerRows.length > 0 || santRows.length > 0) && (
+              <div className="space-y-2 border rounded-xl overflow-hidden">
+                <div className="px-4 py-2.5 bg-muted/50 border-b">
+                  <p className="text-xs font-semibold text-foreground uppercase tracking-wide">
+                    Líneas de tarjeta — desde PDFs
+                  </p>
+                  <p className="text-xs text-muted-foreground">Revisá y ajustá la categoría de cada gasto</p>
+                </div>
+                <div className="divide-y divide-border/50 max-h-64 overflow-y-auto">
+                  {[...iebraRows, ...kollikerRows, ...santRows].map((row, i) => (
+                    <div key={i} className="flex items-center gap-2 px-4 py-2.5">
+                      <input
+                        type="checkbox"
+                        checked={row.selected}
+                        onChange={e => {
+                          if (i < iebraRows.length) {
+                            setIebraRows(prev => prev.map((r, idx) => idx === i ? { ...r, selected: e.target.checked } : r));
+                          } else if (i < iebraRows.length + kollikerRows.length) {
+                            const j = i - iebraRows.length;
+                            setKollikerRows(prev => prev.map((r, idx) => idx === j ? { ...r, selected: e.target.checked } : r));
+                          } else {
+                            const j = i - iebraRows.length - kollikerRows.length;
+                            setSantRows(prev => prev.map((r, idx) => idx === j ? { ...r, selected: e.target.checked } : r));
+                          }
+                        }}
+                        className="shrink-0"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-foreground truncate">{row.description}</p>
+                        <p className="text-[10px] text-muted-foreground">{row.date}</p>
+                      </div>
+                      <span className="text-xs font-mono text-foreground shrink-0">
+                        {'$' + Math.round(row.amountARS).toLocaleString('es-AR')}
+                      </span>
+                      <Select
+                        value={row.categoryName}
+                        onValueChange={val => {
+                          if (i < iebraRows.length) {
+                            setIebraRows(prev => prev.map((r, idx) => idx === i ? { ...r, categoryName: val } : r));
+                          } else if (i < iebraRows.length + kollikerRows.length) {
+                            const j = i - iebraRows.length;
+                            setKollikerRows(prev => prev.map((r, idx) => idx === j ? { ...r, categoryName: val } : r));
+                          } else {
+                            const j = i - iebraRows.length - kollikerRows.length;
+                            setSantRows(prev => prev.map((r, idx) => idx === j ? { ...r, categoryName: val } : r));
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="w-28 h-7 text-[11px]"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {(categories || []).map((c: any) => (
+                            <SelectItem key={c.id} value={c.name} className="text-xs">{c.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="space-y-1">
               {ITEM_GROUPS.map((group) => {
                 const groupItems = group.items
