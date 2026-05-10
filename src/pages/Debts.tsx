@@ -1500,6 +1500,23 @@ function SplitwiseSettlementWizard({ open, onOpenChange }: { open: boolean; onOp
     }
   }
 
+  // Previous calendar month (yyyy-mm) and human label e.g. "Mayo 2026"
+  const lastMonthInfo = useMemo(() => {
+    const now = new Date();
+    const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const label = format(d, "LLLL yyyy", { locale: es });
+    return { ym, label: label.charAt(0).toUpperCase() + label.slice(1) };
+  }, []);
+
+  // Rows to reconcile = last month + Nico owes (userAmount < 0)
+  const toImport = useMemo(() => {
+    if (!result) return [];
+    return result.rows.filter(
+      (r) => r.date.startsWith(lastMonthInfo.ym) && r.userAmount < 0,
+    );
+  }, [result, lastMonthInfo.ym]);
+
   async function handleConfirm() {
     if (!result) return;
     setSubmitting(true);
@@ -1508,56 +1525,52 @@ function SplitwiseSettlementWizard({ open, onOpenChange }: { open: boolean; onOp
       if (!user) throw new Error('Not authenticated');
       const accId = splitwiseAcc?.id || (await ensureSplitwiseAccount(user.id));
 
-      const net = result.netBalance;
-      const absNet = Math.abs(net);
-      if (absNet < 0.01) {
-        toast.message('El saldo es 0 — no hay nada que registrar.');
+      if (toImport.length === 0) {
+        toast.message('No hay gastos a conciliar.');
         onOpenChange(false);
         return;
       }
-      const isIncome = net > 0; // te deben → income; debés → expense
+
       const groupLabel = result.groupName || 'grupo';
-      const description = `Splitwise — ${groupLabel} (saldo)`;
-      const today = new Date().toISOString().slice(0, 10);
+      const rows = toImport.map((r) => {
+        const abs = Math.abs(r.userAmount);
+        const amountUSD = r.currency === 'USD'
+          ? abs
+          : r.currency === 'ARS'
+            ? (arsToUsd > 0 ? +(abs * arsToUsd).toFixed(2) : 0)
+            : abs;
+        return {
+          user_id: user.id,
+          account_id: accId,
+          date: r.date,
+          description: `Splitwise — ${groupLabel}: ${r.description}`,
+          amount: -abs,
+          currency: r.currency,
+          fx_rate: r.currency === 'USD' ? 1 : (arsToUsd || 1),
+          amount_usd: -amountUSD,
+          type: 'expense' as const,
+          external_id: r.external_id,
+        };
+      });
 
-      let amountUSD = 0;
-      if (result.currency === 'USD') amountUSD = absNet;
-      else if (result.currency === 'ARS') amountUSD = arsToUsd > 0 ? +(absNet * arsToUsd).toFixed(2) : 0;
-      else amountUSD = absNet;
-
-      const signedAmt = isIncome ? absNet : -absNet;
-      const signedUsd = isIncome ? amountUSD : -amountUSD;
-
-      const { error } = await supabase.from('transactions').insert([{
-        user_id: user.id,
-        account_id: accId,
-        date: today,
-        description,
-        amount: signedAmt,
-        currency: result.currency,
-        fx_rate: result.currency === 'USD' ? 1 : (arsToUsd || 1),
-        amount_usd: signedUsd,
-        type: isIncome ? 'income' : 'expense',
-        external_id: `sw-balance-${today}-${groupLabel}`,
-      }]);
+      const { error } = await supabase.from('transactions').insert(rows);
       if (error) throw error;
 
-      // Log the import so it appears in Historial
       await supabase.from('import_log').insert({
         user_id: user.id,
         source: 'splitwise',
-        month: today.slice(0, 7),
-        transaction_count: result.rows.length,
+        month: lastMonthInfo.ym,
+        transaction_count: rows.length,
       });
 
       qc.invalidateQueries({ queryKey: ['transactions'] });
       qc.invalidateQueries({ queryKey: ['account-balances'] });
       qc.invalidateQueries({ queryKey: ['import-log'] });
 
-      toast.success('Saldo registrado');
+      toast.success(`${rows.length} gastos importados`);
       onOpenChange(false);
     } catch (e: any) {
-      toast.error(e.message || 'Error registrando saldo');
+      toast.error(e.message || 'Error importando gastos');
     } finally {
       setSubmitting(false);
     }
@@ -1572,7 +1585,7 @@ function SplitwiseSettlementWizard({ open, onOpenChange }: { open: boolean; onOp
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{step === 1 ? 'Splitwise — Subir CSV' : 'Splitwise — Confirmar'}</DialogTitle>
+          <DialogTitle>Splitwise — Conciliar gastos</DialogTitle>
         </DialogHeader>
 
         {step === 1 && (
@@ -1616,67 +1629,53 @@ function SplitwiseSettlementWizard({ open, onOpenChange }: { open: boolean; onOp
                     <span>{result.currency}</span>
                   </div>
                 </div>
-                <p className="text-[11px] text-muted-foreground">
-                  {isPositive
-                    ? `Se va a registrar un ingreso a la cuenta Splitwise: "${groupLabel}" te debe.`
-                    : isNegative
-                    ? `Se va a registrar un gasto a la cuenta Splitwise: vos le debés a "${groupLabel}".`
-                    : 'El balance está en 0 — no hay nada que registrar.'}
-                </p>
+                <div className="rounded-xl border p-3 space-y-2">
+                  <div>
+                    <p className="text-sm font-semibold">Gastos a conciliar — {lastMonthInfo.label}</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      Solo lo que otros pagaron por vos y aún no está registrado
+                    </p>
+                  </div>
+                  {toImport.length === 0 ? (
+                    <p className="text-xs text-muted-foreground py-2">
+                      No hay gastos pagados por otros en {lastMonthInfo.label}.
+                    </p>
+                  ) : (
+                    <div className="max-h-48 overflow-y-auto divide-y -mx-1">
+                      {toImport.map((r, i) => {
+                        const abs = Math.abs(r.userAmount);
+                        return (
+                          <div key={i} className="flex justify-between px-1 py-1.5 text-xs gap-2">
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate font-medium">{r.description}</p>
+                              <p className="text-muted-foreground font-mono">{r.date}</p>
+                            </div>
+                            <span className="font-mono text-destructive shrink-0">
+                              −{r.currency === 'ARS'
+                                ? '$' + Math.round(abs).toLocaleString('es-AR')
+                                : '$' + abs.toFixed(2)}
+                              {' '}{r.currency}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
                 <Button
-                  onClick={() => setStep(2)}
+                  onClick={handleConfirm}
                   className="w-full"
-                  disabled={!isPositive && !isNegative}
+                  disabled={submitting || toImport.length === 0}
                 >
-                  Registrar saldo →
+                  {submitting
+                    ? 'Importando...'
+                    : `Importar ${toImport.length} gastos a registrar →`}
                 </Button>
               </div>
             )}
           </div>
         )}
 
-        {step === 2 && result && (
-          <div className="space-y-4">
-            <div className="rounded-xl border p-4 space-y-2 text-sm">
-              <p className="text-xs text-muted-foreground uppercase tracking-wide">Transacción a crear</p>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Tipo</span>
-                <span className="font-medium">{isPositive ? 'Ingreso' : 'Gasto'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Descripción</span>
-                <span className="font-medium truncate ml-2">Splitwise — {groupLabel} (saldo)</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Monto</span>
-                <span className={cn(
-                  'font-mono font-semibold',
-                  isPositive ? 'text-success' : 'text-destructive',
-                )}>
-                  {isPositive ? '+' : '−'}
-                  {result.currency === 'ARS'
-                    ? '$' + Math.round(Math.abs(net)).toLocaleString('es-AR')
-                    : '$' + Math.abs(net).toFixed(2)}
-                  {' '}{result.currency}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Cuenta</span>
-                <span className="font-medium">{splitwiseAcc?.name || 'Splitwise (se creará)'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Fecha</span>
-                <span className="font-mono">{new Date().toISOString().slice(0, 10)}</span>
-              </div>
-            </div>
-            <div className="flex justify-between gap-2">
-              <Button variant="outline" onClick={() => setStep(1)} disabled={submitting}>← Atrás</Button>
-              <Button onClick={handleConfirm} disabled={submitting}>
-                {submitting ? 'Registrando...' : 'Confirmar'}
-              </Button>
-            </div>
-          </div>
-        )}
       </DialogContent>
     </Dialog>
   );
