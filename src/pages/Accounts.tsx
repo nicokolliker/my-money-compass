@@ -171,6 +171,8 @@ export default function Accounts() {
     try {
       const payload: any = { name: form.name, type: form.type, institution: form.institution || null, currency: form.currency, opening_balance: parseFloat(form.opening_balance), notes: form.notes || null, exclude_from_net_worth: form.exclude_from_net_worth };
       payload.group_id = form.group_id || null;
+      payload.my_card_suffix = form.type === 'credit_card' && form.my_card_suffix ? form.my_card_suffix : null;
+      payload.is_own_card = form.type === 'credit_card' && !!form.my_card_suffix && !!form.is_own_card;
 
       if (editId) {
         await updateAccount.mutateAsync({ id: editId, ...payload });
