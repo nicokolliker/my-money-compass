@@ -1610,12 +1610,13 @@ function ViejoCycleHistory({ importLog }: { importLog: any[] }) {
     const sumBreakdown = Object.values(breakdown).reduce((s: number, v) => s + Number(v || 0), 0);
     const sumExtras = (p.extras || []).reduce((s: number, e: any) => s + Number(e.amountARS || 0), 0);
     const totalARS = Number(p.totalARS) > 0 ? Number(p.totalARS) : (sumBreakdown + sumExtras);
-    downloadSettlementPdf({
+    void downloadSettlementPdf({
       monthLabel,
       mamaRows: p.mamaRows || [],
       papaRows: p.papaRows || [],
       santRows: p.santRows || [],
       manualItems,
+      categoryBreakdown: p.categoryBreakdown || undefined,
       totalARS,
       tcBlue: Number(p.tcBlue) || 0,
       usdAPagar: Number(p.usdPagado) || Math.abs(Number(tx?.amount_usd) || 0),
