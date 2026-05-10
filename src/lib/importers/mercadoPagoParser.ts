@@ -40,9 +40,28 @@ export function parseMercadoPago(fileBuffer: ArrayBuffer, fxRate = 0): ParsedTra
 
     if (/Transferencia/i.test(typeStr) && !refStr) continue;
 
-    const isIncome = amount > 0;
     const amountARS = Math.abs(amount);
     const amountUSD = fxRate > 0 ? +(amountARS * fxRate).toFixed(2) : 0;
+
+    // ── Classify by TRANSACTION_TYPE label ──────────────────────────────────
+    let type: ParsedTransaction['type'];
+    let isIncomingTransfer = false;
+    if (/Transferencia recibida/i.test(typeStr)) {
+      // Incoming transfer from own ARQ account → mark as transfer; others = income
+      if (/NICOLAS/i.test(typeStr)) {
+        type = 'transfer';
+        isIncomingTransfer = true;
+      } else {
+        type = 'income';
+      }
+    } else if (/Rendimientos/i.test(typeStr)) {
+      type = 'income';
+    } else if (/Transferencia enviada|Pago de servicio|Pago con QR|Pago/i.test(typeStr)) {
+      type = 'expense';
+    } else {
+      // Fallback to sign
+      type = amount > 0 ? 'income' : 'expense';
+    }
 
     const external_id = refStr
       ? `mp-${refStr}`
@@ -53,7 +72,8 @@ export function parseMercadoPago(fileBuffer: ArrayBuffer, fxRate = 0): ParsedTra
       description: typeStr || 'MercadoPago',
       amountUSD,
       amountARS,
-      type: isIncome ? 'income' : 'expense',
+      type,
+      isIncomingTransfer: isIncomingTransfer || undefined,
       external_id,
       matched: false,
     });
