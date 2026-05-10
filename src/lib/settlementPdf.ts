@@ -584,10 +584,11 @@ export async function generateSettlementPdf(data: SettlementPdfData): Promise<js
 
     y += 28;
 
+    const manualCatHook = makeCategoryCellRenderer(doc, font, emojiFontResolved, 1);
     autoTable(doc, {
       startY: y,
       head: [['Concepto', 'Categoría', 'Monto']],
-      body: data.manualItems.map((i) => [i.label, i.categoryName || '—', fmtARS(i.amountARS)]),
+      body: data.manualItems.map((i) => [i.label, i.categoryName || 'Otros', fmtARS(i.amountARS)]),
       theme: 'plain',
       styles: {
         font,
@@ -608,10 +609,12 @@ export async function generateSettlementPdf(data: SettlementPdfData): Promise<js
       alternateRowStyles: { fillColor: [252, 252, 253] as any },
       columnStyles: {
         0: { cellWidth: 'auto' },
-        1: { cellWidth: 110, textColor: BRAND.muted, fontSize: 8 },
-        2: { cellWidth: 95, halign: 'right', fontStyle: 'bold' },
+        1: { cellWidth: COL.category, textColor: BRAND.muted, fontSize: 9 },
+        2: { cellWidth: COL.amount, halign: 'right', fontStyle: 'bold' },
       },
       margin: { left: margin, right: margin },
+      willDrawCell: manualCatHook.willDrawCell,
+      didDrawCell: manualCatHook.didDrawCell,
     });
     y = (doc as any).lastAutoTable.finalY + 22;
   }
