@@ -26,9 +26,11 @@ const CATEGORIAS = [
   { cat: 'J', tope: 90_997_503.90, cuota: 666_977.68 },
   { cat: 'K', tope: 108_357_084.05, cuota: 1_381_687.90 },
 ];
-const VIGENCIA = 'Feb–Jul 2026';
-const CAT_ACTUAL = 'A';
-const CUOTA_ACTUAL = 45_700.74;
+const DEFAULT_MONOTRIBUTO: MonotributoConfig = {
+  vigencia: 'Feb–Jul 2026',
+  cat_actual: 'A',
+  cuota_actual: 45_700.74,
+};
 
 function formatARS(n: number) {
   return '$' + Math.round(n).toLocaleString('es-AR');
