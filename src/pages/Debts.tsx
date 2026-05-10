@@ -61,25 +61,8 @@ export default function DebtsPage() {
         <p className="text-sm text-muted-foreground">Revisión y liquidación mensual</p>
       </div>
 
-      {(pendingCredits || []).length > 0 && (
-        <Card className="rounded-2xl border-success/40 bg-success/10">
-          <CardContent className="p-4 space-y-2">
-            {(pendingCredits || []).map((pc) => (
-              <p key={pc.id} className="text-sm text-foreground leading-snug">
-                <span className="mr-1">💚</span>
-                <span className="font-semibold">Saldo a favor:</span>{' '}
-                <span className="font-mono font-semibold text-success">
-                  +{formatARS(pc.amount_ars)}
-                </span>
-                {pc.settlement_month && (
-                  <> de liquidación <span className="capitalize">{pc.settlement_month}</span></>
-                )}{' '}
-                <span className="text-muted-foreground">— llegará por MercadoPago</span>
-              </p>
-            ))}
-          </CardContent>
-        </Card>
-      )}
+      <PendingCreditsBanner />
+
 
       <ViejoDebtCard
         importLog={importLog || []}
