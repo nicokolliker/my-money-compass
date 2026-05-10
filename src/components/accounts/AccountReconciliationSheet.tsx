@@ -21,6 +21,7 @@ import {
   useReconciliationHistory,
 } from '@/hooks/useAccountReconciliation';
 import { formatUSD } from '@/lib/constants';
+import { RecentTransactionsList } from './RecentTransactionsList';
 
 interface Props {
   open: boolean;
@@ -228,6 +229,16 @@ export function AccountReconciliationSheet({
               })}
             </div>
           )}
+        </section>
+
+        <Separator className="my-4" />
+
+        <section>
+          <h3 className="text-sm font-semibold mb-3">Últimas transacciones</h3>
+          <RecentTransactionsList
+            accountId={accountId}
+            onNavigate={onClose}
+          />
         </section>
 
       </SheetContent>
