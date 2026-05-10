@@ -1830,6 +1830,46 @@ function SettlementDetail({ parsed }: { parsed: any }) {
 
   return (
     <div className="space-y-4">
+      {catEntries.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-muted-foreground">📊 Distribución por categoría</p>
+            <p className="text-xs font-mono text-muted-foreground">{formatARS(catSum)}</p>
+          </div>
+          {/* Stacked bar */}
+          <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-muted">
+            {catEntries.map(([name, v], idx) => (
+              <div
+                key={name}
+                className="h-full transition-all"
+                style={{
+                  width: `${(Number(v) / catSum) * 100}%`,
+                  background: CAT_COLORS[idx % CAT_COLORS.length],
+                }}
+                title={`${name}: ${formatARS(Number(v))}`}
+              />
+            ))}
+          </div>
+          {/* Legend */}
+          <div className="rounded-lg border divide-y">
+            {catEntries.map(([name, v], idx) => {
+              const pct = (Number(v) / catSum) * 100;
+              return (
+                <div key={name} className="flex items-center gap-3 px-3 py-2 text-sm">
+                  <span
+                    className="inline-block h-2.5 w-2.5 rounded-full shrink-0"
+                    style={{ background: CAT_COLORS[idx % CAT_COLORS.length] }}
+                  />
+                  <span className="flex-1 truncate font-medium">{name}</span>
+                  <span className="text-xs text-muted-foreground tabular-nums w-12 text-right">{pct.toFixed(1)}%</span>
+                  <span className="font-mono text-sm tabular-nums w-24 text-right">{formatARS(Number(v))}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {groups.map((g) => (
         <div key={g.label} className="space-y-1.5">
           <p className="text-xs font-semibold text-muted-foreground">{g.label}</p>
