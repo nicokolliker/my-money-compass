@@ -1706,7 +1706,18 @@ function ViejoCycleHistory({ importLog }: { importLog: any[] }) {
             <CollapsibleTrigger asChild>
               <button type="button" className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-muted/40 transition-colors">
                 <div>
-                  <p className="text-sm font-semibold">Historial de ciclos</p>
+                  <p className="text-sm font-semibold">
+                    Historial de ciclos
+                    {(() => {
+                      const lastLiq = rows.find((r) => r.liquidado);
+                      if (!lastLiq) return null;
+                      return (
+                        <span className="font-normal text-muted-foreground">
+                          {' · '}último: <span className="font-mono text-foreground">{formatUSD(lastLiq.usd)}</span> · <span className="capitalize">{lastLiq.label}</span>
+                        </span>
+                      );
+                    })()}
+                  </p>
                   <p className="text-xs text-muted-foreground">{allMonths.length} meses registrados</p>
                 </div>
                 <ChevronDown className={cn('h-4 w-4 transition-transform shrink-0', open && 'rotate-180')} />
