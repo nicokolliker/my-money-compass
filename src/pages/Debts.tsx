@@ -721,23 +721,26 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
         notes: settlementNotes,
       });
 
-      // ── PASO 4: Vuelto esperado → Mercado Pago ───────────────────────
+      // ── PASO 4: Vuelto esperado → pending_credit (no auto tx) ─────────
+      // Clear prior pending credit for the same source+month, then insert.
+      await supabase
+        .from('pending_credits' as any)
+        .delete()
+        .eq('user_id', user.id)
+        .eq('source', 'viejo_settlement')
+        .eq('settlement_month', settlementMonth);
+
       if (vueltoARS > 0) {
-        await supabase.from('transactions').insert({
+        await supabase.from('pending_credits' as any).insert({
           user_id: user.id,
-          account_id: mpAcc.id,
-          date: settlementDate,
-          description: `Vuelto ${monthLabel} — viejo`,
-          amount: vueltoARS,
-          currency: 'ARS',
-          fx_rate: fxArsUsd,
+          amount_ars: vueltoARS,
           amount_usd: vueltoARS * fxArsUsd,
-          type: 'income' as const,
-          notes: JSON.stringify({
-            type: 'vuelto_settlement',
-            month: settlementMonth,
-          }),
-        });
+          source: 'viejo_settlement',
+          expected_via_account_id: mpAcc.id,
+          settlement_month: settlementMonth,
+          status: 'pending',
+        } as any);
+        qc.invalidateQueries({ queryKey: ['pending-credits'] });
       }
 
       // ── Guardar defaults para el próximo mes ─────────────────────────
