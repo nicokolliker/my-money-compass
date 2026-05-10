@@ -77,6 +77,30 @@ export default function Accounts() {
   const [showAddChoice, setShowAddChoice] = useState(false);
   const [showPostCreate, setShowPostCreate] = useState(false);
   const [arqSheetAccount, setArqSheetAccount] = useState<any>(null);
+  const [destSheetAccount, setDestSheetAccount] = useState<any>(null);
+
+  // Pending counts per destination account (MP/Galicia) for badges
+  const userId = useUserId();
+  const { data: destPendingMap } = useQuery({
+    queryKey: ['account-reconciliations-pending-map', userId],
+    enabled: !!userId,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('account_reconciliations')
+        .select('to_account_id, transfer_amount_usd, transfer_date')
+        .eq('status', 'pending');
+      const map = new Map<string, { total: number; latest: string | null }>();
+      for (const r of data || []) {
+        const k = r.to_account_id as string;
+        const cur = map.get(k) || { total: 0, latest: null };
+        cur.total += Number(r.transfer_amount_usd) || 0;
+        const d = r.transfer_date as string;
+        if (!cur.latest || d > cur.latest) cur.latest = d;
+        map.set(k, cur);
+      }
+      return map;
+    },
+  });
 
 
 
