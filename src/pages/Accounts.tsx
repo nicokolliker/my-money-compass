@@ -15,7 +15,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { ACCOUNT_TYPE_LABELS, CURRENCIES, formatCurrency, formatUSD } from '@/lib/constants';
 import { MerchantLogo } from '@/components/MerchantLogo';
 import { getAccountStyle } from '@/lib/accountIcons';
-import { Plus, ChevronDown, FolderPlus, Pencil, Trash2, FileUp, PenLine, Wifi, Clock, AlertTriangle, EyeOff } from 'lucide-react';
+import { Plus, ChevronDown, FolderPlus, Pencil, Trash2, FileUp, PenLine, Wifi, Clock, AlertTriangle, EyeOff, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { DemoDataBanner } from '@/components/DemoDataBanner';
 import { useDemoData } from '@/hooks/useDemoData';
@@ -24,6 +24,7 @@ import { Switch } from '@/components/ui/switch';
 import { useQueryClient } from '@tanstack/react-query';
 import { useImportLog } from '@/hooks/useImportLog';
 import { useArqPendingReconciliations } from '@/hooks/useArqReconciliation';
+import { ArqReconciliationSheet } from '@/components/accounts/ArqReconciliationSheet';
 import { useUserSettings } from '@/hooks/useUserSettings';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -72,6 +73,7 @@ export default function Accounts() {
   const [editGroupId, setEditGroupId] = useState<string | null>(null);
   const [showAddChoice, setShowAddChoice] = useState(false);
   const [showPostCreate, setShowPostCreate] = useState(false);
+  const [arqSheetAccount, setArqSheetAccount] = useState<any>(null);
 
 
 
@@ -244,6 +246,15 @@ export default function Accounts() {
                     const pct = totalNetWorth !== 0 ? (balUsd / totalNetWorth * 100) : 0;
                     return (
                       <div key={a.id} className="flex items-center gap-1">
+                        {isArqAccount(a.name) && (
+                          <button
+                            onClick={() => setArqSheetAccount(a)}
+                            className="p-1.5 rounded-lg hover:bg-accent/50 transition-colors shrink-0"
+                            title="Ver conciliaciones"
+                          >
+                            <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
+                          </button>
+                        )}
                         <button onClick={() => openEdit(a)} className="flex items-center gap-3 flex-1 min-w-0 py-3 text-left hover:bg-accent/50 active:bg-accent rounded-lg px-2 -mx-2 transition-colors">
                           <AccountLogo name={a.name} institution={(a as any).institution} />
                           <div className="flex-1 min-w-0">
@@ -510,5 +521,15 @@ export default function Accounts() {
         </DialogContent>
       </Dialog>
     </div>
+
+      {/* ARQ Reconciliation Sheet */}
+      {arqSheetAccount && (
+        <ArqReconciliationSheet
+          open={!!arqSheetAccount}
+          onClose={() => setArqSheetAccount(null)}
+          accountName={arqSheetAccount.name}
+          balanceUsd={arqSheetAccount.computed_balance_usd}
+        />
+      )}
   );
 }
