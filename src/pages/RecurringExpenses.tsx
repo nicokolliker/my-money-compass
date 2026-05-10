@@ -455,8 +455,6 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
 
               const renderItemRow = (item: any) => {
                 const acc = item.accounts;
-                const state = itemState[item.id] || 'none';
-                const badge = STATUS_STYLES[state];
                 return (
                   <div key={item.id} className="flex items-center gap-3 py-2.5 px-3 rounded-xl hover:bg-muted/40 transition-colors">
                     <MerchantLogo name={item.name} size={36} />
@@ -470,12 +468,6 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
                       <p className="text-sm font-bold text-foreground tabular-nums">
                         {Number(item.amount).toLocaleString('en-US', { style: 'currency', currency: item.currency, maximumFractionDigits: item.currency === 'ARS' ? 0 : 2 })}
                       </p>
-                      <span
-                        className="inline-block mt-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
-                        style={{ backgroundColor: badge.bg, color: badge.color }}
-                      >
-                        {badge.label}
-                      </span>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
                       <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => openEdit(item)} aria-label="Edit">
