@@ -748,49 +748,49 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
           </>
         )}
 
-        {step === 2 && (
-          <div className="space-y-4">
-            <p className="text-xs text-muted-foreground">
-              BC: {formatARS(bcTotalARS)} ARS detectados · Santander: {formatARS(santTotalARS)} ARS detectados
-            </p>
-            {(iebraRows.length > 0 || kollikerRows.length > 0 || santRows.length > 0) && (() => {
-              type RowRef = { row: ParsedTransaction & { categoryName: string; selected: boolean }; src: 'iebra' | 'kolliker' | 'sant'; idx: number };
-              const allRefs: RowRef[] = [
-                ...iebraRows.map((row, idx) => ({ row, src: 'iebra' as const, idx })),
-                ...kollikerRows.map((row, idx) => ({ row, src: 'kolliker' as const, idx })),
-                ...santRows.map((row, idx) => ({ row, src: 'sant' as const, idx })),
-              ];
-              const arsRefs = allRefs.filter(r => !r.row.matched);
-              const usdRefs = allRefs.filter(r => r.row.matched);
-              const setSelected = (ref: RowRef, checked: boolean) => {
-                const setter = ref.src === 'iebra' ? setIebraRows : ref.src === 'kolliker' ? setKollikerRows : setSantRows;
-                setter(prev => prev.map((r, i) => i === ref.idx ? { ...r, selected: checked } : r));
-              };
-              const setCategory = (ref: RowRef, val: string) => {
-                const setter = ref.src === 'iebra' ? setIebraRows : ref.src === 'kolliker' ? setKollikerRows : setSantRows;
-                setter(prev => prev.map((r, i) => i === ref.idx ? { ...r, categoryName: val } : r));
-              };
-              const renderRow = (ref: RowRef, key: string) => (
-                <div key={key} className="flex items-center gap-2 px-3 py-2 border-b border-border/40 last:border-0">
+        {step === 2 && (() => {
+          type Row = ParsedTransaction & { categoryName: string; selected: boolean };
+          type RowSrc = 'iebra' | 'kolliker' | 'sant';
+          const setterFor = (src: RowSrc) =>
+            src === 'iebra' ? setIebraRows : src === 'kolliker' ? setKollikerRows : setSantRows;
+          const rowsFor = (key: string): { rows: Row[]; src: RowSrc } | null => {
+            if (key === 'visa_ciudad') return { rows: iebraRows, src: 'iebra' };
+            if (key === 'visa_santander') return { rows: santRows, src: 'sant' };
+            if (key === 'obra_social') return { rows: kollikerRows, src: 'kolliker' };
+            return null;
+          };
+          const renderPdfRows = (key: string) => {
+            const data = rowsFor(key);
+            if (!data || data.rows.length === 0) return null;
+            const { rows, src } = data;
+            const setter = setterFor(src);
+            const arsIdx: number[] = [];
+            const usdIdx: number[] = [];
+            rows.forEach((r, i) => (r.matched ? usdIdx.push(i) : arsIdx.push(i)));
+            const renderRow = (i: number) => {
+              const r = rows[i];
+              return (
+                <div key={i} className="flex items-center gap-2 px-3 py-1.5 border-b border-border/40 last:border-0">
                   <input
                     type="checkbox"
-                    checked={ref.row.selected}
-                    onChange={e => setSelected(ref, e.target.checked)}
+                    checked={r.selected}
+                    onChange={(e) => setter((prev) => prev.map((x, j) => j === i ? { ...x, selected: e.target.checked } : x))}
                     className="shrink-0 accent-primary"
                   />
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs text-foreground truncate font-medium">{ref.row.description}</p>
-                    <p className="text-[10px] text-muted-foreground">{ref.row.date}</p>
+                    <p className="text-xs text-foreground truncate font-medium">{r.description}</p>
+                    <p className="text-[10px] text-muted-foreground">{r.date}</p>
                   </div>
                   <span className="text-xs font-mono text-foreground shrink-0 min-w-[80px] text-right">
-                    {ref.row.matched
-                      ? 'US$' + ref.row.amountUSD.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                      : '$' + Math.round(ref.row.amountARS).toLocaleString('es-AR')}
+                    {r.matched
+                      ? 'US$' + r.amountUSD.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                      : '$' + Math.round(r.amountARS).toLocaleString('es-AR')}
                   </span>
-                  <Select value={ref.row.categoryName} onValueChange={val => setCategory(ref, val)}>
-                    <SelectTrigger className="w-24 h-7 text-[11px] shrink-0">
-                      <SelectValue />
-                    </SelectTrigger>
+                  <Select
+                    value={r.categoryName}
+                    onValueChange={(v) => setter((prev) => prev.map((x, j) => j === i ? { ...x, categoryName: v } : x))}
+                  >
+                    <SelectTrigger className="w-24 h-7 text-[11px] shrink-0"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {(categories || []).map((c: any) => (
                         <SelectItem key={c.id} value={c.name} className="text-xs">{c.name}</SelectItem>
@@ -799,39 +799,33 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
                   </Select>
                 </div>
               );
-              const totalSelected = allRefs.filter(r => r.row.selected).length;
-              return (
-                <div className="space-y-2 border rounded-xl overflow-hidden">
-                  <div className="px-4 py-2.5 bg-muted/50 border-b flex items-center justify-between">
-                    <div>
-                      <p className="text-xs font-semibold text-foreground uppercase tracking-wide">
-                        Líneas de tarjeta — desde PDFs
-                      </p>
-                      <p className="text-xs text-muted-foreground">Revisá y ajustá la categoría de cada gasto</p>
+            };
+            return (
+              <div className="ml-9 mt-1 mb-2 border rounded-lg overflow-hidden bg-muted/20">
+                {arsIdx.length > 0 && (
+                  <>
+                    <div className="px-3 py-1 bg-muted/40 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground border-b">
+                      En ARS · {arsIdx.length}
                     </div>
-                    <span className="text-xs text-muted-foreground">{totalSelected} seleccionadas</span>
-                  </div>
-                  <div className="max-h-72 overflow-y-auto">
-                    {arsRefs.length > 0 && (
-                      <>
-                        <div className="px-3 py-1.5 bg-muted/30 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground border-b">
-                          En ARS · {arsRefs.length}
-                        </div>
-                        {arsRefs.map((ref, i) => renderRow(ref, `ars-${i}`))}
-                      </>
-                    )}
-                    {usdRefs.length > 0 && (
-                      <>
-                        <div className="px-3 py-1.5 bg-muted/30 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground border-b border-t">
-                          En USD · {usdRefs.length}
-                        </div>
-                        {usdRefs.map((ref, i) => renderRow(ref, `usd-${i}`))}
-                      </>
-                    )}
-                  </div>
-                </div>
-              );
-            })()}
+                    {arsIdx.map(renderRow)}
+                  </>
+                )}
+                {usdIdx.length > 0 && (
+                  <>
+                    <div className={cn('px-3 py-1 bg-muted/40 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground border-b', arsIdx.length > 0 && 'border-t')}>
+                      En USD · {usdIdx.length}
+                    </div>
+                    {usdIdx.map(renderRow)}
+                  </>
+                )}
+              </div>
+            );
+          };
+          return (
+          <div className="space-y-4">
+            <p className="text-xs text-muted-foreground">
+              BC: {formatARS(bcTotalARS)} ARS detectados · Santander: {formatARS(santTotalARS)} ARS detectados
+            </p>
             <div className="space-y-1">
               {ITEM_GROUPS.map((group) => {
                 const groupItems = group.items
@@ -846,34 +840,37 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
                     {groupItems.map((it) => {
                       const autoFilled = !it.editable;
                       return (
-                        <div key={it.key} className="flex items-center gap-3 py-2.5">
-                          <span className="text-base w-6 shrink-0">{it.emoji}</span>
-                          <span className={cn('text-sm flex-1 min-w-0 truncate', autoFilled ? 'text-foreground' : 'text-muted-foreground')}>
-                            {it.label}
-                            {autoFilled && <span className="ml-1 text-[10px] text-muted-foreground">🔒</span>}
-                          </span>
-                          {autoFilled ? (
-                            <span className="text-sm font-mono text-foreground w-32 text-right shrink-0">{formatARS(it.amountARS)}</span>
-                          ) : (
-                            <Input
-                              type="text"
-                              inputMode="numeric"
-                              value={formatARS(it.amountARS)}
-                              onChange={(e) => updateItem(it.key, { amountARS: parseARSInput(e.target.value) })}
-                              className={cn('w-32 text-right text-sm h-8 shrink-0', NUMERIC_INPUT_CLS)}
-                              placeholder="0"
-                            />
-                          )}
-                          {!autoFilled ? (
-                            <Select value={it.categoryName} onValueChange={(v) => updateItem(it.key, { categoryName: v })}>
-                              <SelectTrigger className="w-28 h-8 text-xs shrink-0"><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                {(categories || []).map((c: any) => (<SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>))}
-                              </SelectContent>
-                            </Select>
-                          ) : (
-                            <span className="text-xs text-muted-foreground w-28 shrink-0">{it.categoryName}</span>
-                          )}
+                        <div key={it.key}>
+                          <div className="flex items-center gap-3 py-2.5">
+                            <span className="text-base w-6 shrink-0">{it.emoji}</span>
+                            <span className={cn('text-sm flex-1 min-w-0 truncate', autoFilled ? 'text-foreground' : 'text-muted-foreground')}>
+                              {it.label}
+                              {autoFilled && <span className="ml-1 text-[10px] text-muted-foreground">🔒</span>}
+                            </span>
+                            {autoFilled ? (
+                              <span className="text-sm font-mono text-foreground w-32 text-right shrink-0">{formatARS(it.amountARS)}</span>
+                            ) : (
+                              <Input
+                                type="text"
+                                inputMode="numeric"
+                                value={formatARS(it.amountARS)}
+                                onChange={(e) => updateItem(it.key, { amountARS: parseARSInput(e.target.value) })}
+                                className={cn('w-32 text-right text-sm h-8 shrink-0', NUMERIC_INPUT_CLS)}
+                                placeholder="0"
+                              />
+                            )}
+                            {!autoFilled ? (
+                              <Select value={it.categoryName} onValueChange={(v) => updateItem(it.key, { categoryName: v })}>
+                                <SelectTrigger className="w-28 h-8 text-xs shrink-0"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  {(categories || []).map((c: any) => (<SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>))}
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <span className="text-xs text-muted-foreground w-28 shrink-0">{it.categoryName}</span>
+                            )}
+                          </div>
+                          {renderPdfRows(it.key)}
                         </div>
                       );
                     })}
