@@ -614,6 +614,12 @@ export default function Accounts() {
           balanceUsd={destSheetAccount.computed_balance_usd}
         />
       )}
+      {/* Generic account detail sheet */}
+      <AccountDetailSheet
+        open={!!detailAccount}
+        onClose={() => setDetailAccount(null)}
+        account={detailAccount}
+      />
     </div>
   );
 }
