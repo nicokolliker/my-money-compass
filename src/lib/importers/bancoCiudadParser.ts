@@ -99,13 +99,12 @@ function parseBlock(
 }
 
 /**
- * Parse Banco Ciudad credit card statement (PDF text).
- * Only extracts charges from card 1689 (titular IEBRA).
+ * Parse Banco Ciudad credit card statement (PDF text) for a given card number.
  */
-export function parseBancoCiudad(pdfText: string, fxRate = 0): ParsedTransaction[] {
-  const block = extractCardBlock(pdfText, '1689');
+export function parseBancoCiudad(pdfText: string, fxRate = 0, cardNumber = '1689'): ParsedTransaction[] {
+  const block = extractCardBlock(pdfText, cardNumber);
   if (!block) return [];
-  return parseBlock(block, 'bc1689', fxRate);
+  return parseBlock(block, `bc${cardNumber}`, fxRate);
 }
 
 /**

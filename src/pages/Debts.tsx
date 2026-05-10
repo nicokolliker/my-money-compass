@@ -24,7 +24,7 @@ import { useBlueDollarRate } from '@/hooks/useBlueDollar';
 import { useCreateTransfer } from '@/hooks/useTransactions';
 import { MerchantLogo } from '@/components/MerchantLogo';
 import { formatUSD } from '@/lib/constants';
-import { parseBancoCiudad, parseBancoCiudadObSoc, extractCardTotal } from '@/lib/importers/bancoCiudadParser';
+import { parseBancoCiudad, extractCardTotal } from '@/lib/importers/bancoCiudadParser';
 import { parseSantander } from '@/lib/importers/santanderParser';
 import type { ParsedTransaction } from '@/lib/importers/arqParser';
 import { parseSplitwise, type SplitwiseRow } from '@/lib/importers/splitwiseParser';
@@ -431,10 +431,9 @@ interface SettlementItem {
 }
 
 const ITEM_GROUPS: { label: string; items: string[] }[] = [
-  { label: '🏦 Tarjetas', items: ['visa_ciudad', 'visa_santander', 'amex'] },
+  { label: '🏦 Tarjetas', items: ['visa_ciudad_mama', 'visa_ciudad_papa', 'visa_santander', 'amex'] },
   { label: '🏠 Casa', items: ['expensas'] },
   { label: '🚗 Auto', items: ['prestamo', 'cochera', 'patente', 'multa'] },
-  { label: '❤️ Salud', items: ['obra_social'] },
 ];
 
 function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
@@ -453,8 +452,8 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
   const [santFile, setSantFile] = useState<File | null>(null);
   const [bcTotalARS, setBcTotalARS] = useState(0);
   const [santTotalARS, setSantTotalARS] = useState(0);
-  const [visaCiudadARS, setVisaCiudadARS] = useState(0);
-  const [obSocARS, setObSocARS] = useState(0);
+  const [visaCiudadMamaARS, setVisaCiudadMamaARS] = useState(0);
+  const [visaCiudadPapaARS, setVisaCiudadPapaARS] = useState(0);
   const [processing, setProcessing] = useState(false);
 
   const [iebraRows, setIebraRows] = useState<(ParsedTransaction & { categoryName: string; selected: boolean })[]>([]);
@@ -488,7 +487,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
       setStep(1);
       setSettlementMonth(format(new Date(), 'yyyy-MM'));
       setIebraFile(null); setKollikerFile(null); setSantFile(null);
-      setBcTotalARS(0); setSantTotalARS(0); setVisaCiudadARS(0); setObSocARS(0);
+      setBcTotalARS(0); setSantTotalARS(0); setVisaCiudadMamaARS(0); setVisaCiudadPapaARS(0);
       setExtraItems([]);
       setIebraRows([]); setKollikerRows([]); setSantRows([]);
     }
@@ -499,15 +498,15 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
     let saved: any = {};
     try { saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch {}
     setItems([
-      { key: 'visa_ciudad',    label: 'VISA Ciudad',       emoji: '🏦', amountARS: visaCiudadARS || bcTotalARS, editable: (visaCiudadARS || bcTotalARS) === 0, categoryName: 'Casa' },
-      { key: 'visa_santander', label: 'VISA Santander',    emoji: '🏦', amountARS: santTotalARS || saved.visa_santander || 0, editable: santTotalARS === 0, categoryName: 'Casa' },
+      { key: 'visa_ciudad_mama', label: 'VISA Ciudad — Mamá', emoji: '🏦', amountARS: visaCiudadMamaARS, editable: visaCiudadMamaARS === 0, categoryName: '' },
+      { key: 'visa_ciudad_papa', label: 'VISA Ciudad — Papá', emoji: '🏦', amountARS: visaCiudadPapaARS, editable: visaCiudadPapaARS === 0, categoryName: '' },
+      { key: 'visa_santander', label: 'VISA Santander',    emoji: '🏦', amountARS: santTotalARS || saved.visa_santander || 0, editable: santTotalARS === 0, categoryName: '' },
       { key: 'amex',           label: 'AMEX Santander',    emoji: '💳', amountARS: saved.amex || 0,        editable: true, categoryName: 'Casa' },
       { key: 'expensas',       label: 'Expensas',          emoji: '🏠', amountARS: saved.expensas || 0,    editable: true, categoryName: 'Casa' },
       { key: 'prestamo',       label: 'Préstamo + Seguro', emoji: '🚗', amountARS: saved.prestamo || 0,    editable: true, categoryName: 'Auto' },
       { key: 'cochera',        label: 'Cochera + Lavado',  emoji: '🅿️', amountARS: saved.cochera || 0,     editable: true, categoryName: 'Auto' },
       { key: 'patente',        label: 'Patente',           emoji: '📋', amountARS: saved.patente || 0,     editable: true, categoryName: 'Auto' },
       { key: 'multa',          label: 'Multa',             emoji: '⚠️', amountARS: saved.multa || 0,       editable: true, categoryName: 'Auto' },
-      { key: 'obra_social',    label: 'Obra Social',       emoji: '❤️', amountARS: obSocARS || saved.obra_social || 0, editable: true, categoryName: 'Salud' },
     ]);
     if (Array.isArray(saved.extras)) {
       setExtraItems(saved.extras.map((e: any) => ({
@@ -521,7 +520,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
       setExtraItems([]);
     }
     setTcBlue(defaultBlueRate);
-  }, [step, bcTotalARS, santTotalARS, visaCiudadARS, obSocARS, defaultBlueRate]);
+  }, [step, bcTotalARS, santTotalARS, visaCiudadMamaARS, visaCiudadPapaARS, defaultBlueRate]);
 
   const totalARS = items.reduce((s, i) => s + (i.amountARS || 0), 0) + extraItems.reduce((s, i) => s + (i.amountARS || 0), 0);
   const usdExacto = tcBlue > 0 ? totalARS / tcBlue : 0;
@@ -536,23 +535,27 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
     setProcessing(true);
     try {
       const fxFallback = arsToUsd || 0.00072;
-      let bc = 0, sant = 0, visaCiudad = 0, obSoc = 0;
+      let sant = 0, visaCiudadMama = 0, visaCiudadPapa = 0;
 
       const bcFiles = [iebraFile, kollikerFile].filter((f): f is File => !!f);
-      const allIebra: ParsedTransaction[] = [];
-      const allKolliker: ParsedTransaction[] = [];
+      const allMama: ParsedTransaction[] = [];
+      const allPapa: ParsedTransaction[] = [];
       for (const f of bcFiles) {
         const text = await extractPdfText(f);
         // Card 1689 (mamá) — todos los gastos
-        const iebraRowsFromFile = parseBancoCiudad(text, fxFallback);
-        if (iebraRowsFromFile.length > 0) {
+        const mamaRows = parseBancoCiudad(text, fxFallback, '1689');
+        if (mamaRows.length > 0) {
           const { ars: vcARS, usd: vcUSD } = extractCardTotal(text, '1689');
-          visaCiudad += vcARS + (vcUSD > 0 ? vcUSD / fxFallback : 0);
-          allIebra.push(...iebraRowsFromFile);
+          visaCiudadMama += vcARS + (vcUSD > 0 ? vcUSD / fxFallback : 0);
+          allMama.push(...mamaRows);
         }
-        // Card 8157 (papá) — solo OB SOC / PODER JUD
-        const kollikerRowsFromFile = parseBancoCiudadObSoc(text, fxFallback);
-        if (kollikerRowsFromFile.length > 0) allKolliker.push(...kollikerRowsFromFile);
+        // Card 8157 (papá) — todos los gastos
+        const papaRows = parseBancoCiudad(text, fxFallback, '8157');
+        if (papaRows.length > 0) {
+          const { ars: vcARS, usd: vcUSD } = extractCardTotal(text, '8157');
+          visaCiudadPapa += vcARS + (vcUSD > 0 ? vcUSD / fxFallback : 0);
+          allPapa.push(...papaRows);
+        }
       }
       // Dedup por external_id
       const dedup = (arr: ParsedTransaction[]) => {
@@ -564,19 +567,17 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
           return true;
         });
       };
-      const iebraDedup = dedup(allIebra);
-      const kollikerDedup = dedup(allKolliker);
-      obSoc = kollikerDedup.reduce((s, r) => s + r.amountARS, 0);
-      bc = visaCiudad + obSoc;
+      const mamaDedup = dedup(allMama);
+      const papaDedup = dedup(allPapa);
 
-      setIebraRows(iebraDedup.map(r => ({
+      setIebraRows(mamaDedup.map(r => ({
         ...r,
         categoryName: inferCategoryName(r.description) || 'Casa',
         selected: true,
       })));
-      setKollikerRows(kollikerDedup.map(r => ({
+      setKollikerRows(papaDedup.map(r => ({
         ...r,
-        categoryName: 'Salud',
+        categoryName: inferCategoryName(r.description) || 'Casa',
         selected: true,
       })));
 
@@ -591,10 +592,10 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
         })));
       }
 
-      setBcTotalARS(bc);
+      setBcTotalARS(visaCiudadMama + visaCiudadPapa);
       setSantTotalARS(sant);
-      setVisaCiudadARS(visaCiudad);
-      setObSocARS(obSoc);
+      setVisaCiudadMamaARS(visaCiudadMama);
+      setVisaCiudadPapaARS(visaCiudadPapa);
       setStep(2);
     } catch (e: any) {
       toast.error(e.message || 'Error procesando PDFs');
@@ -649,9 +650,9 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
         });
       }
 
-      // 2. Ítems manuales (todos los items con monto > 0, incluyendo los no editables)
+      // 2. Ítems manuales: solo los editables con monto > 0 (los autollenados de tarjeta vienen del PDF)
       const allItems = [
-        ...items.filter(i => i.amountARS > 0),
+        ...items.filter(i => i.editable && i.amountARS > 0),
         ...extraItems.filter(e => e.amountARS > 0 && e.label.trim()),
       ];
       for (const item of allItems) {
@@ -772,9 +773,9 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
           const setterFor = (src: RowSrc) =>
             src === 'iebra' ? setIebraRows : src === 'kolliker' ? setKollikerRows : setSantRows;
           const rowsFor = (key: string): { rows: Row[]; src: RowSrc } | null => {
-            if (key === 'visa_ciudad') return { rows: iebraRows, src: 'iebra' };
+            if (key === 'visa_ciudad_mama') return { rows: iebraRows, src: 'iebra' };
+            if (key === 'visa_ciudad_papa') return { rows: kollikerRows, src: 'kolliker' };
             if (key === 'visa_santander') return { rows: santRows, src: 'sant' };
-            if (key === 'obra_social') return { rows: kollikerRows, src: 'kolliker' };
             return null;
           };
           const renderPdfRows = (key: string) => {
@@ -821,19 +822,18 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
             const expanded = !!expandedDetails[key];
             const selectedCount = rows.filter(r => r.selected).length;
             return (
-              <div className="ml-9 mt-1 mb-2 border rounded-lg overflow-hidden bg-muted/20">
+              <div className="mt-1 mb-2 border rounded-lg overflow-hidden bg-muted/20">
                 <button
                   type="button"
                   onClick={() => setExpandedDetails(prev => ({ ...prev, [key]: !prev[key] }))}
-                  className="w-full flex items-center justify-between px-3 py-1.5 bg-muted/40 hover:bg-muted/60 transition-colors"
+                  className="w-full flex items-center gap-2 px-3 py-1.5 bg-muted/40 hover:bg-muted/60 transition-colors text-left"
                 >
                   <span className="text-[11px] font-medium text-muted-foreground">
                     {expanded ? '▾' : '▸'} Detalle ({selectedCount}/{rows.length} seleccionadas)
                   </span>
                   <span className="text-[10px] text-muted-foreground">
-                    {arsIdx.length > 0 && `${arsIdx.length} ARS`}
-                    {arsIdx.length > 0 && usdIdx.length > 0 && ' · '}
-                    {usdIdx.length > 0 && `${usdIdx.length} USD`}
+                    {arsIdx.length > 0 && `· ${arsIdx.length} ARS`}
+                    {usdIdx.length > 0 && ` · ${usdIdx.length} USD`}
                   </span>
                 </button>
                 {expanded && (
@@ -905,7 +905,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
                                 </SelectContent>
                               </Select>
                             ) : (
-                              <span className="text-xs text-muted-foreground w-28 shrink-0">{it.categoryName}</span>
+                              <span className="w-28 shrink-0" />
                             )}
                           </div>
                           {renderPdfRows(it.key)}
@@ -1428,6 +1428,8 @@ function TransferDialog({ account, onClose }: { account: any; onClose: () => voi
 
 const ITEM_META: Record<string, { label: string; emoji: string }> = {
   visa_ciudad: { label: 'VISA Ciudad', emoji: '🏦' },
+  visa_ciudad_mama: { label: 'VISA Ciudad — Mamá', emoji: '🏦' },
+  visa_ciudad_papa: { label: 'VISA Ciudad — Papá', emoji: '🏦' },
   visa_santander: { label: 'VISA Santander', emoji: '🏦' },
   amex: { label: 'AMEX Santander', emoji: '💳' },
   expensas: { label: 'Expensas', emoji: '🏠' },
@@ -1438,7 +1440,7 @@ const ITEM_META: Record<string, { label: string; emoji: string }> = {
   obra_social: { label: 'Obra Social', emoji: '❤️' },
 };
 
-const CARD_KEYS = ['visa_ciudad', 'visa_santander', 'amex'];
+const CARD_KEYS = ['visa_ciudad', 'visa_ciudad_mama', 'visa_ciudad_papa', 'visa_santander', 'amex'];
 
 type RangeFilter = '6' | '12' | '24' | 'all';
 
