@@ -411,6 +411,7 @@ export default function ImportPage() {
       setResultMsg(`${toImport.length} transacciones importadas, ${dupCount} duplicados ignorados`);
       toast.success('Importación completa');
       silentRefreshRecurring();
+      setRows([]);
       setArqMonth('');
       setArsFile(null);
       setUsdFile(null);
