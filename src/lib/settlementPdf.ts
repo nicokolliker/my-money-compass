@@ -556,7 +556,7 @@ export async function generateSettlementPdf(data: SettlementPdfData): Promise<js
   ];
 
   for (const s of sections) {
-    y = drawSection(doc, s, y, margin, pageW, font);
+    y = drawSection(doc, s, y, margin, pageW, font, emojiFontResolved);
   }
 
   // ---------- MANUAL ITEMS ----------
