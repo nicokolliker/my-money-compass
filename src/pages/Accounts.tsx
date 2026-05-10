@@ -26,6 +26,7 @@ import { useImportLog } from '@/hooks/useImportLog';
 import { useArqPendingReconciliations } from '@/hooks/useArqReconciliation';
 import { ArqReconciliationSheet } from '@/components/accounts/ArqReconciliationSheet';
 import { AccountReconciliationSheet } from '@/components/accounts/AccountReconciliationSheet';
+import { AccountDetailSheet } from '@/components/accounts/AccountDetailSheet';
 import { useQuery } from '@tanstack/react-query';
 import { useUserId } from '@/hooks/useAuthUser';
 import { useUserSettings } from '@/hooks/useUserSettings';
@@ -79,6 +80,7 @@ export default function Accounts() {
   const [showPostCreate, setShowPostCreate] = useState(false);
   const [arqSheetAccount, setArqSheetAccount] = useState<any>(null);
   const [destSheetAccount, setDestSheetAccount] = useState<any>(null);
+  const [detailAccount, setDetailAccount] = useState<any>(null);
 
   // Pending counts per destination account (MP/Galicia) for badges
   const userId = useUserId();
@@ -296,7 +298,11 @@ export default function Accounts() {
                             <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
                           </button>
                         )}
-                        <button onClick={() => openEdit(a)} className="flex items-center gap-3 flex-1 min-w-0 py-3 text-left hover:bg-accent/50 active:bg-accent rounded-lg px-2 -mx-2 transition-colors">
+                        {(() => {
+                          const isSpecial = isArqAccount(a.name) || isTrackedDestAccount(a.name);
+                          const onRowClick = isSpecial ? () => openEdit(a) : () => setDetailAccount(a);
+                          return (
+                        <button onClick={onRowClick} className="flex items-center gap-3 flex-1 min-w-0 py-3 text-left hover:bg-accent/50 active:bg-accent rounded-lg px-2 -mx-2 transition-colors">
                           <AccountLogo name={a.name} institution={(a as any).institution} />
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5">
@@ -354,6 +360,17 @@ export default function Accounts() {
                             </div>
                           </div>
                         </button>
+                          );
+                        })()}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
+                          onClick={() => openEdit(a)}
+                          title="Editar cuenta"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive">
@@ -597,6 +614,12 @@ export default function Accounts() {
           balanceUsd={destSheetAccount.computed_balance_usd}
         />
       )}
+      {/* Generic account detail sheet */}
+      <AccountDetailSheet
+        open={!!detailAccount}
+        onClose={() => setDetailAccount(null)}
+        account={detailAccount}
+      />
     </div>
   );
 }

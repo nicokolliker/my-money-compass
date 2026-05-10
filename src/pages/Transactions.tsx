@@ -1,4 +1,5 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useTransactions, useDeleteTransaction, useUpdateTransaction } from '@/hooks/useTransactions';
@@ -160,15 +161,27 @@ function ConcilRow({ row, onImport }: { row: any; onImport: () => void }) {
 }
 
 export default function Transactions() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const initialAccountId = (location.state as any)?.accountId as string | undefined;
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
-  const [accountFilter, setAccountFilter] = useState('all');
+  const [accountFilter, setAccountFilter] = useState<string>(initialAccountId || 'all');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [showDateFilter, setShowDateFilter] = useState(false);
   const [uncategorizedOnly, setUncategorizedOnly] = useState(false);
   const [editTx, setEditTx] = useState<any>(null);
+
+  // Clear location state once consumed so refreshes don't re-apply it
+  useEffect(() => {
+    if (initialAccountId) {
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
 
   const { data: transactions, isLoading, error } = useTransactions({
     search: search || undefined,
