@@ -526,7 +526,12 @@ export default function Transactions() {
                                     {cat ? (
                                       <span className="flex items-center gap-1">
                                         <span>{cat.icon || '📌'}</span>
-                                        <span>{cat.name}</span>
+                                        <span>
+                                          {cat.name}
+                                          {cat.name === 'Digital' && (tx as any).subcategories?.name
+                                            ? ` · ${(tx as any).subcategories.name}`
+                                            : ''}
+                                        </span>
                                       </span>
                                     ) : '+ Category'}
                                   </button>
