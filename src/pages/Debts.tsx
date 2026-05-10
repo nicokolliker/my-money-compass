@@ -1662,15 +1662,21 @@ function ViejoCycleHistory({ importLog }: { importLog: any[] }) {
               Liquidación {selectedMonth ? format(new Date(selectedMonth + '-01T00:00:00'), 'MMMM yyyy', { locale: es }) : ''}
             </DialogTitle>
           </DialogHeader>
-          {selected?.parsed ? (
+          {selected ? (
             <>
-              <SettlementDetail parsed={selected.parsed} />
+              {selected.parsed ? (
+                <SettlementDetail parsed={selected.parsed} />
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Esta liquidación es anterior y no tiene desglose detallado guardado.
+                </p>
+              )}
               <div className="flex justify-end pt-2">
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    const p = selected.parsed;
+                    const p = selected.parsed || {};
                     const monthLabel = format(new Date(selectedMonth + '-01T00:00:00'), 'MMMM yyyy', { locale: es });
                     const breakdown: Record<string, number> = p.breakdown || {};
                     const manualItems = Object.entries(breakdown)
@@ -1687,7 +1693,7 @@ function ViejoCycleHistory({ importLog }: { importLog: any[] }) {
                       manualItems,
                       totalARS: p.totalARS || 0,
                       tcBlue: p.tcBlue || 0,
-                      usdAPagar: p.usdPagado || 0,
+                      usdAPagar: p.usdPagado || Math.abs(Number(selected.tx?.amount_usd) || 0),
                       vueltoARS: p.vueltoARS || 0,
                     }, `liquidacion-${selectedMonth}.pdf`);
                   }}
@@ -1696,9 +1702,7 @@ function ViejoCycleHistory({ importLog }: { importLog: any[] }) {
                 </Button>
               </div>
             </>
-          ) : (
-            <p className="text-sm text-muted-foreground">No hay detalles guardados para este mes.</p>
-          )}
+          ) : null}
         </DialogContent>
       </Dialog>
     </>
