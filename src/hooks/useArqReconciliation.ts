@@ -22,6 +22,7 @@ export interface ArqReconciliation {
   reconciled_at: string | null;
   total_spent_usd: number | null;
   balance_after_usd: number | null;
+  last_import_date: string | null;
   created_at: string;
   updated_at: string;
 }
