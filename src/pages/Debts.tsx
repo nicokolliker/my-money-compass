@@ -585,7 +585,10 @@ function ViejoSettlementWizard({ open, onOpenChange, onSantTotalDetected }: { op
 
       if (santFile) {
         const text = await extractPdfText(santFile);
-        const rows = parseSantander(text, fxFallback);
+        const { transactions: rows, cardSubtotals: santSubs } = parseSantanderWithSubtotals(text, fxFallback, '5829');
+        for (const [k, v] of Object.entries(santSubs)) {
+          subtotals[k] = (subtotals[k] || 0) + v;
+        }
         sant = rows.reduce((s, r) => s + r.amountARS, 0);
         setSantRows(rows.map(r => ({
           ...r,
@@ -593,6 +596,8 @@ function ViejoSettlementWizard({ open, onOpenChange, onSantTotalDetected }: { op
           selected: true,
         })));
       }
+
+      setCardSubtotals(subtotals);
 
       setBcTotalARS(visaCiudadMama + visaCiudadPapa);
       setSantTotalARS(sant);
