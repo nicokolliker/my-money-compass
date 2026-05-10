@@ -54,6 +54,19 @@ export function extractCardTotal(pdfText: string, cardNumber: string): { ars: nu
   };
 }
 
+/** Scan the whole statement and return ARS totals for every detected card suffix. */
+export function extractAllCardSubtotals(pdfText: string): Record<string, number> {
+  const re = /Tarjeta\s+(\d{4})\s+Total\s+Consumos[^\d]*(\d[\d.,]+)/gi;
+  const out: Record<string, number> = {};
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(pdfText)) !== null) {
+    const suffix = m[1];
+    const ars = parseArsAmount(m[2]);
+    out[suffix] = (out[suffix] || 0) + ars;
+  }
+  return out;
+}
+
 function parseBlock(
   block: string,
   cardPrefix: string,

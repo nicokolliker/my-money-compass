@@ -53,15 +53,65 @@ export function CreditCardDebtCard() {
     },
   });
 
-  const cardBalances = useMemo(() => {
-    if (!lastSettlement?.notes) return [];
-    let parsed: any = null;
-    try { parsed = JSON.parse(lastSettlement.notes); } catch { return []; }
-    const bd = parsed?.breakdown || {};
-    return Object.keys(CARD_LABELS)
-      .map(k => ({ key: k, label: CARD_LABELS[k], ars: Number(bd[k] || 0) }))
-      .filter(c => c.ars > 0);
+  // Accounts that have my_card_suffix set or are flagged as own card
+  const { data: ownCardAccounts } = useQuery({
+    queryKey: ['own-card-accounts'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('accounts')
+        .select('id, name, my_card_suffix, is_own_card, type')
+        .eq('type', 'credit_card')
+        .eq('is_active', true);
+      return data || [];
+    },
+  });
+
+  const { settlementParsed, settlementCardSubs } = useMemo(() => {
+    if (!lastSettlement?.notes) return { settlementParsed: null, settlementCardSubs: {} as Record<string, number> };
+    try {
+      const p = JSON.parse(lastSettlement.notes);
+      return { settlementParsed: p, settlementCardSubs: (p?.cardSubtotals || {}) as Record<string, number> };
+    } catch { return { settlementParsed: null, settlementCardSubs: {} as Record<string, number> }; }
   }, [lastSettlement]);
+
+  const cardBalances = useMemo(() => {
+    const bd = settlementParsed?.breakdown || {};
+    const subs = settlementCardSubs;
+    const rows: { key: string; label: string; ars: number }[] = [];
+
+    // 1) Per-account rows using my_card_suffix (preferred)
+    const suffixesUsed = new Set<string>();
+    for (const a of (ownCardAccounts || []) as any[]) {
+      const suf = a.my_card_suffix as string | null;
+      if (suf && subs[suf] != null) {
+        suffixesUsed.add(suf);
+        rows.push({
+          key: `acct-${a.id}`,
+          label: `${a.name} (tarjeta •••• ${suf})`,
+          ars: Number(subs[suf] || 0),
+        });
+      } else if (a.is_own_card) {
+        // Fallback to full balance — read computed balance separately would require another query;
+        // for now use the legacy breakdown key if it loosely matches the account name.
+        const guess = Object.keys(bd).find(k => a.name.toLowerCase().includes(k.replace(/_/g, ' ')));
+        rows.push({
+          key: `acct-${a.id}`,
+          label: a.name,
+          ars: guess ? Number(bd[guess] || 0) : 0,
+        });
+      }
+    }
+
+    // 2) Legacy fallback — show breakdown keys that aren't already covered by an account suffix
+    Object.keys(CARD_LABELS).forEach(k => {
+      const ars = Number(bd[k] || 0);
+      if (ars > 0 && !rows.some(r => r.label.includes(CARD_LABELS[k]))) {
+        rows.push({ key: k, label: CARD_LABELS[k], ars });
+      }
+    });
+
+    return rows.filter(r => r.ars > 0);
+  }, [settlementParsed, settlementCardSubs, ownCardAccounts]);
 
   const pendingCuotas = useMemo(() => {
     if (!cuotaTxs) return [];

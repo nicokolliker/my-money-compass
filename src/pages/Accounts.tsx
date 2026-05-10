@@ -71,7 +71,7 @@ export default function Accounts() {
   const binanceTotalUsd = binanceBalances.reduce((s: number, b: any) => s + (b.value_usd || 0), 0);
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: '', type: 'bank' as string, institution: '', currency: 'USD', opening_balance: '0', notes: '', group_id: '', exclude_from_net_worth: false });
+  const [form, setForm] = useState({ name: '', type: 'bank' as string, institution: '', currency: 'USD', opening_balance: '0', notes: '', group_id: '', exclude_from_net_worth: false, my_card_suffix: '', is_own_card: false });
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [showGroupForm, setShowGroupForm] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
@@ -171,6 +171,8 @@ export default function Accounts() {
     try {
       const payload: any = { name: form.name, type: form.type, institution: form.institution || null, currency: form.currency, opening_balance: parseFloat(form.opening_balance), notes: form.notes || null, exclude_from_net_worth: form.exclude_from_net_worth };
       payload.group_id = form.group_id || null;
+      payload.my_card_suffix = form.type === 'credit_card' && form.my_card_suffix ? form.my_card_suffix : null;
+      payload.is_own_card = form.type === 'credit_card' && !!form.my_card_suffix && !!form.is_own_card;
 
       if (editId) {
         await updateAccount.mutateAsync({ id: editId, ...payload });
@@ -186,7 +188,7 @@ export default function Accounts() {
   };
 
   const openEdit = (a: any) => {
-    setForm({ name: a.name, type: a.type, institution: a.institution || '', currency: a.currency, opening_balance: String(a.opening_balance), notes: a.notes || '', group_id: a.group_id || '', exclude_from_net_worth: !!(a as any).exclude_from_net_worth });
+    setForm({ name: a.name, type: a.type, institution: a.institution || '', currency: a.currency, opening_balance: String(a.opening_balance), notes: a.notes || '', group_id: a.group_id || '', exclude_from_net_worth: !!(a as any).exclude_from_net_worth, my_card_suffix: (a as any).my_card_suffix || '', is_own_card: !!(a as any).is_own_card });
     setEditId(a.id);
     setShowForm(true);
   };
@@ -521,6 +523,34 @@ export default function Accounts() {
               />
             </div>
             <div><Label>Notes</Label><Input value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} className="mt-1 rounded-xl" /></div>
+            {form.type === 'credit_card' && (
+              <>
+                <div>
+                  <Label>Mi tarjeta (últimos 4 dígitos)</Label>
+                  <Input
+                    inputMode="numeric"
+                    maxLength={4}
+                    placeholder="1689"
+                    value={form.my_card_suffix}
+                    onChange={e => setForm(f => ({ ...f, my_card_suffix: e.target.value.replace(/\D/g, '').slice(0, 4) }))}
+                    className="mt-1 rounded-xl"
+                  />
+                  <p className="text-[11px] text-muted-foreground mt-1">Ej: 1689 — para identificar tus cargos en el resumen</p>
+                </div>
+                {form.my_card_suffix.length === 4 && (
+                  <div className="flex items-center justify-between rounded-xl border border-border px-3 py-2.5">
+                    <div>
+                      <Label className="text-sm cursor-pointer">Es tarjeta propia</Label>
+                      <p className="text-[11px] text-muted-foreground">Si toda la cuenta refleja sólo tus gastos</p>
+                    </div>
+                    <Switch
+                      checked={form.is_own_card}
+                      onCheckedChange={v => setForm(f => ({ ...f, is_own_card: v }))}
+                    />
+                  </div>
+                )}
+              </>
+            )}
             <Button className="w-full h-12 rounded-xl" onClick={handleSave} disabled={createAccount.isPending || updateAccount.isPending}>Save</Button>
           </div>
         </DialogContent>
@@ -546,7 +576,7 @@ export default function Accounts() {
               </div>
             </div>
             <button
-              onClick={() => { setShowAddChoice(false); setEditId(null); setForm({ name: '', type: 'bank', institution: '', currency: 'USD', opening_balance: '0', notes: '', group_id: '', exclude_from_net_worth: false }); setShowForm(true); }}
+              onClick={() => { setShowAddChoice(false); setEditId(null); setForm({ name: '', type: 'bank', institution: '', currency: 'USD', opening_balance: '0', notes: '', group_id: '', exclude_from_net_worth: false, my_card_suffix: '', is_own_card: false }); setShowForm(true); }}
               className="w-full flex items-center gap-4 p-4 rounded-xl border hover:border-primary/40 hover:bg-accent/50 transition-colors text-left"
             >
               <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0">

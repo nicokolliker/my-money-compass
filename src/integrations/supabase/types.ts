@@ -111,7 +111,9 @@ export type Database = {
           institution: string | null
           integration_id: string | null
           is_active: boolean
+          is_own_card: boolean
           logo_url: string | null
+          my_card_suffix: string | null
           name: string
           notes: string | null
           official_balance: number | null
@@ -132,7 +134,9 @@ export type Database = {
           institution?: string | null
           integration_id?: string | null
           is_active?: boolean
+          is_own_card?: boolean
           logo_url?: string | null
+          my_card_suffix?: string | null
           name: string
           notes?: string | null
           official_balance?: number | null
@@ -153,7 +157,9 @@ export type Database = {
           institution?: string | null
           integration_id?: string | null
           is_active?: boolean
+          is_own_card?: boolean
           logo_url?: string | null
+          my_card_suffix?: string | null
           name?: string
           notes?: string | null
           official_balance?: number | null
@@ -415,6 +421,7 @@ export type Database = {
       }
       invoices: {
         Row: {
+          card_subtotals: Json | null
           cliente: string
           created_at: string
           estado: string
@@ -429,6 +436,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          card_subtotals?: Json | null
           cliente?: string
           created_at?: string
           estado?: string
@@ -443,6 +451,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          card_subtotals?: Json | null
           cliente?: string
           created_at?: string
           estado?: string

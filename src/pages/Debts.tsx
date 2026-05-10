@@ -25,8 +25,8 @@ import { useBlueDollarRate } from '@/hooks/useBlueDollar';
 import { useCreateTransfer } from '@/hooks/useTransactions';
 import { MerchantLogo } from '@/components/MerchantLogo';
 import { formatUSD } from '@/lib/constants';
-import { parseBancoCiudad, extractCardTotal } from '@/lib/importers/bancoCiudadParser';
-import { parseSantander } from '@/lib/importers/santanderParser';
+import { parseBancoCiudad, extractCardTotal, extractAllCardSubtotals } from '@/lib/importers/bancoCiudadParser';
+import { parseSantander, parseSantanderWithSubtotals } from '@/lib/importers/santanderParser';
 import type { ParsedTransaction } from '@/lib/importers/arqParser';
 import { parseSplitwise, type SplitwiseRow } from '@/lib/importers/splitwiseParser';
 import { inferCategoryName } from '@/hooks/useRuleSuggestions';
@@ -454,6 +454,7 @@ function ViejoSettlementWizard({ open, onOpenChange, onSantTotalDetected }: { op
   const [resultUsd, setResultUsd] = useState(0);
   const [resultVuelto, setResultVuelto] = useState(0);
   const [expandedDetails, setExpandedDetails] = useState<Record<string, boolean>>({});
+  const [cardSubtotals, setCardSubtotals] = useState<Record<string, number>>({});
 
   const monthOptions = useMemo(() => {
     const arr: { ym: string; label: string }[] = [];
@@ -483,6 +484,7 @@ function ViejoSettlementWizard({ open, onOpenChange, onSantTotalDetected }: { op
       setIebraRows([]); setKollikerRows([]); setSantRows([]);
       setUsdAPagar(0);
       setResultUsd(0); setResultVuelto(0);
+      setCardSubtotals({});
     }
   }, [open]);
 
@@ -530,12 +532,18 @@ function ViejoSettlementWizard({ open, onOpenChange, onSantTotalDetected }: { op
     try {
       const fxFallback = arsToUsd || 0.00072;
       let sant = 0, visaCiudadMama = 0, visaCiudadPapa = 0;
+      const subtotals: Record<string, number> = {};
 
       const bcFiles = [iebraFile, kollikerFile].filter((f): f is File => !!f);
       const allMama: ParsedTransaction[] = [];
       const allPapa: ParsedTransaction[] = [];
       for (const f of bcFiles) {
         const text = await extractPdfText(f);
+        // Accumulate per-card subtotals from THIS PDF
+        const bcSubs = extractAllCardSubtotals(text);
+        for (const [k, v] of Object.entries(bcSubs)) {
+          subtotals[k] = (subtotals[k] || 0) + v;
+        }
         // Card 1689 (mamá) — todos los gastos
         const mamaRows = parseBancoCiudad(text, fxFallback, '1689');
         if (mamaRows.length > 0) {
@@ -577,7 +585,10 @@ function ViejoSettlementWizard({ open, onOpenChange, onSantTotalDetected }: { op
 
       if (santFile) {
         const text = await extractPdfText(santFile);
-        const rows = parseSantander(text, fxFallback);
+        const { transactions: rows, cardSubtotals: santSubs } = parseSantanderWithSubtotals(text, fxFallback, '5829');
+        for (const [k, v] of Object.entries(santSubs)) {
+          subtotals[k] = (subtotals[k] || 0) + v;
+        }
         sant = rows.reduce((s, r) => s + r.amountARS, 0);
         setSantRows(rows.map(r => ({
           ...r,
@@ -585,6 +596,8 @@ function ViejoSettlementWizard({ open, onOpenChange, onSantTotalDetected }: { op
           selected: true,
         })));
       }
+
+      setCardSubtotals(subtotals);
 
       setBcTotalARS(visaCiudadMama + visaCiudadPapa);
       setSantTotalARS(sant);
@@ -779,6 +792,7 @@ function ViejoSettlementWizard({ open, onOpenChange, onSantTotalDetected }: { op
         breakdown,
         extras: extrasForNotes,
         categoryBreakdown,
+        cardSubtotals,
       });
 
       await supabase.from('transactions').insert({
