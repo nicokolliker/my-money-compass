@@ -369,6 +369,7 @@ function drawCategoryBreakdown(
   margin: number,
   pageW: number,
   font: string,
+  emojiFont: string | null,
 ): number {
   const entries = Object.entries(breakdown)
     .filter(([, v]) => Number(v) > 0)
@@ -376,7 +377,7 @@ function drawCategoryBreakdown(
   if (entries.length === 0) return y;
 
   const sum = entries.reduce((s, [, v]) => s + Number(v), 0) || 1;
-  const rowH = 26;
+  const rowH = 28;
   const headerH = 38;
   const blockH = headerH + entries.length * rowH + 16;
 
@@ -411,8 +412,11 @@ function drawCategoryBreakdown(
 
   let ry = y + 6;
   const labelX = cardX + 14;
-  const barX = cardX + 150;
-  const barMaxW = cardW - 150 - 14 - 130; // leave room for amount + %
+  const labelW = 170;
+  const barX = cardX + labelW + 14;
+  const amountW = 100;
+  const pctW = 50;
+  const barMaxW = cardW - (barX - cardX) - amountW - pctW - 14;
   const amountX = pageW - margin - 14;
 
   entries.forEach(([name, val], idx) => {
@@ -422,34 +426,49 @@ function drawCategoryBreakdown(
 
     // Color dot
     rgb(doc, 'setFillColor', color);
-    doc.circle(labelX + 4, ry + 11, 3.5, 'F');
+    doc.circle(labelX + 4, ry + 12, 3.8, 'F');
+
+    // Emoji
+    const emoji = getCategoryEmoji(name);
+    if (emojiFont) {
+      rgb(doc, 'setTextColor', BRAND.ink);
+      doc.setFont(emojiFont, 'normal');
+      doc.setFontSize(11);
+      doc.text(emoji, labelX + 14, ry + 16);
+    }
+    const emojiW = emojiFont ? 16 : 0;
 
     // Label
     rgb(doc, 'setTextColor', BRAND.ink);
     doc.setFont(font, 'bold');
     doc.setFontSize(10);
-    const labelText = name.length > 22 ? name.slice(0, 21) + '…' : name;
-    doc.text(labelText, labelX + 14, ry + 14);
+    const maxLabelW = labelW - 18 - emojiW;
+    let labelText = name;
+    while (doc.getTextWidth(labelText) > maxLabelW && labelText.length > 3) {
+      labelText = labelText.slice(0, -2);
+    }
+    if (labelText !== name) labelText = labelText.slice(0, -1) + '…';
+    doc.text(labelText, labelX + 14 + emojiW, ry + 16);
 
     // Bar background
     rgb(doc, 'setFillColor', BRAND.border);
-    doc.roundedRect(barX, ry + 7, barMaxW, 8, 2, 2, 'F');
+    doc.roundedRect(barX, ry + 8, barMaxW, 8, 2, 2, 'F');
     // Bar fill
     rgb(doc, 'setFillColor', color);
     const w = Math.max(2, (pct / 100) * barMaxW);
-    doc.roundedRect(barX, ry + 7, w, 8, 2, 2, 'F');
+    doc.roundedRect(barX, ry + 8, w, 8, 2, 2, 'F');
 
     // % label
     rgb(doc, 'setTextColor', BRAND.muted);
     doc.setFont(font, 'normal');
     doc.setFontSize(9);
-    doc.text(pct.toFixed(1) + '%', barX + barMaxW + 8, ry + 14);
+    doc.text(pct.toFixed(1) + '%', barX + barMaxW + 8, ry + 16);
 
     // Amount
     rgb(doc, 'setTextColor', BRAND.ink);
     doc.setFont(font, 'bold');
     doc.setFontSize(10);
-    doc.text(fmtARS(v), amountX, ry + 14, { align: 'right' });
+    doc.text(fmtARS(v), amountX, ry + 16, { align: 'right' });
 
     ry += rowH;
   });
