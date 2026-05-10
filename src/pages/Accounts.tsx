@@ -27,6 +27,7 @@ import { useArqPendingReconciliations } from '@/hooks/useArqReconciliation';
 import { ArqReconciliationSheet } from '@/components/accounts/ArqReconciliationSheet';
 import { AccountReconciliationSheet } from '@/components/accounts/AccountReconciliationSheet';
 import { useQuery } from '@tanstack/react-query';
+import { useUserId } from '@/hooks/useAuthUser';
 import { useUserSettings } from '@/hooks/useUserSettings';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
