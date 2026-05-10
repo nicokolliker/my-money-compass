@@ -520,6 +520,13 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
       setSantTotalARS(sant);
       setVisaCiudadMamaARS(visaCiudadMama);
       setVisaCiudadPapaARS(visaCiudadPapa);
+
+      if (amexFile) {
+        const text = await extractPdfText(amexFile);
+        const total = parseAmexTotal(text);
+        setAmexARS(total);
+      }
+
       setStep(2);
     } catch (e: any) {
       toast.error(e.message || 'Error procesando PDFs');
