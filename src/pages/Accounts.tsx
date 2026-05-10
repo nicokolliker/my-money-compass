@@ -283,6 +283,15 @@ export default function Accounts() {
                             <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
                           </button>
                         )}
+                        {isTrackedDestAccount(a.name) && (
+                          <button
+                            onClick={() => setDestSheetAccount(a)}
+                            className="p-1.5 rounded-lg hover:bg-accent/50 transition-colors shrink-0"
+                            title="Ver conciliaciones"
+                          >
+                            <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
+                          </button>
+                        )}
                         <button onClick={() => openEdit(a)} className="flex items-center gap-3 flex-1 min-w-0 py-3 text-left hover:bg-accent/50 active:bg-accent rounded-lg px-2 -mx-2 transition-colors">
                           <AccountLogo name={a.name} institution={(a as any).institution} />
                           <div className="flex-1 min-w-0">
