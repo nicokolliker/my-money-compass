@@ -621,6 +621,7 @@ export default function ImportPage() {
           .reduce((s, r) => s + (r.amountUSD || 0), 0),
       });
       qc.invalidateQueries({ queryKey: ['account-reconciliations'] });
+      const dups = galiciaRows.filter((r) => r.duplicate).length;
       setGaliciaResultMsg(`${toImport.length} transacciones importadas, ${dups} duplicados ignorados`);
       toast.success('Importación completa');
       setGaliciaRows([]);
