@@ -1,8 +1,9 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useRules } from '@/hooks/useRules';
 import { useCategories } from '@/hooks/useCategories';
 import { useRecurringExpenses } from '@/hooks/useRecurringExpenses';
+import { useUserSettings, useUpsertUserSettings } from '@/hooks/useUserSettings';
 
 export type SuggestionType = 'category' | 'recurring' | 'rule';
 
