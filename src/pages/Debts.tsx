@@ -468,6 +468,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
   const [submitting, setSubmitting] = useState(false);
   const [resultUsd, setResultUsd] = useState(0);
   const [resultVuelto, setResultVuelto] = useState(0);
+  const [expandedDetails, setExpandedDetails] = useState<Record<string, boolean>>({});
 
   const monthOptions = useMemo(() => {
     const arr: { ym: string; label: string }[] = [];
@@ -537,30 +538,47 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
       const fxFallback = arsToUsd || 0.00072;
       let bc = 0, sant = 0, visaCiudad = 0, obSoc = 0;
 
-      if (iebraFile) {
-        const text = await extractPdfText(iebraFile);
-        const rows = parseBancoCiudad(text, fxFallback);
-        const { ars: vcARS, usd: vcUSD } = extractCardTotal(text, '1689');
-        visaCiudad = vcARS + (vcUSD > 0 ? vcUSD / fxFallback : 0);
-        bc += visaCiudad;
-        setIebraRows(rows.map(r => ({
-          ...r,
-          categoryName: inferCategoryName(r.description) || 'Casa',
-          selected: true,
-        })));
+      const bcFiles = [iebraFile, kollikerFile].filter((f): f is File => !!f);
+      const allIebra: ParsedTransaction[] = [];
+      const allKolliker: ParsedTransaction[] = [];
+      for (const f of bcFiles) {
+        const text = await extractPdfText(f);
+        // Card 1689 (mamá) — todos los gastos
+        const iebraRowsFromFile = parseBancoCiudad(text, fxFallback);
+        if (iebraRowsFromFile.length > 0) {
+          const { ars: vcARS, usd: vcUSD } = extractCardTotal(text, '1689');
+          visaCiudad += vcARS + (vcUSD > 0 ? vcUSD / fxFallback : 0);
+          allIebra.push(...iebraRowsFromFile);
+        }
+        // Card 8157 (papá) — solo OB SOC / PODER JUD
+        const kollikerRowsFromFile = parseBancoCiudadObSoc(text, fxFallback);
+        if (kollikerRowsFromFile.length > 0) allKolliker.push(...kollikerRowsFromFile);
       }
+      // Dedup por external_id
+      const dedup = (arr: ParsedTransaction[]) => {
+        const seen = new Set<string>();
+        return arr.filter((r) => {
+          const k = r.external_id || `${r.date}-${r.description}-${r.amountARS}`;
+          if (seen.has(k)) return false;
+          seen.add(k);
+          return true;
+        });
+      };
+      const iebraDedup = dedup(allIebra);
+      const kollikerDedup = dedup(allKolliker);
+      obSoc = kollikerDedup.reduce((s, r) => s + r.amountARS, 0);
+      bc = visaCiudad + obSoc;
 
-      if (kollikerFile) {
-        const text = await extractPdfText(kollikerFile);
-        const rows = parseBancoCiudadObSoc(text, fxFallback);
-        obSoc = rows.reduce((s, r) => s + r.amountARS, 0);
-        bc += obSoc;
-        setKollikerRows(rows.map(r => ({
-          ...r,
-          categoryName: 'Salud',
-          selected: true,
-        })));
-      }
+      setIebraRows(iebraDedup.map(r => ({
+        ...r,
+        categoryName: inferCategoryName(r.description) || 'Casa',
+        selected: true,
+      })));
+      setKollikerRows(kollikerDedup.map(r => ({
+        ...r,
+        categoryName: 'Salud',
+        selected: true,
+      })));
 
       if (santFile) {
         const text = await extractPdfText(santFile);
@@ -736,8 +754,8 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
               <p className="text-xs text-muted-foreground">
                 Subí los PDFs disponibles. Los faltantes podés cargarlos manualmente en el siguiente paso.
               </p>
-              <FileSlot label="BC IEBRA (1689)" file={iebraFile} onChange={setIebraFile} />
-              <FileSlot label="BC KOLLIKER (8157)" file={kollikerFile} onChange={setKollikerFile} />
+              <FileSlot label="BC mamá (resumen)" file={iebraFile} onChange={setIebraFile} />
+              <FileSlot label="BC papá (resumen)" file={kollikerFile} onChange={setKollikerFile} />
               <FileSlot label="Santander VISA" file={santFile} onChange={setSantFile} />
             </div>
             <DialogFooter className="border-t pt-4 mt-4 min-w-0">
@@ -800,23 +818,43 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
                 </div>
               );
             };
+            const expanded = !!expandedDetails[key];
+            const selectedCount = rows.filter(r => r.selected).length;
             return (
               <div className="ml-9 mt-1 mb-2 border rounded-lg overflow-hidden bg-muted/20">
-                {arsIdx.length > 0 && (
-                  <>
-                    <div className="px-3 py-1 bg-muted/40 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground border-b">
-                      En ARS · {arsIdx.length}
-                    </div>
-                    {arsIdx.map(renderRow)}
-                  </>
-                )}
-                {usdIdx.length > 0 && (
-                  <>
-                    <div className={cn('px-3 py-1 bg-muted/40 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground border-b', arsIdx.length > 0 && 'border-t')}>
-                      En USD · {usdIdx.length}
-                    </div>
-                    {usdIdx.map(renderRow)}
-                  </>
+                <button
+                  type="button"
+                  onClick={() => setExpandedDetails(prev => ({ ...prev, [key]: !prev[key] }))}
+                  className="w-full flex items-center justify-between px-3 py-1.5 bg-muted/40 hover:bg-muted/60 transition-colors"
+                >
+                  <span className="text-[11px] font-medium text-muted-foreground">
+                    {expanded ? '▾' : '▸'} Detalle ({selectedCount}/{rows.length} seleccionadas)
+                  </span>
+                  <span className="text-[10px] text-muted-foreground">
+                    {arsIdx.length > 0 && `${arsIdx.length} ARS`}
+                    {arsIdx.length > 0 && usdIdx.length > 0 && ' · '}
+                    {usdIdx.length > 0 && `${usdIdx.length} USD`}
+                  </span>
+                </button>
+                {expanded && (
+                  <div>
+                    {arsIdx.length > 0 && (
+                      <>
+                        <div className="px-3 py-1 bg-muted/30 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground border-t border-b">
+                          En ARS · {arsIdx.length}
+                        </div>
+                        {arsIdx.map(renderRow)}
+                      </>
+                    )}
+                    {usdIdx.length > 0 && (
+                      <>
+                        <div className="px-3 py-1 bg-muted/30 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground border-t border-b">
+                          En USD · {usdIdx.length}
+                        </div>
+                        {usdIdx.map(renderRow)}
+                      </>
+                    )}
+                  </div>
                 )}
               </div>
             );
