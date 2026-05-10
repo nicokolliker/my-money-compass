@@ -58,7 +58,7 @@ function classify(movimiento: string, debito: number, credito: number): ParsedTr
   return null;
 }
 
-export function parseGalicia(buffer: ArrayBuffer): ParsedTransaction[] {
+export function parseGalicia(buffer: ArrayBuffer, fxRate = 0): ParsedTransaction[] {
   const wb = XLSX.read(buffer, { type: 'array', cellDates: true });
   const sheet = wb.Sheets['Cuentas'] || wb.Sheets[wb.SheetNames[0]];
   if (!sheet) return [];
