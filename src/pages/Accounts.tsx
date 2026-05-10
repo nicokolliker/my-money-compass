@@ -546,7 +546,7 @@ export default function Accounts() {
               </div>
             </div>
             <button
-              onClick={() => { setShowAddChoice(false); setEditId(null); setForm({ name: '', type: 'bank', institution: '', currency: 'USD', opening_balance: '0', notes: '', group_id: '', exclude_from_net_worth: false }); setShowForm(true); }}
+              onClick={() => { setShowAddChoice(false); setEditId(null); setForm({ name: '', type: 'bank', institution: '', currency: 'USD', opening_balance: '0', notes: '', group_id: '', exclude_from_net_worth: false, my_card_suffix: '', is_own_card: false }); setShowForm(true); }}
               className="w-full flex items-center gap-4 p-4 rounded-xl border hover:border-primary/40 hover:bg-accent/50 transition-colors text-left"
             >
               <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0">
