@@ -3,6 +3,16 @@ import type { ParsedTransaction } from './arqParser';
 export interface SplitwiseRow extends ParsedTransaction {
   category_hint?: string;
   swType: 'expense' | 'receivable';
+  currency: 'USD' | 'ARS' | string;
+  userAmount: number; // raw signed user-column amount
+}
+
+export interface SplitwiseParseResult {
+  rows: SplitwiseRow[];
+  netBalance: number;            // sum of all user-column amounts (in dominant currency)
+  currency: 'USD' | 'ARS';       // dominant currency in the file
+  groupName: string;             // best-effort group label
+  earliestDate: string | null;   // ISO yyyy-mm-dd of oldest row
 }
 
 const CATEGORY_MAP: Record<string, string> = {
@@ -13,7 +23,8 @@ const CATEGORY_MAP: Record<string, string> = {
   Entretenimiento: 'Ocio',
 };
 
-const DEFAULT_CUTOFF = '2026-05-01';
+const DEFAULT_CUTOFF = '2015-01-01';
+const TOTAL_BALANCE_RE = /total\s*balance|saldo\s*total/i;
 
 function parseCsvLine(line: string): string[] {
   const out: string[] = [];
