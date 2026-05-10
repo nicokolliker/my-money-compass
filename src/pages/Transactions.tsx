@@ -30,45 +30,7 @@ import { es } from 'date-fns/locale';
 import { parseMercadoPago } from '@/lib/importers/mercadoPagoParser';
 import { parseArqStatements } from '@/lib/importers/arqParser';
 
-async function extractPdfText(file: File): Promise<string> {
-  return new Promise(async (resolve, reject) => {
-    try {
-      // Limpiar instancia previa si tiene versión incorrecta
-      if ((window as any).pdfjsLib?.version && (window as any).pdfjsLib.version !== '3.11.174') {
-        delete (window as any).pdfjsLib;
-      }
-
-      if (!(window as any).pdfjsLib) {
-        await new Promise<void>((res, rej) => {
-          const existing = document.querySelector('script[data-pdfjs]');
-          if (existing) { res(); return; }
-          const script = document.createElement('script');
-          script.setAttribute('data-pdfjs', '3.11.174');
-          script.src = 'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.min.js';
-          script.onload = () => res();
-          script.onerror = () => rej(new Error('No se pudo cargar pdf.js'));
-          document.head.appendChild(script);
-        });
-      }
-
-      const pdfjs = (window as any).pdfjsLib;
-      pdfjs.GlobalWorkerOptions.workerSrc =
-        'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
-
-      const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjs.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
-      let text = '';
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const content = await page.getTextContent();
-        text += content.items.map((item: any) => item.str).join(' ') + '\n';
-      }
-      resolve(text);
-    } catch (e) {
-      reject(e);
-    }
-  });
-}
+import { extractPdfText } from '@/lib/pdfReader';
 
 const MONTH_LABELS_FULL = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
