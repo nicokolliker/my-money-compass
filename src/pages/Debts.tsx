@@ -534,28 +534,45 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
   async function handleProcessFiles() {
     setProcessing(true);
     try {
-      let bc = 0, sant = 0;
-      let visaCiudad = 0;
-      let obSoc = 0;
       const fxFallback = arsToUsd || 0.00072;
+      let bc = 0, sant = 0, visaCiudad = 0, obSoc = 0;
+
       if (iebraFile) {
-        const iebraText = await extractPdfText(iebraFile);
-        const rows = parseBancoCiudad(iebraText, arsToUsd || 0);
-        bc += rows.reduce((s, r) => s + r.amountARS, 0);
-        const { ars: visaCiudadARSExtract, usd: visaCiudadUSD } = extractCardTotal(iebraText, '1689');
-        visaCiudad = visaCiudadARSExtract + (visaCiudadUSD > 0 ? visaCiudadUSD / fxFallback : 0);
+        const text = await extractPdfText(iebraFile);
+        const rows = parseBancoCiudad(text, fxFallback);
+        const { ars: vcARS, usd: vcUSD } = extractCardTotal(text, '1689');
+        visaCiudad = vcARS + (vcUSD > 0 ? vcUSD / fxFallback : 0);
+        bc += visaCiudad;
+        setIebraRows(rows.map(r => ({
+          ...r,
+          categoryName: inferCategoryName(r.description) || 'Casa',
+          selected: true,
+        })));
       }
+
       if (kollikerFile) {
-        const kollikerText = await extractPdfText(kollikerFile);
-        const rows = parseBancoCiudadObSoc(kollikerText, fxFallback);
-        bc += rows.reduce((s, r) => s + r.amountARS, 0);
-        obSoc = rows.reduce((s, t) => s + t.amountARS, 0);
+        const text = await extractPdfText(kollikerFile);
+        const rows = parseBancoCiudadObSoc(text, fxFallback);
+        obSoc = rows.reduce((s, r) => s + r.amountARS, 0);
+        bc += obSoc;
+        setKollikerRows(rows.map(r => ({
+          ...r,
+          categoryName: 'Salud',
+          selected: true,
+        })));
       }
+
       if (santFile) {
         const text = await extractPdfText(santFile);
-        const rows = parseSantander(text, arsToUsd || 0);
+        const rows = parseSantander(text, fxFallback);
         sant = rows.reduce((s, r) => s + r.amountARS, 0);
+        setSantRows(rows.map(r => ({
+          ...r,
+          categoryName: inferCategoryName(r.description) || 'Casa',
+          selected: true,
+        })));
       }
+
       setBcTotalARS(bc);
       setSantTotalARS(sant);
       setVisaCiudadARS(visaCiudad);
