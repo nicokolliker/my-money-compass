@@ -531,6 +531,7 @@ export default function ImportPage() {
       const dups = mpRows.filter((r) => r.duplicate).length;
       setMpResultMsg(`${toImport.length} transacciones importadas, ${dups} duplicados ignorados`);
       toast.success('Importación completa');
+      silentRefreshRecurring();
       setMpRows([]);
       setMpMonth('');
       setMpFile(null);
