@@ -905,7 +905,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
                                 </SelectContent>
                               </Select>
                             ) : (
-                              <span className="text-xs text-muted-foreground w-28 shrink-0">{it.categoryName}</span>
+                              <span className="w-28 shrink-0" />
                             )}
                           </div>
                           {renderPdfRows(it.key)}
