@@ -1503,7 +1503,9 @@ function ViejoCycleHistory({ importLog }: { importLog: any[] }) {
       let parsed: any = null;
       try { parsed = tx.notes ? JSON.parse(tx.notes) : null; } catch {}
       const ym = parsed?.month || (typeof tx.date === 'string' ? tx.date.slice(0, 7) : '');
-      if (ym && !m[ym]) m[ym] = { tx, parsed };
+      if (!ym) return;
+      // Prefer the entry that carries metadata (parsed.settlement)
+      if (!m[ym] || (!m[ym].parsed && parsed)) m[ym] = { tx, parsed };
     });
     return m;
   }, [liqs]);
