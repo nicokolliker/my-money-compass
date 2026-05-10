@@ -338,27 +338,38 @@ function InvoiceForm({ open, onClose, onSaved }: { open: boolean; onClose: () =>
         filled.push(`Nº ${nroMatch[1]}`);
       }
 
+      // Parser robusto: detecta cuál separador es decimal según posición
       const parseNum = (s: string) => {
-        // Si tiene coma, asumir formato es-AR: '.' miles, ',' decimal
-        if (s.includes(',')) return parseFloat(s.replace(/\./g, '').replace(',', '.'));
-        // Si solo tiene puntos, podría ser miles ('1.396') o decimal ('1396.00')
-        const parts = s.split('.');
-        if (parts.length === 2 && parts[1].length === 2) return parseFloat(s); // decimal
-        return parseFloat(s.replace(/\./g, '')); // miles
+        const lastComma = s.lastIndexOf(',');
+        const lastDot = s.lastIndexOf('.');
+        let decSep = '';
+        if (lastComma > lastDot) decSep = ',';
+        else if (lastDot > lastComma) {
+          const after = s.length - lastDot - 1;
+          if (after >= 1 && after <= 2 && lastComma === -1 && s.indexOf('.') === lastDot) decSep = '.';
+        }
+        let cleaned = s;
+        if (decSep === ',') cleaned = s.replace(/\./g, '').replace(',', '.');
+        else if (decSep === '.') cleaned = s;
+        else cleaned = s.replace(/[.,]/g, '');
+        return parseFloat(cleaned);
       };
 
-      const tcMatch = norm.match(/Tipo\s*de\s*Cambio[^\d]{0,10}([\d.,]+)/i);
+      // Captura UN número con formato válido (no runs interminables)
+      const NUM = '\\d{1,3}(?:[.,]\\d{3})*(?:[.,]\\d{1,4})?|\\d+(?:[.,]\\d{1,4})?';
+
+      const tcMatch = norm.match(new RegExp(`Tipo\\s*de\\s*Cambio[^\\d-]{0,10}(${NUM})`, 'i'));
       if (tcMatch) {
         const tc = parseNum(tcMatch[1]);
-        if (!isNaN(tc)) { setTcARS(String(tc)); filled.push(`TC ${tc}`); }
+        if (!isNaN(tc) && tc > 0) { setTcARS(String(tc)); filled.push(`TC ${tc}`); }
       }
 
-      const totalMatch = norm.match(/Importe\s*Total[^\d]{0,15}USD\s*([\d.,]+)/i)
-        || norm.match(/Importe\s*Total[^\d]{0,15}([\d.,]+)/i);
+      const totalMatch =
+        norm.match(new RegExp(`Importe\\s*Total[^\\d-]{0,15}USD\\s*(${NUM})`, 'i'))
+        || norm.match(new RegExp(`Importe\\s*Total[^\\d-]{0,15}(${NUM})`, 'i'));
       if (totalMatch) {
-        const raw = totalMatch[1].replace(/,/g, '');
-        const usd = parseFloat(raw);
-        if (!isNaN(usd)) { setMontoUSD(String(usd)); filled.push(`USD ${usd}`); }
+        const usd = parseNum(totalMatch[1]);
+        if (!isNaN(usd) && usd > 0) { setMontoUSD(String(usd)); filled.push(`USD ${usd}`); }
       }
 
       setPdfFile({ name: file.name, fields: filled });
