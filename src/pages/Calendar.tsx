@@ -322,6 +322,12 @@ export default function CalendarPage({ embedded = false }: { embedded?: boolean 
           </CardContent>
         </Card>
       )}
+
+      <ManualMatchDialog
+        instance={matchInstance}
+        open={!!matchInstance}
+        onOpenChange={(o) => { if (!o) setMatchInstance(null); }}
+      />
     </div>
   );
 }
