@@ -186,7 +186,7 @@ export default function Accounts() {
   };
 
   const openEdit = (a: any) => {
-    setForm({ name: a.name, type: a.type, institution: a.institution || '', currency: a.currency, opening_balance: String(a.opening_balance), notes: a.notes || '', group_id: a.group_id || '', exclude_from_net_worth: !!(a as any).exclude_from_net_worth });
+    setForm({ name: a.name, type: a.type, institution: a.institution || '', currency: a.currency, opening_balance: String(a.opening_balance), notes: a.notes || '', group_id: a.group_id || '', exclude_from_net_worth: !!(a as any).exclude_from_net_worth, my_card_suffix: (a as any).my_card_suffix || '', is_own_card: !!(a as any).is_own_card });
     setEditId(a.id);
     setShowForm(true);
   };
