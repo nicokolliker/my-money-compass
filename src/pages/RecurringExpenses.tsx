@@ -21,7 +21,7 @@ import { format, addMonths, addYears, addWeeks } from 'date-fns';
 import { DemoDataBanner } from '@/components/DemoDataBanner';
 import { MerchantLogo } from '@/components/MerchantLogo';
 import { useDemoData } from '@/hooks/useDemoData';
-import RecurringTracking from '@/components/recurring/RecurringTracking';
+import CalendarPage from './Calendar';
 
 // Status badge tones (Library list)
 const STATUS_STYLES: Record<DerivedInstanceState | 'none', { label: string; bg: string; color: string }> = {
