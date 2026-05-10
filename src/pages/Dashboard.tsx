@@ -20,6 +20,7 @@ import { useDemoData } from '@/hooks/useDemoData';
 import { useHomeAlerts } from '@/hooks/useHomeAlerts';
 import { cn } from '@/lib/utils';
 import { FundFlowDiagram } from '@/components/accounts/FundFlowDiagram';
+import { PendingCreditsBanner } from '@/components/PendingCreditsBanner';
 
 function greeting() {
   const h = new Date().getHours();
@@ -142,6 +143,7 @@ export default function Dashboard() {
       </div>
 
       {/* Alertas */}
+      <PendingCreditsBanner variant="inline" />
       {alerts.length > 0 && (
         <div className="space-y-2">
           {alerts.map(alert => (
