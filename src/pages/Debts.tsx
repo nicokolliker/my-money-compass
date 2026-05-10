@@ -1620,12 +1620,13 @@ function ViejoCycleHistory({ importLog }: { importLog: any[] }) {
                             <TableHead className="text-center">Manuales</TableHead>
                             <TableHead className="text-center">Liquidado</TableHead>
                             <TableHead className="text-right">Pagado</TableHead>
+                            <TableHead className="text-center w-10">PDF</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {rows.length === 0 && (
                             <TableRow>
-                              <TableCell colSpan={5} className="text-center text-xs text-muted-foreground py-6">
+                              <TableCell colSpan={6} className="text-center text-xs text-muted-foreground py-6">
                                 Sin registros para este rango.
                               </TableCell>
                             </TableRow>
@@ -1641,6 +1642,21 @@ function ViejoCycleHistory({ importLog }: { importLog: any[] }) {
                               <TableCell className="text-center text-sm">{r.manualCount > 0 ? `✓ (${r.manualCount})` : '—'}</TableCell>
                               <TableCell className="text-center text-sm">{r.liquidado ? <span className="text-success font-semibold">✓</span> : '—'}</TableCell>
                               <TableCell className="text-right font-mono text-sm">{r.liquidado ? formatUSD(r.usd) : '—'}</TableCell>
+                              <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                                {r.liquidado ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => downloadPdfFor(r.ym, r.parsed, r.tx)}
+                                    className="inline-flex items-center justify-center w-7 h-7 rounded-md text-muted-foreground hover:bg-muted hover:text-primary transition-colors"
+                                    title="Descargar PDF"
+                                    aria-label="Descargar PDF"
+                                  >
+                                    <Download className="h-3.5 w-3.5" />
+                                  </button>
+                                ) : (
+                                  <span className="text-muted-foreground/40">—</span>
+                                )}
+                              </TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
