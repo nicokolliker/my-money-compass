@@ -225,6 +225,8 @@ export default function ImportPage() {
   } | null>(null);
   const qc = useQueryClient();
   const invalidateArqRecons = useInvalidateArqReconciliations();
+  const refreshRecurring = useRefreshRecurringTracking();
+  const silentRefreshRecurring = () => { refreshRecurring.mutateAsync().catch(() => {}); };
 
   async function handleProcess() {
     if (!arsFile) {
