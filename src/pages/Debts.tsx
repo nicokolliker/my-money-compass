@@ -1542,9 +1542,35 @@ function ViejoCycleHistory({ importLog }: { importLog: any[] }) {
       ym,
       label: format(new Date(ym + '-01T00:00:00'), 'MMMM yyyy', { locale: es }),
       shortLabel: format(new Date(ym + '-01T00:00:00'), "MMM ''yy", { locale: es }),
-      hasImport, liquidado, manualCount, usd,
+      hasImport, liquidado, manualCount, usd, parsed: liq?.parsed, tx: liq?.tx,
     };
   }), [filteredMonths, byMonth, importLog]);
+
+  function downloadPdfFor(ym: string, parsed: any, tx: any) {
+    const monthLabel = format(new Date(ym + '-01T00:00:00'), 'MMMM yyyy', { locale: es });
+    const p = parsed || {};
+    const breakdown: Record<string, number> = p.breakdown || {};
+    const manualItems: any[] = Object.entries(breakdown)
+      .filter(([k, v]) => !CARD_KEYS.includes(k) && Number(v) > 0)
+      .map(([k, v]) => ({ label: ITEM_META[k]?.label || k, amountARS: Number(v) }));
+    if (Array.isArray(p.extras)) {
+      for (const e of p.extras) manualItems.push({ label: e.label, amountARS: e.amountARS, categoryName: e.categoryName });
+    }
+    const sumBreakdown = Object.values(breakdown).reduce((s: number, v) => s + Number(v || 0), 0);
+    const sumExtras = (p.extras || []).reduce((s: number, e: any) => s + Number(e.amountARS || 0), 0);
+    const totalARS = Number(p.totalARS) > 0 ? Number(p.totalARS) : (sumBreakdown + sumExtras);
+    downloadSettlementPdf({
+      monthLabel,
+      mamaRows: p.mamaRows || [],
+      papaRows: p.papaRows || [],
+      santRows: p.santRows || [],
+      manualItems,
+      totalARS,
+      tcBlue: Number(p.tcBlue) || 0,
+      usdAPagar: Number(p.usdPagado) || Math.abs(Number(tx?.amount_usd) || 0),
+      vueltoARS: Number(p.vueltoARS) || 0,
+    }, `liquidacion-${ym}.pdf`);
+  }
 
   const chartData = useMemo(() => [...rows].reverse().map((r) => ({
     month: r.shortLabel, usd: r.liquidado ? Math.round(r.usd) : 0, ym: r.ym, liquidado: r.liquidado,
@@ -1594,12 +1620,13 @@ function ViejoCycleHistory({ importLog }: { importLog: any[] }) {
                             <TableHead className="text-center">Manuales</TableHead>
                             <TableHead className="text-center">Liquidado</TableHead>
                             <TableHead className="text-right">Pagado</TableHead>
+                            <TableHead className="text-center w-10">PDF</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {rows.length === 0 && (
                             <TableRow>
-                              <TableCell colSpan={5} className="text-center text-xs text-muted-foreground py-6">
+                              <TableCell colSpan={6} className="text-center text-xs text-muted-foreground py-6">
                                 Sin registros para este rango.
                               </TableCell>
                             </TableRow>
@@ -1615,6 +1642,21 @@ function ViejoCycleHistory({ importLog }: { importLog: any[] }) {
                               <TableCell className="text-center text-sm">{r.manualCount > 0 ? `✓ (${r.manualCount})` : '—'}</TableCell>
                               <TableCell className="text-center text-sm">{r.liquidado ? <span className="text-success font-semibold">✓</span> : '—'}</TableCell>
                               <TableCell className="text-right font-mono text-sm">{r.liquidado ? formatUSD(r.usd) : '—'}</TableCell>
+                              <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                                {r.liquidado ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => downloadPdfFor(r.ym, r.parsed, r.tx)}
+                                    className="inline-flex items-center justify-center w-7 h-7 rounded-md text-muted-foreground hover:bg-muted hover:text-primary transition-colors"
+                                    title="Descargar PDF"
+                                    aria-label="Descargar PDF"
+                                  >
+                                    <Download className="h-3.5 w-3.5" />
+                                  </button>
+                                ) : (
+                                  <span className="text-muted-foreground/40">—</span>
+                                )}
+                              </TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
@@ -1675,28 +1717,7 @@ function ViejoCycleHistory({ importLog }: { importLog: any[] }) {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => {
-                    const p = selected.parsed || {};
-                    const monthLabel = format(new Date(selectedMonth + '-01T00:00:00'), 'MMMM yyyy', { locale: es });
-                    const breakdown: Record<string, number> = p.breakdown || {};
-                    const manualItems = Object.entries(breakdown)
-                      .filter(([k, v]) => !CARD_KEYS.includes(k) && Number(v) > 0)
-                      .map(([k, v]) => ({ label: ITEM_META[k]?.label || k, amountARS: Number(v) }));
-                    if (Array.isArray(p.extras)) {
-                      for (const e of p.extras) manualItems.push({ label: e.label, amountARS: e.amountARS, categoryName: e.categoryName } as any);
-                    }
-                    downloadSettlementPdf({
-                      monthLabel,
-                      mamaRows: p.mamaRows || [],
-                      papaRows: p.papaRows || [],
-                      santRows: p.santRows || [],
-                      manualItems,
-                      totalARS: p.totalARS || 0,
-                      tcBlue: p.tcBlue || 0,
-                      usdAPagar: p.usdPagado || Math.abs(Number(selected.tx?.amount_usd) || 0),
-                      vueltoARS: p.vueltoARS || 0,
-                    }, `liquidacion-${selectedMonth}.pdf`);
-                  }}
+                  onClick={() => selectedMonth && downloadPdfFor(selectedMonth, selected.parsed, selected.tx)}
                 >
                   <Download className="h-4 w-4 mr-1.5" /> Descargar PDF
                 </Button>
@@ -1719,10 +1740,22 @@ function SettlementDetail({ parsed }: { parsed: any }) {
       .map((k) => ({ key: k, label: ITEM_META[k]?.label || k, amount: Number(breakdown[k]) })),
   })).filter((g) => g.items.length > 0);
 
-  const otros = Object.entries(breakdown)
-    .filter(([k, v]) => !ITEM_META[k] && Number(v) > 0)
-    .map(([k, v]) => ({ key: k, label: k, amount: Number(v) }));
-  if (otros.length > 0) groups.push({ label: '➕ Otros', items: otros });
+  const extras = Array.isArray(parsed.extras) ? parsed.extras : [];
+  if (extras.length > 0) {
+    groups.push({
+      label: '➕ Otros',
+      items: extras.map((e: any, idx: number) => ({
+        key: `extra-${idx}`,
+        label: e.label || '—',
+        amount: Number(e.amountARS || 0),
+      })),
+    });
+  }
+
+  // Recompute total robustly: breakdown + extras (cards already included in breakdown)
+  const sumBreakdown = Object.values(breakdown).reduce((s: number, v) => s + Number(v || 0), 0);
+  const sumExtras = extras.reduce((s: number, e: any) => s + Number(e.amountARS || 0), 0);
+  const totalARS = Number(parsed.totalARS) > 0 ? Number(parsed.totalARS) : (sumBreakdown + sumExtras);
 
   return (
     <div className="space-y-4">
@@ -1743,7 +1776,7 @@ function SettlementDetail({ parsed }: { parsed: any }) {
       <div className="rounded-lg bg-muted/40 p-3 space-y-1 text-sm">
         <div className="flex justify-between">
           <span className="text-muted-foreground">Total ARS</span>
-          <span className="font-mono font-semibold">{formatARS(parsed.totalARS || 0)}</span>
+          <span className="font-mono font-semibold">{formatARS(totalARS)}</span>
         </div>
         <div className="flex justify-between">
           <span className="text-muted-foreground">TC Blue</span>
