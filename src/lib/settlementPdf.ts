@@ -484,6 +484,9 @@ export async function generateSettlementPdf(data: SettlementPdfData): Promise<js
 
   const fonts = await fetchPoppins();
   const font = fonts ? registerPoppins(doc, fonts) : 'helvetica';
+  const emojiBase64 = await fetchNotoEmoji();
+  const emojiFont = emojiBase64 ? registerNotoEmoji(doc, emojiBase64) : null;
+  const emojiFontResolved = emojiFont || null;
   doc.setFont(font, 'normal');
 
   // ---------- COVER HEADER ----------
