@@ -217,12 +217,7 @@ export default function CalendarPage({ embedded = false }: { embedded?: boolean 
         </div>
       ) : (
         <Card>
-          <CardHeader className="pb-2 flex flex-row items-center justify-between">
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setCurrentMonth(m => subMonths(m, 1))}><ChevronLeft className="h-4 w-4" /></Button>
-            <CardTitle className="text-sm font-medium">{format(currentMonth, 'MMMM yyyy')}</CardTitle>
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setCurrentMonth(m => addMonths(m, 1))}><ChevronRight className="h-4 w-4" /></Button>
-          </CardHeader>
-          <CardContent>
+          <CardContent className="pt-5">
             <div className="grid grid-cols-7 gap-1">
               {['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map(d => (
                 <div key={d} className="text-center text-[10px] text-muted-foreground font-medium py-1 uppercase tracking-wide">{d}</div>
