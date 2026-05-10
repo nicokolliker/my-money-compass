@@ -996,6 +996,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
             </div>
           </div>
         )}
+        </div>
       </DialogContent>
     </Dialog>
   );
