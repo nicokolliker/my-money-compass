@@ -947,6 +947,10 @@ export type Database = {
       }
       user_settings: {
         Row: {
+          binance_api_key: string | null
+          binance_api_secret: string | null
+          binance_balances: Json | null
+          binance_last_sync: string | null
           created_at: string
           updated_at: string
           user_id: string
@@ -955,6 +959,10 @@ export type Database = {
           wise_token: string | null
         }
         Insert: {
+          binance_api_key?: string | null
+          binance_api_secret?: string | null
+          binance_balances?: Json | null
+          binance_last_sync?: string | null
           created_at?: string
           updated_at?: string
           user_id: string
@@ -963,6 +971,10 @@ export type Database = {
           wise_token?: string | null
         }
         Update: {
+          binance_api_key?: string | null
+          binance_api_secret?: string | null
+          binance_balances?: Json | null
+          binance_last_sync?: string | null
           created_at?: string
           updated_at?: string
           user_id?: string
