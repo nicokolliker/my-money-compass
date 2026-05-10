@@ -18,6 +18,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 export default function CalendarPage({ embedded = false }: { embedded?: boolean } = {}) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [view, setView] = useState<'calendar' | 'timeline'>('timeline');
+  const effectiveView: 'calendar' | 'timeline' = embedded ? 'timeline' : view;
   const monthStart = startOfMonth(currentMonth).toISOString().split('T')[0];
   const monthEnd = endOfMonth(currentMonth).toISOString().split('T')[0];
 
@@ -79,10 +80,12 @@ export default function CalendarPage({ embedded = false }: { embedded?: boolean 
           <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refresh.isPending}>
             <RefreshCw className={`h-3.5 w-3.5 ${refresh.isPending ? 'animate-spin' : ''}`} />
           </Button>
-          <div className="flex rounded-xl overflow-hidden border">
-            <Button variant={view === 'timeline' ? 'secondary' : 'ghost'} size="sm" className="rounded-none h-8 text-xs" onClick={() => setView('timeline')}>Timeline</Button>
-            <Button variant={view === 'calendar' ? 'secondary' : 'ghost'} size="sm" className="rounded-none h-8 text-xs" onClick={() => setView('calendar')}>Calendar</Button>
-          </div>
+          {!embedded && (
+            <div className="flex rounded-xl overflow-hidden border">
+              <Button variant={view === 'timeline' ? 'secondary' : 'ghost'} size="sm" className="rounded-none h-8 text-xs" onClick={() => setView('timeline')}>Timeline</Button>
+              <Button variant={view === 'calendar' ? 'secondary' : 'ghost'} size="sm" className="rounded-none h-8 text-xs" onClick={() => setView('calendar')}>Calendar</Button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -121,7 +124,7 @@ export default function CalendarPage({ embedded = false }: { embedded?: boolean 
         </Card>
       </div>
 
-      {view === 'timeline' ? (
+      {effectiveView === 'timeline' ? (
         <div className="space-y-3">
           {Object.keys(dayEvents).length === 0 && (
             <div className="text-center py-12 text-muted-foreground">

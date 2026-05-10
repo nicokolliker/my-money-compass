@@ -45,8 +45,8 @@ function ProtectedRoutes() {
         <Route path="/transactions" element={<Transactions />} />
         <Route path="/analytics" element={<Analytics />} />
         <Route path="/planning" element={<Navigate to="/planning/recurring" replace />} />
+        <Route path="/planning/calendar" element={<Navigate to="/planning/recurring" replace />} />
         <Route path="/planning/recurring" element={<Planning initialTab="recurring" />} />
-        <Route path="/planning/calendar" element={<Planning initialTab="calendar" />} />
         <Route path="/planning/budget" element={<Planning initialTab="budget" />} />
         <Route path="/rules" element={<Rules />} />
         <Route path="/rules/categories" element={<Rules initialTab="categories" />} />
