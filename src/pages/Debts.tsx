@@ -127,84 +127,116 @@ export default function DebtsPage() {
   );
 }
 
-function ViejoDebtCard({ account, importLog, onOpen }: {
-  account: any; importLog: any[]; onOpen: () => void;
+function ViejoDebtCard({ importLog, onOpen }: {
+  importLog: any[]; onOpen: () => void;
 }) {
   const currentMonth = format(new Date(), 'yyyy-MM');
-  const balance = Number(account.computed_balance_usd || 0);
-  const isDebt = balance < -0.5;
+  const monthLabel = format(new Date(), 'MMMM yyyy', { locale: es });
 
-  const bcImportado = importLog.some(l =>
-    ['banco_ciudad', 'santander'].includes(l.source) && l.month === currentMonth
-  );
-
-  const { data: liquidacionTxs } = useQuery({
+  const { data: liquidacionTx } = useQuery({
     queryKey: ['liquidacion-check', currentMonth],
     queryFn: async () => {
       const { data } = await supabase
         .from('transactions')
-        .select('id, description, amount_usd')
-        .ilike('description', '%Liquidación%')
-        .gte('date', currentMonth + '-01');
-      return data || [];
-    },
-  });
-
-  const yaLiquidado = (liquidacionTxs || []).length > 0;
-
-  const { data: vueltoTx } = useQuery({
-    queryKey: ['vuelto-check', currentMonth],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('transactions')
-        .select('id, amount')
-        .ilike('notes', `%vuelto_settlement_${currentMonth}%`)
+        .select('id, description, amount_usd, notes, date')
+        .ilike('description', `%Liquidación%`)
+        .ilike('description', `%viejo%`)
+        .gte('date', currentMonth + '-01')
+        .not('notes', 'is', null)
         .maybeSingle();
       return data;
     },
   });
 
-  const monthLabel = format(new Date(), 'MMMM yyyy', { locale: es });
+  const yaLiquidado = !!liquidacionTx;
+
+  const settlementData = useMemo(() => {
+    if (!liquidacionTx?.notes) return null;
+    try { return JSON.parse(liquidacionTx.notes); } catch { return null; }
+  }, [liquidacionTx]);
+
+  const { data: lastLiquidacion } = useQuery({
+    queryKey: ['last-liquidacion'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('transactions')
+        .select('date, notes, amount_usd')
+        .ilike('description', '%Liquidación%')
+        .ilike('description', '%viejo%')
+        .not('notes', 'is', null)
+        .lt('date', currentMonth + '-01')
+        .order('date', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data;
+    },
+  });
+
+  const lastMonth = lastLiquidacion
+    ? format(new Date(lastLiquidacion.date + 'T12:00:00'), 'MMMM yyyy', { locale: es })
+    : null;
 
   return (
-    <Card>
-      <CardContent className="p-5 space-y-4">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-center gap-3 min-w-0">
-            <MerchantLogo name={account.name} size={40} />
-            <div className="min-w-0">
-              <p className="font-semibold text-base">Viejo</p>
-              <p className="text-xs text-muted-foreground capitalize">
-                Ciclo {monthLabel}
-              </p>
-            </div>
+    <Card className="rounded-2xl overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-4 border-b border-border/50">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center text-base">
+            👴
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-foreground">Viejo</p>
+            <p className="text-xs text-muted-foreground">
+              {lastMonth
+                ? `Último mes liquidado: ${lastMonth}`
+                : 'Sin liquidaciones anteriores'}
+            </p>
           </div>
         </div>
+        {yaLiquidado && (
+          <Badge variant="secondary" className="text-[10px]">✓ {monthLabel}</Badge>
+        )}
+      </div>
 
-        {yaLiquidado ? (
-          <div className="space-y-3">
-            <div className="flex items-center gap-3 rounded-xl bg-success/10 px-4 py-3">
-              <CheckCircle2 className="h-5 w-5 text-success shrink-0" />
-              <div className="flex-1">
-                <p className="text-sm font-medium text-foreground capitalize">
-                  {monthLabel} liquidado ✓
+      <div className="px-5 py-4 space-y-3">
+        {yaLiquidado && settlementData ? (
+          <>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="rounded-xl bg-muted/50 px-3 py-2.5">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Total ARS</p>
+                <p className="text-sm font-mono font-medium text-foreground mt-0.5">
+                  {'$' + Math.round(settlementData.totalARS || 0).toLocaleString('es-AR')}
                 </p>
-                <p className="text-xs text-muted-foreground">
-                  Pagaste {formatUSD(Math.abs(Number(liquidacionTxs?.[0]?.amount_usd || 0)))} USD
-                  {vueltoTx && ` · Vuelto ARS ${Math.round(Number(vueltoTx.amount)).toLocaleString('es-AR')} en MP`}
+              </div>
+              <div className="rounded-xl bg-muted/50 px-3 py-2.5">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wide">USD pagado</p>
+                <p className="text-sm font-mono font-bold text-foreground mt-0.5">
+                  ${(settlementData.usdPagado || 0).toLocaleString('en-US')}
+                </p>
+              </div>
+              <div className="rounded-xl bg-muted/50 px-3 py-2.5">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Vuelto ARS</p>
+                <p className="text-sm font-mono text-success mt-0.5">
+                  {settlementData.vueltoARS > 0
+                    ? '+$' + Math.round(settlementData.vueltoARS).toLocaleString('es-AR')
+                    : '—'}
                 </p>
               </div>
             </div>
-            <Button variant="outline" className="w-full" onClick={onOpen}>
+            <Button variant="outline" className="w-full" size="sm" onClick={onOpen}>
               Ver detalle / Reliquidar →
             </Button>
-          </div>
+          </>
         ) : (
-          <Button className="w-full" onClick={onOpen}>
-            Empezar liquidación de {monthLabel} →
-          </Button>
+          <>
+            <p className="text-xs text-muted-foreground">
+              Subí los resúmenes de BC + Santander y completá los gastos del mes para liquidar.
+            </p>
+            <Button className="w-full" onClick={onOpen}>
+              Liquidar {monthLabel} →
+            </Button>
+          </>
         )}
-      </CardContent>
+      </div>
     </Card>
   );
 }
