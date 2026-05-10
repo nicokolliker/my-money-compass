@@ -28,7 +28,7 @@ import { formatUSD } from '@/lib/constants';
 import { parseBancoCiudad, extractCardTotal, extractAllCardSubtotals } from '@/lib/importers/bancoCiudadParser';
 import { parseSantander, parseSantanderWithSubtotals } from '@/lib/importers/santanderParser';
 import type { ParsedTransaction } from '@/lib/importers/arqParser';
-import { parseSplitwise, type SplitwiseRow } from '@/lib/importers/splitwiseParser';
+import { parseSplitwise } from '@/lib/importers/splitwiseParser';
 import { inferCategoryName } from '@/hooks/useRuleSuggestions';
 import { useImportLog } from '@/hooks/useImportLog';
 import { extractPdfText } from '@/lib/pdfReader';
