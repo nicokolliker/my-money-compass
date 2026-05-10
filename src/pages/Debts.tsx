@@ -535,23 +535,27 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
     setProcessing(true);
     try {
       const fxFallback = arsToUsd || 0.00072;
-      let bc = 0, sant = 0, visaCiudad = 0, obSoc = 0;
+      let sant = 0, visaCiudadMama = 0, visaCiudadPapa = 0;
 
       const bcFiles = [iebraFile, kollikerFile].filter((f): f is File => !!f);
-      const allIebra: ParsedTransaction[] = [];
-      const allKolliker: ParsedTransaction[] = [];
+      const allMama: ParsedTransaction[] = [];
+      const allPapa: ParsedTransaction[] = [];
       for (const f of bcFiles) {
         const text = await extractPdfText(f);
         // Card 1689 (mamá) — todos los gastos
-        const iebraRowsFromFile = parseBancoCiudad(text, fxFallback);
-        if (iebraRowsFromFile.length > 0) {
+        const mamaRows = parseBancoCiudad(text, fxFallback, '1689');
+        if (mamaRows.length > 0) {
           const { ars: vcARS, usd: vcUSD } = extractCardTotal(text, '1689');
-          visaCiudad += vcARS + (vcUSD > 0 ? vcUSD / fxFallback : 0);
-          allIebra.push(...iebraRowsFromFile);
+          visaCiudadMama += vcARS + (vcUSD > 0 ? vcUSD / fxFallback : 0);
+          allMama.push(...mamaRows);
         }
-        // Card 8157 (papá) — solo OB SOC / PODER JUD
-        const kollikerRowsFromFile = parseBancoCiudadObSoc(text, fxFallback);
-        if (kollikerRowsFromFile.length > 0) allKolliker.push(...kollikerRowsFromFile);
+        // Card 8157 (papá) — todos los gastos
+        const papaRows = parseBancoCiudad(text, fxFallback, '8157');
+        if (papaRows.length > 0) {
+          const { ars: vcARS, usd: vcUSD } = extractCardTotal(text, '8157');
+          visaCiudadPapa += vcARS + (vcUSD > 0 ? vcUSD / fxFallback : 0);
+          allPapa.push(...papaRows);
+        }
       }
       // Dedup por external_id
       const dedup = (arr: ParsedTransaction[]) => {
@@ -563,19 +567,17 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
           return true;
         });
       };
-      const iebraDedup = dedup(allIebra);
-      const kollikerDedup = dedup(allKolliker);
-      obSoc = kollikerDedup.reduce((s, r) => s + r.amountARS, 0);
-      bc = visaCiudad + obSoc;
+      const mamaDedup = dedup(allMama);
+      const papaDedup = dedup(allPapa);
 
-      setIebraRows(iebraDedup.map(r => ({
+      setIebraRows(mamaDedup.map(r => ({
         ...r,
         categoryName: inferCategoryName(r.description) || 'Casa',
         selected: true,
       })));
-      setKollikerRows(kollikerDedup.map(r => ({
+      setKollikerRows(papaDedup.map(r => ({
         ...r,
-        categoryName: 'Salud',
+        categoryName: inferCategoryName(r.description) || 'Casa',
         selected: true,
       })));
 
@@ -590,10 +592,10 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
         })));
       }
 
-      setBcTotalARS(bc);
+      setBcTotalARS(visaCiudadMama + visaCiudadPapa);
       setSantTotalARS(sant);
-      setVisaCiudadARS(visaCiudad);
-      setObSocARS(obSoc);
+      setVisaCiudadMamaARS(visaCiudadMama);
+      setVisaCiudadPapaARS(visaCiudadPapa);
       setStep(2);
     } catch (e: any) {
       toast.error(e.message || 'Error procesando PDFs');
