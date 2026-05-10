@@ -97,7 +97,7 @@ export function parseGalicia(buffer: ArrayBuffer, fxRate = 0): ParsedTransaction
     out.push({
       date,
       description: movimiento,
-      amountUSD: 0,
+      amountUSD: fxRate > 0 ? +(amountARS * fxRate).toFixed(2) : 0,
       amountARS,
       type,
       external_id,
