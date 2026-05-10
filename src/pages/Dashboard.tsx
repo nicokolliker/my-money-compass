@@ -55,13 +55,20 @@ export default function Dashboard() {
   const monthSavings = monthIncome - totalMonthSpending;
 
   const topCategories = useMemo(() => {
-    const map: Record<string, { name: string; total: number; icon: string | null; color: string | null }> = {};
+    const map: Record<string, { name: string; total: number; icon: string | null; color: string | null; isDigital: boolean; children: { name: string; total: number }[] }> = {};
     monthExpenses.forEach(t => {
       const cat = (t as any).categories;
       const catName = cat?.name || 'Sin categoría';
-      if (!map[catName]) map[catName] = { name: catName, total: 0, icon: cat?.icon || null, color: cat?.color || null };
+      if (!map[catName]) map[catName] = { name: catName, total: 0, icon: cat?.icon || null, color: cat?.color || null, isDigital: catName === 'Digital', children: [] };
       map[catName].total += Math.abs(Number(t.amount_usd));
+      if (catName === 'Digital') {
+        const subName = (t as any).subcategories?.name || 'Otros';
+        const existing = map[catName].children.find(c => c.name === subName);
+        if (existing) existing.total += Math.abs(Number(t.amount_usd));
+        else map[catName].children.push({ name: subName, total: Math.abs(Number(t.amount_usd)) });
+      }
     });
+    Object.values(map).forEach(c => c.children.sort((a, b) => b.total - a.total));
     return Object.values(map).sort((a, b) => b.total - a.total).slice(0, 5);
   }, [monthExpenses]);
 
