@@ -22,7 +22,7 @@ export function useFxRates() {
 }
 
 const FALLBACK_TO_USD: Record<string, number> = {
-  ARS: 1 / 1390,
+  ARS: 1 / 1500,
   EUR: 1.08,
   GBP: 1.27,
 };
@@ -30,9 +30,17 @@ const FALLBACK_TO_USD: Record<string, number> = {
 export function useLatestFxRate(fromCurrency: string, toCurrency = 'USD') {
   const { data: rates } = useFxRates();
   if (fromCurrency === toCurrency) return 1;
-  if (!rates) return FALLBACK_TO_USD[fromCurrency] ?? 1;
-  const rate = rates.find(r => r.from_currency === fromCurrency && r.to_currency === toCurrency);
-  return rate?.rate ?? FALLBACK_TO_USD[fromCurrency] ?? 1;
+  if (!rates || rates.length === 0) return FALLBACK_TO_USD[fromCurrency] ?? 1;
+
+  // Primary: exact match for the target currency pair (rates already ordered by date desc).
+  const exact = rates.find(r => r.from_currency === fromCurrency && r.to_currency === toCurrency);
+  if (exact?.rate) return exact.rate;
+
+  // Secondary: most recent rate from the source currency, regardless of target.
+  const anyFrom = rates.find(r => r.from_currency === fromCurrency);
+  if (anyFrom?.rate) return anyFrom.rate;
+
+  return FALLBACK_TO_USD[fromCurrency] ?? 1;
 }
 
 export function useCreateFxRate() {

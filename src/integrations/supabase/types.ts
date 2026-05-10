@@ -1078,6 +1078,8 @@ export type Database = {
           binance_balances: Json | null
           binance_last_sync: string | null
           created_at: string
+          ignored_suggestion_ids: Json | null
+          monotributo_config: Json | null
           updated_at: string
           user_id: string
           wise_last_sync: string | null
@@ -1090,6 +1092,8 @@ export type Database = {
           binance_balances?: Json | null
           binance_last_sync?: string | null
           created_at?: string
+          ignored_suggestion_ids?: Json | null
+          monotributo_config?: Json | null
           updated_at?: string
           user_id: string
           wise_last_sync?: string | null
@@ -1102,6 +1106,8 @@ export type Database = {
           binance_balances?: Json | null
           binance_last_sync?: string | null
           created_at?: string
+          ignored_suggestion_ids?: Json | null
+          monotributo_config?: Json | null
           updated_at?: string
           user_id?: string
           wise_last_sync?: string | null

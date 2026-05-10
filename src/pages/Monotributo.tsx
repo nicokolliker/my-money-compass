@@ -7,10 +7,11 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ExternalLink, Plus, AlertTriangle, CheckCircle2, Clock, Upload } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { ExternalLink, Plus, AlertTriangle, CheckCircle2, Clock, Upload, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { useUserSettings, useUpsertUserSettings, type MonotributoConfig } from '@/hooks/useUserSettings';
 
 const CATEGORIAS = [
   { cat: 'A', tope: 10_277_988.13, cuota: 42_386.74 },
@@ -25,9 +26,11 @@ const CATEGORIAS = [
   { cat: 'J', tope: 90_997_503.90, cuota: 666_977.68 },
   { cat: 'K', tope: 108_357_084.05, cuota: 1_381_687.90 },
 ];
-const VIGENCIA = 'Feb–Jul 2026';
-const CAT_ACTUAL = 'A';
-const CUOTA_ACTUAL = 45_700.74;
+const DEFAULT_MONOTRIBUTO: MonotributoConfig = {
+  vigencia: 'Feb–Jul 2026',
+  cat_actual: 'A',
+  cuota_actual: 45_700.74,
+};
 
 function formatARS(n: number) {
   return '$' + Math.round(n).toLocaleString('es-AR');
@@ -53,7 +56,17 @@ function useInvoices() {
 export default function MonotributoPage() {
   const qc = useQueryClient();
   const { data: invoices = [] } = useInvoices();
+  const { data: settings } = useUserSettings();
   const [showForm, setShowForm] = useState(false);
+  const [showConfig, setShowConfig] = useState(false);
+
+  const config: MonotributoConfig = {
+    ...DEFAULT_MONOTRIBUTO,
+    ...(settings?.monotributo_config || {}),
+  };
+  const VIGENCIA = config.vigencia;
+  const CAT_ACTUAL = config.cat_actual;
+  const CUOTA_ACTUAL = config.cuota_actual;
 
   const now = new Date();
   const currentPeriodo = format(now, 'yyyy-MM');
@@ -125,6 +138,15 @@ export default function MonotributoPage() {
               <div className="flex items-center gap-2">
                 <Badge className="text-base px-3 py-1">{CAT_ACTUAL}</Badge>
                 <span className="text-sm text-muted-foreground">Locaciones de servicios</span>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-6 w-6"
+                  onClick={() => setShowConfig(true)}
+                  aria-label="Editar configuración"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
               </div>
               <p className="text-xs text-muted-foreground mt-1">
                 Cuota mensual: {formatARS(CUOTA_ACTUAL)} · Vigencia: {VIGENCIA}
@@ -273,6 +295,12 @@ export default function MonotributoPage() {
           qc.invalidateQueries({ queryKey: ['invoices'] });
           setShowForm(false);
         }}
+      />
+
+      <MonotributoConfigDialog
+        open={showConfig}
+        onClose={() => setShowConfig(false)}
+        current={config}
       />
     </div>
   );
@@ -489,6 +517,80 @@ function InvoiceForm({ open, onClose, onSaved }: { open: boolean; onClose: () =>
             {saving ? 'Guardando...' : 'Registrar factura'}
           </Button>
         </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function MonotributoConfigDialog({
+  open,
+  onClose,
+  current,
+}: {
+  open: boolean;
+  onClose: () => void;
+  current: MonotributoConfig;
+}) {
+  const [vigencia, setVigencia] = useState(current.vigencia);
+  const [catActual, setCatActual] = useState(current.cat_actual);
+  const [cuotaActual, setCuotaActual] = useState(String(current.cuota_actual));
+  const [saving, setSaving] = useState(false);
+  const upsert = useUpsertUserSettings();
+
+  // Re-sync when the dialog re-opens with new defaults.
+  useMemo(() => {
+    if (open) {
+      setVigencia(current.vigencia);
+      setCatActual(current.cat_actual);
+      setCuotaActual(String(current.cuota_actual));
+    }
+  }, [open, current]);
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      const payload: MonotributoConfig = {
+        vigencia: vigencia.trim() || current.vigencia,
+        cat_actual: catActual.trim().toUpperCase() || current.cat_actual,
+        cuota_actual: Number(cuotaActual) || current.cuota_actual,
+      };
+      await upsert.mutateAsync({ monotributo_config: payload } as any);
+      toast.success('Configuración actualizada');
+      onClose();
+    } catch (e: any) {
+      toast.error(e.message || 'No se pudo guardar');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Editar Monotributo</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div>
+            <label className="text-xs text-muted-foreground">Vigencia</label>
+            <Input value={vigencia} onChange={(e) => setVigencia(e.target.value)} placeholder="Feb–Jul 2026" />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground">Categoría actual</label>
+            <Input value={catActual} onChange={(e) => setCatActual(e.target.value)} placeholder="A" />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground">Cuota mensual (ARS)</label>
+            <Input type="number" value={cuotaActual} onChange={(e) => setCuotaActual(e.target.value)} placeholder="45700.74" />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Actualizá estos valores cuando ARCA publique nueva tabla de Monotributo.
+          </p>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+          <Button onClick={handleSave} disabled={saving}>{saving ? 'Guardando...' : 'Guardar'}</Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

@@ -2,6 +2,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useUserId } from '@/hooks/useAuthUser';
 
+export interface MonotributoConfig {
+  vigencia: string;
+  cat_actual: string;
+  cuota_actual: number;
+}
+
 export interface UserSettings {
   user_id: string;
   wise_token: string | null;
@@ -11,6 +17,8 @@ export interface UserSettings {
   binance_api_secret?: string | null;
   binance_last_sync?: string | null;
   binance_balances?: any[] | null;
+  monotributo_config?: MonotributoConfig | null;
+  ignored_suggestion_ids?: string[] | null;
 }
 
 export function useUserSettings() {

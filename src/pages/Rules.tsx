@@ -14,7 +14,7 @@ import { useCategories } from '@/hooks/useCategories';
 import { useFxRates, useCreateFxRate, useDeleteFxRate } from '@/hooks/useFxRates';
 import { useBlueDollarRate, useRefreshBlueDollar } from '@/hooks/useBlueDollar';
 import { useEurUsdRate } from '@/hooks/useEurUsd';
-import { useRuleSuggestions, ignoreSuggestion, type RuleSuggestion } from '@/hooks/useRuleSuggestions';
+import { useRuleSuggestions, useIgnoredSuggestions, type RuleSuggestion } from '@/hooks/useRuleSuggestions';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2, Zap, RefreshCw, DollarSign, ChevronDown, Lightbulb, Repeat, X } from 'lucide-react';
@@ -51,6 +51,7 @@ export default function Rules({ initialTab }: { initialTab?: RulesTab } = {}) {
 
 function SuggestionsPanel() {
   const suggestions = useRuleSuggestions();
+  const { ignore: ignoreSuggestion } = useIgnoredSuggestions();
   const { data: categories } = useCategories();
   const createRule = useCreateRule();
   const navigate = useNavigate();

@@ -23,13 +23,15 @@ export function useNetWorth() {
     const usd = (a: (typeof list)[number]) =>
       a.currency === 'USD' ? a.computed_balance : a.computed_balance_usd;
 
-    // Exclude tracking accounts that should not affect net worth
-    // Fallback name-based guard ensures consistency even if DB flag isn't set
-    const included = list.filter(a =>
-      !(a as any).exclude_from_net_worth &&
-      !/deel/i.test(a.name) &&
-      !/splitwise/i.test(a.name)
-    );
+    // Primary filter: DB flag exclude_from_net_worth.
+    // Secondary fallback: name-based guard for legacy accounts where the flag
+    // may not have been set yet. If users rename these accounts, the DB flag
+    // remains the source of truth.
+    const included = list.filter(a => {
+      if ((a as any).exclude_from_net_worth) return false;
+      if (/deel/i.test(a.name) || /splitwise/i.test(a.name)) return false;
+      return true;
+    });
 
     const assets      = included.filter(a => ASSET_TYPES.includes(a.type));
     const liabilities = included.filter(a => LIABILITY_TYPES.includes(a.type));

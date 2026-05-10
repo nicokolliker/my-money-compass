@@ -1,8 +1,9 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useRules } from '@/hooks/useRules';
 import { useCategories } from '@/hooks/useCategories';
 import { useRecurringExpenses } from '@/hooks/useRecurringExpenses';
+import { useUserSettings, useUpsertUserSettings } from '@/hooks/useUserSettings';
 
 export type SuggestionType = 'category' | 'recurring' | 'rule';
 
@@ -37,10 +38,27 @@ export function inferCategoryName(name: string): string | null {
 
 const IGNORED_KEY = 'ignored_suggestions';
 
+/** @deprecated reads localStorage only — kept as a fallback during migration. */
 export function getIgnoredSuggestions(): string[] {
   try { return JSON.parse(localStorage.getItem(IGNORED_KEY) || '[]'); } catch { return []; }
 }
 
+/**
+ * Persist a dismissed suggestion. Reads the current list from Supabase
+ * (user_settings.ignored_suggestion_ids) and appends to it.
+ */
+export async function ignoreSuggestionRemote(
+  id: string,
+  current: string[],
+  upsert: (patch: { ignored_suggestion_ids: string[] }) => Promise<unknown> | unknown,
+) {
+  if (current.includes(id)) return current;
+  const next = [...current, id];
+  await upsert({ ignored_suggestion_ids: next });
+  return next;
+}
+
+/** @deprecated localStorage-only writer. Use ignoreSuggestionRemote instead. */
 export function ignoreSuggestion(id: string) {
   const list = getIgnoredSuggestions();
   if (!list.includes(id)) {
@@ -49,14 +67,48 @@ export function ignoreSuggestion(id: string) {
   }
 }
 
+export function useIgnoredSuggestions() {
+  const { data: settings } = useUserSettings();
+  const upsert = useUpsertUserSettings();
+  const remoteIds = useMemo(
+    () => (Array.isArray(settings?.ignored_suggestion_ids) ? (settings!.ignored_suggestion_ids as string[]) : []),
+    [settings?.ignored_suggestion_ids],
+  );
+
+  // One-time migration: move localStorage entries into Supabase, then clear LS.
+  useEffect(() => {
+    if (!settings) return;
+    const legacy = getIgnoredSuggestions();
+    if (legacy.length === 0) return;
+    const merged = Array.from(new Set([...remoteIds, ...legacy]));
+    if (merged.length === remoteIds.length) {
+      localStorage.removeItem(IGNORED_KEY);
+      return;
+    }
+    upsert.mutate(
+      { ignored_suggestion_ids: merged } as any,
+      { onSuccess: () => localStorage.removeItem(IGNORED_KEY) },
+    );
+  }, [settings, remoteIds, upsert]);
+
+  return {
+    ids: remoteIds,
+    ignore: (id: string) => {
+      if (remoteIds.includes(id)) return;
+      upsert.mutate({ ignored_suggestion_ids: [...remoteIds, id] } as any);
+    },
+  };
+}
+
 export function useRuleSuggestions() {
   const { data: transactions } = useTransactions();
   const { data: rules } = useRules();
   const { data: categories } = useCategories();
   const { data: recurring } = useRecurringExpenses();
+  const { ids: ignoredIds } = useIgnoredSuggestions();
 
   return useMemo(() => {
-    const ignored = new Set(getIgnoredSuggestions());
+    const ignored = new Set(ignoredIds);
     const suggestions: RuleSuggestion[] = [];
     if (!transactions) return suggestions;
 
