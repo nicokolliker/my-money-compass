@@ -33,12 +33,11 @@ import { inferCategoryName } from '@/hooks/useRuleSuggestions';
 import { useImportLog } from '@/hooks/useImportLog';
 import { extractPdfText } from '@/lib/pdfReader';
 import { parseAmexTotal } from '@/lib/importers/amexParser';
-import { usePendingCredits } from '@/hooks/usePendingCredits';
+import { PendingCreditsBanner } from '@/components/PendingCreditsBanner';
 
 export default function DebtsPage() {
   const { data: importLog } = useImportLog();
   const { data: accounts } = useAccountBalances();
-  const { data: pendingCredits } = usePendingCredits();
   const [openViejo, setOpenViejo] = useState(false);
   const [openSw, setOpenSw] = useState(false);
   const [santPreviewARS, setSantPreviewARS] = useState<number>(() => {
