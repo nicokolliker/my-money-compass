@@ -360,16 +360,26 @@ export default function ImportPage() {
           .filter(r => r.type !== 'income')
           .reduce((s, r) => s + r.amountUSD, 0);
 
-        await supabase
-          .from('arq_reconciliations')
-          .update({
-            status: 'reconciled',
-            reconciled_at: new Date().toISOString(),
-            period: arqMonth,
-            total_spent_usd: +totalSpentUsd.toFixed(2),
-            balance_after_usd: arqBalanceFinal,
-          })
-          .in('id', (pendingRecons as any[]).map((r: any) => r.id));
+        const nowIso = new Date().toISOString();
+        for (const r of pendingRecons as any[]) {
+          const transfer = Number(r.wise_amount_usd || 0);
+          const share = totalDeposited > 0 ? transfer / totalDeposited : 1 / pendingRecons.length;
+          const addedSpent = +(totalSpentUsd * share).toFixed(2);
+          const prevSpent = Number(r.total_spent_usd || 0);
+          const newSpent = +(prevSpent + addedSpent).toFixed(2);
+          const status = newSpent >= transfer ? 'reconciled' : 'pending';
+          await supabase
+            .from('arq_reconciliations')
+            .update({
+              status,
+              reconciled_at: nowIso,
+              period: arqMonth,
+              total_spent_usd: newSpent,
+              balance_after_usd: arqBalanceFinal,
+              last_import_date: arqMonth,
+            })
+            .eq('id', r.id);
+        }
 
         setArqReconcileResult({
           count: pendingRecons.length,
