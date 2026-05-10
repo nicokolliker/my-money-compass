@@ -264,6 +264,126 @@ export default function IntegrationsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Binance Card */}
+      <Card>
+        <CardContent className="pt-5 space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-yellow-500/10 flex items-center justify-center">
+              <Bitcoin className="h-6 w-6 text-yellow-500" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <p className="font-semibold text-foreground">Binance</p>
+                {isBinanceConnected && (
+                  <Badge variant="secondary" className="text-[10px] gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
+                    Conectado
+                  </Badge>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {isBinanceConnected
+                  ? binanceLastSync
+                    ? `Última sync: ${formatDistanceToNow(new Date(binanceLastSync), { addSuffix: true })}`
+                    : 'Nunca sincronizado'
+                  : 'Conectá tu cuenta de Binance con read-only API key'}
+              </p>
+            </div>
+          </div>
+
+          {isBinanceConnected && (
+            <div className="flex gap-2">
+              <Button onClick={handleSyncBinance} disabled={syncingBinance} className="flex-1">
+                {syncingBinance ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+                Sincronizar ahora
+              </Button>
+              <Button variant="outline" onClick={handleDisconnectBinance} disabled={upsert.isPending}>
+                Desconectar
+              </Button>
+            </div>
+          )}
+
+          {isBinanceConnected && binanceBalances.length > 0 && (
+            <div className="border-t pt-3 space-y-2">
+              {binanceBalances.map((b: any) => (
+                <div key={b.asset} className="flex items-center justify-between text-sm">
+                  <div>
+                    <span className="font-semibold text-foreground">{b.asset}</span>
+                    <span className="text-xs text-muted-foreground ml-2 tabular-nums">
+                      {Number(b.total).toFixed(b.asset === 'BTC' ? 8 : 4)}
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-semibold text-foreground tabular-nums">
+                      ${Number(b.value_usd).toLocaleString('en-US', { maximumFractionDigits: 2 })}
+                    </p>
+                    {b.asset !== 'USDT' && b.price_usd > 0 && (
+                      <p className="text-[10px] text-muted-foreground tabular-nums">
+                        @ ${Number(b.price_usd).toLocaleString('en-US', { maximumFractionDigits: 2 })}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+              <div className="flex items-center justify-between pt-2 border-t text-sm">
+                <span className="font-semibold text-foreground">Total</span>
+                <span className="font-bold text-foreground tabular-nums">
+                  ${binanceTotalUsd.toLocaleString('en-US', { maximumFractionDigits: 2 })}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {!isBinanceConnected && (
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-foreground">API Key (read-only)</label>
+                <Input
+                  value={binanceKey}
+                  onChange={(e) => setBinanceKey(e.target.value)}
+                  placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                  className="font-mono text-xs"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-foreground">API Secret</label>
+                <div className="relative">
+                  <Input
+                    type={showSecret ? 'text' : 'password'}
+                    value={binanceSecret}
+                    onChange={(e) => setBinanceSecret(e.target.value)}
+                    placeholder="••••••••••••••••••••••••••••••••"
+                    className="font-mono text-xs pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowSecret(s => !s)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                  >
+                    {showSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Creá una API key con permisos de solo lectura (Read Info) en Binance →{' '}
+                <a
+                  href="https://www.binance.com/en/my/settings/api-management"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-primary inline-flex items-center gap-0.5 hover:underline"
+                >
+                  API Management <ExternalLink className="h-3 w-3" />
+                </a>
+              </p>
+              <Button onClick={handleConnectBinance} disabled={connectingBinance} className="w-full">
+                {connectingBinance ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Wifi className="h-4 w-4 mr-2" />}
+                Conectar Binance
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
