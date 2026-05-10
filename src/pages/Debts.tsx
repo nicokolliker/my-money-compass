@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Upload, CheckCircle2, X, Plus, ChevronDown } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -444,6 +446,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
   const defaultBlueRate = blueRate?.blue_avg ? Math.round(blueRate.blue_avg) : (arsToUsd > 0 ? Math.round(1 / arsToUsd) : 1390);
 
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+  const [settlementMonth, setSettlementMonth] = useState<string>(format(new Date(), 'yyyy-MM'));
   const [iebraFile, setIebraFile] = useState<File | null>(null);
   const [kollikerFile, setKollikerFile] = useState<File | null>(null);
   const [santFile, setSantFile] = useState<File | null>(null);
@@ -461,9 +464,23 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
   const [resultUsd, setResultUsd] = useState(0);
   const [resultVuelto, setResultVuelto] = useState(0);
 
+  const monthOptions = useMemo(() => {
+    const arr: { ym: string; label: string }[] = [];
+    const d = new Date();
+    d.setDate(1);
+    // 2 future months + current + 11 past
+    d.setMonth(d.getMonth() + 2);
+    for (let i = 0; i < 14; i++) {
+      arr.push({ ym: format(d, 'yyyy-MM'), label: format(d, 'MMMM yyyy', { locale: es }) });
+      d.setMonth(d.getMonth() - 1);
+    }
+    return arr;
+  }, []);
+
   useEffect(() => {
     if (!open) {
       setStep(1);
+      setSettlementMonth(format(new Date(), 'yyyy-MM'));
       setIebraFile(null); setKollikerFile(null); setSantFile(null);
       setBcTotalARS(0); setSantTotalARS(0); setVisaCiudadARS(0); setObSocARS(0);
       setExtraItems([]);
@@ -551,8 +568,16 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
-      const today = new Date().toISOString().split('T')[0];
-      const monthLabel = format(new Date(), 'MMMM yyyy', { locale: es });
+      const currentYM = format(new Date(), 'yyyy-MM');
+      const isCurrentMonth = settlementMonth === currentYM;
+      // Use today's date for current month, otherwise last day of selected month
+      const settlementDate = (() => {
+        if (isCurrentMonth) return new Date().toISOString().split('T')[0];
+        const [y, m] = settlementMonth.split('-').map(Number);
+        const lastDay = new Date(y, m, 0).getDate();
+        return `${settlementMonth}-${String(lastDay).padStart(2, '0')}`;
+      })();
+      const monthLabel = format(new Date(settlementMonth + '-01T00:00:00'), 'MMMM yyyy', { locale: es });
 
       const tarjetaViejoAcc = accounts.find((a: any) => /viejo|tarjeta.*viejo/i.test(a.name));
       const cashAcc = accounts.find((a: any) => /cash/i.test(a.name) && a.currency === 'USD');
@@ -576,7 +601,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
         await supabase.from('transactions').insert({
           user_id: user.id,
           account_id: tarjetaViejoAcc.id,
-          date: today,
+          date: settlementDate,
           description: `${item.label} — ${monthLabel}`,
           amount: -item.amountARS,
           currency: 'ARS',
@@ -590,7 +615,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
       await supabase.from('transactions').insert({
         user_id: user.id,
         account_id: cashAcc.id,
-        date: today,
+        date: settlementDate,
         description: `Liquidación ${monthLabel} — viejo`,
         amount: -usdAPagar,
         currency: 'USD',
@@ -599,7 +624,7 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
         type: 'expense' as const,
         notes: JSON.stringify({
           settlement: true,
-          month: format(new Date(), 'yyyy-MM'),
+          month: settlementMonth,
           breakdown: Object.fromEntries(items.filter((i) => i.amountARS > 0).map((i) => [i.key, i.amountARS])),
           tcBlue, totalARS, usdPagado: usdAPagar, vueltoARS,
         }),
@@ -609,14 +634,14 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
         await supabase.from('transactions').insert({
           user_id: user.id,
           account_id: mpAcc.id,
-          date: today,
+          date: settlementDate,
           description: `Vuelto liquidación ${monthLabel} — viejo`,
           amount: vueltoARS,
           currency: 'ARS',
           fx_rate: fxArsUsd,
           amount_usd: vueltoARS * fxArsUsd,
           type: 'income' as const,
-          notes: `vuelto_settlement_${format(new Date(), 'yyyy-MM')}`,
+          notes: `vuelto_settlement_${settlementMonth}`,
         });
       }
 
@@ -645,10 +670,10 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg w-full max-h-[90vh] overflow-y-auto overflow-x-hidden">
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="capitalize">
             {step === 1 && 'Liquidar con el viejo — Subir PDFs'}
-            {step === 2 && 'Liquidar con el viejo — Completar ítems'}
-            {step === 3 && 'Liquidar con el viejo — Confirmar'}
+            {step === 2 && `Liquidar ${format(new Date(settlementMonth + '-01T00:00:00'), 'MMMM yyyy', { locale: es })} — Completar ítems`}
+            {step === 3 && `Liquidar ${format(new Date(settlementMonth + '-01T00:00:00'), 'MMMM yyyy', { locale: es })} — Confirmar`}
             {step === 4 && 'Liquidación registrada'}
           </DialogTitle>
         </DialogHeader>
@@ -656,6 +681,17 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
         {step === 1 && (
           <>
             <div className="space-y-4 min-w-0 overflow-hidden">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Mes a liquidar</Label>
+                <Select value={settlementMonth} onValueChange={setSettlementMonth}>
+                  <SelectTrigger className="w-full capitalize"><SelectValue /></SelectTrigger>
+                  <SelectContent className="max-h-72">
+                    {monthOptions.map((m) => (
+                      <SelectItem key={m.ym} value={m.ym} className="capitalize">{m.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <p className="text-xs text-muted-foreground">
                 Subí los PDFs disponibles. Los faltantes podés cargarlos manualmente en el siguiente paso.
               </p>
@@ -1247,31 +1283,20 @@ const ITEM_META: Record<string, { label: string; emoji: string }> = {
 
 const CARD_KEYS = ['visa_ciudad', 'visa_santander', 'amex'];
 
+type RangeFilter = '6' | '12' | '24' | 'all';
+
 function ViejoCycleHistory({ importLog }: { importLog: any[] }) {
   const [open, setOpen] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
-
-  const months = useMemo(() => {
-    const arr: { ym: string; label: string }[] = [];
-    const d = new Date();
-    d.setDate(1);
-    for (let i = 0; i < 12; i++) {
-      arr.push({ ym: format(d, 'yyyy-MM'), label: format(d, 'MMMM yyyy', { locale: es }) });
-      d.setMonth(d.getMonth() - 1);
-    }
-    return arr;
-  }, []);
-
-  const startDate = months[months.length - 1].ym + '-01';
+  const [range, setRange] = useState<RangeFilter>('12');
 
   const { data: liqs } = useQuery({
-    queryKey: ['liquidacion-history', startDate],
+    queryKey: ['liquidacion-history-all'],
     queryFn: async () => {
       const { data } = await supabase
         .from('transactions')
         .select('id, date, description, amount_usd, notes')
         .ilike('description', '%Liquidación%')
-        .gte('date', startDate)
         .order('date', { ascending: false });
       return data || [];
     },
@@ -1288,6 +1313,46 @@ function ViejoCycleHistory({ importLog }: { importLog: any[] }) {
     return m;
   }, [liqs]);
 
+  // Build month list: union of liqs months ∪ import_log (BC/Sant) months ∪ current month
+  const allMonths = useMemo(() => {
+    const set = new Set<string>();
+    Object.keys(byMonth).forEach((ym) => set.add(ym));
+    importLog
+      .filter((l: any) => ['banco_ciudad', 'santander'].includes(l.source))
+      .forEach((l: any) => l.month && set.add(l.month));
+    set.add(format(new Date(), 'yyyy-MM'));
+    return Array.from(set).sort((a, b) => b.localeCompare(a));
+  }, [byMonth, importLog]);
+
+  const filteredMonths = useMemo(() => {
+    if (range === 'all') return allMonths;
+    const n = parseInt(range, 10);
+    const cutoff = new Date();
+    cutoff.setDate(1);
+    cutoff.setMonth(cutoff.getMonth() - (n - 1));
+    const cutoffYM = format(cutoff, 'yyyy-MM');
+    return allMonths.filter((ym) => ym >= cutoffYM);
+  }, [allMonths, range]);
+
+  const rows = useMemo(() => filteredMonths.map((ym) => {
+    const liq = byMonth[ym];
+    const hasImport = importLog.some((l: any) => ['banco_ciudad', 'santander'].includes(l.source) && l.month === ym);
+    const liquidado = !!liq;
+    const breakdown: Record<string, number> = liq?.parsed?.breakdown || {};
+    const manualCount = Object.entries(breakdown).filter(([k, v]) => !CARD_KEYS.includes(k) && Number(v) > 0).length;
+    const usd = liq?.parsed?.usdPagado ?? (liq ? Math.abs(Number(liq.tx.amount_usd) || 0) : 0);
+    return {
+      ym,
+      label: format(new Date(ym + '-01T00:00:00'), 'MMMM yyyy', { locale: es }),
+      shortLabel: format(new Date(ym + '-01T00:00:00'), "MMM ''yy", { locale: es }),
+      hasImport, liquidado, manualCount, usd,
+    };
+  }), [filteredMonths, byMonth, importLog]);
+
+  const chartData = useMemo(() => [...rows].reverse().map((r) => ({
+    month: r.shortLabel, usd: r.liquidado ? Math.round(r.usd) : 0, ym: r.ym, liquidado: r.liquidado,
+  })), [rows]);
+
   const selected = selectedMonth ? byMonth[selectedMonth] : null;
 
   return (
@@ -1299,48 +1364,94 @@ function ViejoCycleHistory({ importLog }: { importLog: any[] }) {
               <button type="button" className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-muted/40 transition-colors">
                 <div>
                   <p className="text-sm font-semibold">Historial de ciclos</p>
-                  <p className="text-xs text-muted-foreground">Últimos 12 meses</p>
+                  <p className="text-xs text-muted-foreground">{allMonths.length} meses registrados</p>
                 </div>
                 <ChevronDown className={cn('h-4 w-4 transition-transform shrink-0', open && 'rotate-180')} />
               </button>
             </CollapsibleTrigger>
             <CollapsibleContent>
-              <div className="border-t overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Mes</TableHead>
-                      <TableHead className="text-center">Resúmenes</TableHead>
-                      <TableHead className="text-center">Gastos manuales</TableHead>
-                      <TableHead className="text-center">Liquidado</TableHead>
-                      <TableHead className="text-right">Monto pagado</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {months.map(({ ym, label }) => {
-                      const liq = byMonth[ym];
-                      const hasImport = importLog.some((l: any) => ['banco_ciudad', 'santander'].includes(l.source) && l.month === ym);
-                      const liquidado = !!liq;
-                      const breakdown: Record<string, number> = liq?.parsed?.breakdown || {};
-                      const manualCount = Object.entries(breakdown).filter(([k, v]) => !CARD_KEYS.includes(k) && Number(v) > 0).length;
-                      const usd = liq?.parsed?.usdPagado ?? (liq ? Math.abs(Number(liq.tx.amount_usd) || 0) : 0);
-                      const clickable = liquidado;
-                      return (
-                        <TableRow
-                          key={ym}
-                          className={cn(clickable && 'cursor-pointer')}
-                          onClick={() => clickable && setSelectedMonth(ym)}
-                        >
-                          <TableCell className="capitalize text-sm font-medium">{label}</TableCell>
-                          <TableCell className="text-center text-sm">{hasImport ? '✓' : '—'}</TableCell>
-                          <TableCell className="text-center text-sm">{manualCount > 0 ? `✓ (${manualCount})` : '—'}</TableCell>
-                          <TableCell className="text-center text-sm">{liquidado ? '✓' : '—'}</TableCell>
-                          <TableCell className="text-right font-mono text-sm">{liquidado ? formatUSD(usd) : '—'}</TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
+              <div className="border-t p-4">
+                <Tabs defaultValue="table">
+                  <div className="flex items-center justify-between gap-2 flex-wrap mb-3">
+                    <TabsList className="h-8">
+                      <TabsTrigger value="table" className="text-xs">Tabla</TabsTrigger>
+                      <TabsTrigger value="chart" className="text-xs">Gráfico</TabsTrigger>
+                    </TabsList>
+                    <Select value={range} onValueChange={(v) => setRange(v as RangeFilter)}>
+                      <SelectTrigger className="h-8 w-36 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="6">Últimos 6 meses</SelectItem>
+                        <SelectItem value="12">Últimos 12 meses</SelectItem>
+                        <SelectItem value="24">Últimos 24 meses</SelectItem>
+                        <SelectItem value="all">Todo</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <TabsContent value="table" className="mt-0 -mx-4">
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Mes</TableHead>
+                            <TableHead className="text-center">Resúmenes</TableHead>
+                            <TableHead className="text-center">Manuales</TableHead>
+                            <TableHead className="text-center">Liquidado</TableHead>
+                            <TableHead className="text-right">Pagado</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {rows.length === 0 && (
+                            <TableRow>
+                              <TableCell colSpan={5} className="text-center text-xs text-muted-foreground py-6">
+                                Sin registros para este rango.
+                              </TableCell>
+                            </TableRow>
+                          )}
+                          {rows.map((r) => (
+                            <TableRow
+                              key={r.ym}
+                              className={cn(r.liquidado && 'cursor-pointer')}
+                              onClick={() => r.liquidado && setSelectedMonth(r.ym)}
+                            >
+                              <TableCell className="capitalize text-sm font-medium">{r.label}</TableCell>
+                              <TableCell className="text-center text-sm">{r.hasImport ? '✓' : '—'}</TableCell>
+                              <TableCell className="text-center text-sm">{r.manualCount > 0 ? `✓ (${r.manualCount})` : '—'}</TableCell>
+                              <TableCell className="text-center text-sm">{r.liquidado ? '✓' : '—'}</TableCell>
+                              <TableCell className="text-right font-mono text-sm">{r.liquidado ? formatUSD(r.usd) : '—'}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </TabsContent>
+                  <TabsContent value="chart" className="mt-0">
+                    {chartData.length === 0 ? (
+                      <p className="text-xs text-muted-foreground py-6 text-center">Sin registros para este rango.</p>
+                    ) : (
+                      <div className="h-64 w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                            <XAxis dataKey="month" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
+                            <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" tickFormatter={(v) => `$${v >= 1000 ? (v / 1000).toFixed(1) + 'k' : v}`} />
+                            <Tooltip
+                              contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: 8, fontSize: 12 }}
+                              formatter={(v: any) => [formatUSD(Number(v)), 'USD pagado']}
+                              cursor={{ fill: 'hsl(var(--muted) / 0.4)' }}
+                            />
+                            <Bar
+                              dataKey="usd"
+                              fill="hsl(var(--primary))"
+                              radius={[4, 4, 0, 0]}
+                              onClick={(d: any) => d?.ym && byMonth[d.ym] && setSelectedMonth(d.ym)}
+                              cursor="pointer"
+                            />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    )}
+                  </TabsContent>
+                </Tabs>
               </div>
             </CollapsibleContent>
           </CardContent>
