@@ -28,22 +28,38 @@ async function closeAccountReconciliations(opts: {
   const periodEnd = new Date(y, m, 0).toISOString().split('T')[0];
   const { data: pending } = await supabase
     .from('account_reconciliations')
-    .select('id')
+    .select('id, transfer_amount_usd, total_spent_usd')
     .eq('user_id', opts.userId)
     .eq('to_account_id', opts.accountId)
     .eq('status', 'pending')
     .gte('transfer_date', periodStart)
     .lte('transfer_date', periodEnd);
   if (!pending || pending.length === 0) return;
-  await supabase
-    .from('account_reconciliations')
-    .update({
-      status: 'reconciled',
-      reconciled_at: new Date().toISOString(),
-      period: opts.month,
-      total_spent_usd: +opts.spentUsd.toFixed(2),
-    })
-    .in('id', pending.map((r: any) => r.id));
+
+  // Distribute the spent amount across pending reconciliations proportionally
+  // by their transfer_amount_usd so partial imports accumulate fairly.
+  const totalTransfer = pending.reduce(
+    (s: number, r: any) => s + Number(r.transfer_amount_usd || 0), 0,
+  );
+  const nowIso = new Date().toISOString();
+  for (const r of pending as any[]) {
+    const transfer = Number(r.transfer_amount_usd || 0);
+    const share = totalTransfer > 0 ? transfer / totalTransfer : 1 / pending.length;
+    const addedSpent = +(opts.spentUsd * share).toFixed(2);
+    const prevSpent = Number(r.total_spent_usd || 0);
+    const newSpent = +(prevSpent + addedSpent).toFixed(2);
+    const status = newSpent >= transfer ? 'reconciled' : 'pending';
+    await supabase
+      .from('account_reconciliations')
+      .update({
+        status,
+        reconciled_at: nowIso,
+        period: opts.month,
+        total_spent_usd: newSpent,
+        last_import_date: opts.month,
+      })
+      .eq('id', r.id);
+  }
 }
 import { useImportLog } from '@/hooks/useImportLog';
 import { MerchantLogo } from '@/components/MerchantLogo';
