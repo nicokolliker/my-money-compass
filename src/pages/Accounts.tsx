@@ -49,6 +49,9 @@ export default function Accounts() {
   const deleteGroup = useDeleteAccountGroup();
   const { hasDemoData, onCleared: onDemoCleared } = useDemoData();
   const { netWorthUsd: totalNetWorth } = useNetWorth();
+  const { data: userSettings } = useUserSettings();
+  const binanceBalances: any[] = (userSettings as any)?.binance_balances || [];
+  const binanceTotalUsd = binanceBalances.reduce((s: number, b: any) => s + (b.value_usd || 0), 0);
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: '', type: 'bank' as string, institution: '', currency: 'USD', opening_balance: '0', notes: '', group_id: '' });
