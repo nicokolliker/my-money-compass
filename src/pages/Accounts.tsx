@@ -55,6 +55,7 @@ export default function Accounts() {
   /** Most recent pending deposit date, for the badge subtitle */
   const arqPendingLatestDate = arqPending?.[0]?.wise_date ?? null;
   const isArqAccount = (name: string) => /arq|dolarapp/i.test(name.toLowerCase());
+  const isTrackedDestAccount = (name: string) => /mercado|galicia/i.test(name.toLowerCase());
   const { data: groups } = useAccountGroups();
   const createAccount = useCreateAccount();
   const updateAccount = useUpdateAccount();
