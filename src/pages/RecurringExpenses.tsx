@@ -398,9 +398,8 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
               const group = grouped[c.id];
               if (!group || group.items.length === 0) return null;
               const activeCount = group.items.filter((i: any) => i.is_active).length;
-              // Default collapsed for categories with many items
-              const defaultCollapsed = group.items.length > 5;
-              const collapsed = collapsedGroups[c.id] === undefined ? defaultCollapsed : !!collapsedGroups[c.id];
+              // All cards collapsed by default; user expands manually
+              const collapsed = collapsedGroups[c.id] === undefined ? true : !!collapsedGroups[c.id];
 
               const renderItemRow = (item: any) => {
                 const acc = item.accounts;
@@ -441,20 +440,28 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
               return (
                 <Card key={c.id}>
                   <CardHeader
-                    className="pb-3 cursor-pointer select-none"
+                    className="p-5 cursor-pointer select-none"
                     onClick={() => toggleGroup(c.id)}
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex items-center gap-3 min-w-0">
-                        <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl text-lg bg-muted shrink-0">{c.icon}</span>
+                        <span className="inline-flex items-center justify-center w-12 h-12 rounded-xl text-2xl bg-muted shrink-0">{c.icon}</span>
                         <div className="min-w-0">
-                          <p className="text-sm font-semibold text-foreground truncate">{c.name}</p>
-                          <p className="text-[11px] text-muted-foreground">
-                            {formatUSD(group.totalUsd)}/mes · {activeCount} activo{activeCount === 1 ? '' : 's'}
+                          <p className="text-foreground truncate" style={{ fontSize: 16, fontWeight: 600 }}>{c.name}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {activeCount} activo{activeCount === 1 ? '' : 's'}
                           </p>
                         </div>
                       </div>
-                      <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform shrink-0 ${collapsed ? '' : 'rotate-180'}`} />
+                      <div className="flex items-center gap-3 shrink-0">
+                        <div className="text-right">
+                          <p className="text-foreground tabular-nums leading-none" style={{ fontSize: 22, fontWeight: 700 }}>
+                            {formatUSD(group.totalUsd)}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground mt-1">/mes</p>
+                        </div>
+                        <ChevronDown className={`h-5 w-5 text-muted-foreground transition-transform ${collapsed ? '' : 'rotate-180'}`} />
+                      </div>
                     </div>
                   </CardHeader>
                   {!collapsed && (

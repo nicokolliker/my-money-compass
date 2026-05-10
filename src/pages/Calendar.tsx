@@ -8,17 +8,20 @@ import { toUSD, isDerivedPaid, type FxRateRow } from '@/lib/money';
 import { MerchantLogo } from '@/components/MerchantLogo';
 import { RecurringStatusBadge } from '@/components/recurring/RecurringStatusBadge';
 import {
-  ChevronLeft, ChevronRight, CalendarDays, AlertCircle, CreditCard, Wallet, RefreshCw, CheckCircle2,
+  ChevronLeft, ChevronRight, CalendarDays, AlertCircle, CreditCard, Wallet, RefreshCw, CheckCircle2, Link2,
 } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isToday, addMonths, subMonths, getDay } from 'date-fns';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import ManualMatchDialog from '@/components/recurring/ManualMatchDialog';
+import type { RecurringInstance } from '@/hooks/useRecurringInstances';
 
 export default function CalendarPage({ embedded = false }: { embedded?: boolean } = {}) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [view, setView] = useState<'calendar' | 'timeline'>('timeline');
-  const effectiveView: 'calendar' | 'timeline' = embedded ? 'timeline' : view;
+  const effectiveView = view;
+  const [matchInstance, setMatchInstance] = useState<RecurringInstance | null>(null);
   const monthStart = startOfMonth(currentMonth).toISOString().split('T')[0];
   const monthEnd = endOfMonth(currentMonth).toISOString().split('T')[0];
 
@@ -80,12 +83,10 @@ export default function CalendarPage({ embedded = false }: { embedded?: boolean 
           <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refresh.isPending}>
             <RefreshCw className={`h-3.5 w-3.5 ${refresh.isPending ? 'animate-spin' : ''}`} />
           </Button>
-          {!embedded && (
-            <div className="flex rounded-xl overflow-hidden border">
-              <Button variant={view === 'timeline' ? 'secondary' : 'ghost'} size="sm" className="rounded-none h-8 text-xs" onClick={() => setView('timeline')}>Timeline</Button>
-              <Button variant={view === 'calendar' ? 'secondary' : 'ghost'} size="sm" className="rounded-none h-8 text-xs" onClick={() => setView('calendar')}>Calendar</Button>
-            </div>
-          )}
+          <div className="flex rounded-xl overflow-hidden border">
+            <Button variant={view === 'timeline' ? 'secondary' : 'ghost'} size="sm" className="rounded-none h-8 text-xs" onClick={() => setView('timeline')}>Timeline</Button>
+            <Button variant={view === 'calendar' ? 'secondary' : 'ghost'} size="sm" className="rounded-none h-8 text-xs" onClick={() => setView('calendar')}>Calendar</Button>
+          </div>
         </div>
       </div>
 
@@ -171,14 +172,25 @@ export default function CalendarPage({ embedded = false }: { embedded?: boolean 
                           </p>
                           <RecurringStatusBadge state={item.derived} />
                         </div>
-                        {!item.isPaid && (
-                          <Button
-                            size="sm" variant="ghost" className="h-7 w-7 p-0 shrink-0"
-                            onClick={() => markPaid.mutateAsync(item.id).then(() => toast.success('Marked paid'))}
-                            title="Mark paid"
-                          >
-                            <CheckCircle2 className="h-4 w-4" />
-                          </Button>
+                        {item.isPaid ? (
+                          <CheckCircle2 className="h-5 w-5 text-success shrink-0" />
+                        ) : (
+                          <div className="flex items-center gap-1 shrink-0">
+                            <Button
+                              size="sm" variant="ghost" className="h-7 w-7 p-0"
+                              onClick={() => setMatchInstance(item as any)}
+                              title="Match transaction"
+                            >
+                              <Link2 className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="sm" variant="ghost" className="h-7 w-7 p-0"
+                              onClick={() => markPaid.mutateAsync(item.id).then(() => toast.success('Marked paid'))}
+                              title="Mark paid"
+                            >
+                              <CheckCircle2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         )}
                       </div>
                     );
@@ -310,6 +322,12 @@ export default function CalendarPage({ embedded = false }: { embedded?: boolean 
           </CardContent>
         </Card>
       )}
+
+      <ManualMatchDialog
+        instance={matchInstance}
+        open={!!matchInstance}
+        onOpenChange={(o) => { if (!o) setMatchInstance(null); }}
+      />
     </div>
   );
 }
