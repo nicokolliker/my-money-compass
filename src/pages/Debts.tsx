@@ -429,7 +429,7 @@ const ITEM_GROUPS: { label: string; items: string[] }[] = [
   { label: '🚗 Auto', items: ['prestamo', 'cochera', 'patente', 'multa'] },
 ];
 
-function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
+function ViejoSettlementWizard({ open, onOpenChange, onSantTotalDetected }: { open: boolean; onOpenChange: (v: boolean) => void; onSantTotalDetected?: (n: number) => void }) {
   const { data: accounts } = useAccountBalances();
   const { data: categories } = useCategories();
   const { data: blueRate } = useBlueDollarRate();
