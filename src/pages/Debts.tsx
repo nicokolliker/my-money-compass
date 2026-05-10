@@ -71,6 +71,8 @@ export default function DebtsPage() {
         onOpen={() => setOpenViejo(true)}
       />
 
+      <CreditCardDebtCard />
+
       {splitwiseAccount ? (
         <SplitwiseDebtCard
           account={splitwiseAccount}
