@@ -136,11 +136,7 @@ export default function CalendarPage({ embedded = false }: { embedded?: boolean 
               0,
             );
             const allPaid = events.every(e => e.isPaid);
-            const dayLabel = format(dayDate, "d 'de' MMMM", { locale: undefined as any })
-              .replace(/^(\d+) de (\w+)/, (_m, d, mo) => `${d} ${mo}`);
-            // Manual Spanish month names (avoid extra locale import)
             const monthsEs = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
-            const headerLabel = `${dayDate.getDate()} ${monthsEs[dayDate.getMonth()]}`;
 
             return (
               <Card key={dateKey} className={allPaid ? 'opacity-60' : ''}>
