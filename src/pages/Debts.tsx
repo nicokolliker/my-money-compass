@@ -670,10 +670,13 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
         const l = lines[idx];
         const cat = categories.find((c: any) => c.name === l.categoryName);
         const usdAmount = +(l.amountARS * fxArsUsd).toFixed(2);
+        // Las cuotas usan la fecha del settlement, no la fecha original de compra
+        const isCuota = /cuota/i.test(l.description);
+        const txDate = isCuota ? settlementDate : (l.date || settlementDate);
         await supabase.from('transactions').insert({
           user_id: user.id,
           account_id: cashAcc.id,
-          date: l.date || settlementDate,
+          date: txDate,
           description: l.description,
           amount: -usdAmount,
           currency: 'USD',
@@ -683,8 +686,8 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
           category_id: cat?.id || null,
           merchant: `Liquidación ${monthLabel} — viejo`,
           external_id: l.external_id ? `viejo-${settlementMonth}-${l.external_id}` : null,
-          // El primer ítem lleva la metadata + el prefijo "Liquidación" para que aparezca en el historial
-          ...(idx === 0 ? { description: `Liquidación ${monthLabel} — ${l.description}`, notes: settlementNotes } : {}),
+          // El primer ítem lleva la metadata para el historial, sin prefijar "Liquidación" en la descripción
+          ...(idx === 0 ? { notes: settlementNotes } : {}),
         });
       }
 
