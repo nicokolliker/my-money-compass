@@ -25,6 +25,7 @@ interface Props {
  */
 export default function ManualMatchDialog({ instance, open, onOpenChange }: Props) {
   const link = useLinkInstanceToTransaction();
+  const markPaid = useMarkInstancePaid();
 
   const { data: candidates, isLoading } = useQuery({
     enabled: open && !!instance,
