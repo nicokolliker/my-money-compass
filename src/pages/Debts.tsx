@@ -439,7 +439,13 @@ function ViejoSettlementWizard({ open, onOpenChange, onSantTotalDetected }: { op
   const defaultBlueRate = blueRate?.blue_avg ? Math.round(blueRate.blue_avg) : (arsToUsd > 0 ? Math.round(1 / arsToUsd) : 1390);
 
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
-  const [settlementMonth, setSettlementMonth] = useState<string>(format(new Date(), 'yyyy-MM'));
+  const [settlementMonth, setSettlementMonth] = useState<string>(() => {
+    const today = new Date();
+    const day = today.getDate();
+    const d = new Date(today.getFullYear(), today.getMonth(), 1);
+    if (day < 20) d.setMonth(d.getMonth() - 1);
+    return format(d, 'yyyy-MM');
+  });
   const [iebraFile, setIebraFile] = useState<File | null>(null);
   const [kollikerFile, setKollikerFile] = useState<File | null>(null);
   const [santFile, setSantFile] = useState<File | null>(null);
