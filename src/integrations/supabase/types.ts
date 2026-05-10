@@ -112,6 +112,72 @@ export type Database = {
           },
         ]
       }
+      arq_reconciliations: {
+        Row: {
+          balance_after_usd: number | null
+          created_at: string
+          id: string
+          import_log_id: string | null
+          period: string | null
+          reconciled_at: string | null
+          status: string
+          total_spent_usd: number | null
+          updated_at: string
+          user_id: string
+          wise_amount_usd: number
+          wise_date: string
+          wise_description: string | null
+          wise_tx_id: string | null
+        }
+        Insert: {
+          balance_after_usd?: number | null
+          created_at?: string
+          id?: string
+          import_log_id?: string | null
+          period?: string | null
+          reconciled_at?: string | null
+          status?: string
+          total_spent_usd?: number | null
+          updated_at?: string
+          user_id: string
+          wise_amount_usd: number
+          wise_date: string
+          wise_description?: string | null
+          wise_tx_id?: string | null
+        }
+        Update: {
+          balance_after_usd?: number | null
+          created_at?: string
+          id?: string
+          import_log_id?: string | null
+          period?: string | null
+          reconciled_at?: string | null
+          status?: string
+          total_spent_usd?: number | null
+          updated_at?: string
+          user_id?: string
+          wise_amount_usd?: number
+          wise_date?: string
+          wise_description?: string | null
+          wise_tx_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "arq_reconciliations_import_log_id_fkey"
+            columns: ["import_log_id"]
+            isOneToOne: false
+            referencedRelation: "import_log"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "arq_reconciliations_wise_tx_id_fkey"
+            columns: ["wise_tx_id"]
+            isOneToOne: true
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       budgets: {
         Row: {
           amount: number
