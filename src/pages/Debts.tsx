@@ -431,10 +431,9 @@ interface SettlementItem {
 }
 
 const ITEM_GROUPS: { label: string; items: string[] }[] = [
-  { label: '🏦 Tarjetas', items: ['visa_ciudad', 'visa_santander', 'amex'] },
+  { label: '🏦 Tarjetas', items: ['visa_ciudad_mama', 'visa_ciudad_papa', 'visa_santander', 'amex'] },
   { label: '🏠 Casa', items: ['expensas'] },
   { label: '🚗 Auto', items: ['prestamo', 'cochera', 'patente', 'multa'] },
-  { label: '❤️ Salud', items: ['obra_social'] },
 ];
 
 function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
