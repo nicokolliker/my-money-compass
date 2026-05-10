@@ -619,74 +619,85 @@ function ViejoSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenCh
       const tarjetaViejoAcc = accounts.find((a: any) => /viejo|tarjeta.*viejo/i.test(a.name));
       const cashAcc = accounts.find((a: any) => /cash/i.test(a.name) && a.currency === 'USD');
       const mpAcc = accounts.find((a: any) => /mercado.*pago|mercadopago/i.test(a.name));
-      if (!tarjetaViejoAcc || !cashAcc || !mpAcc) {
-        toast.error('Faltan cuentas: Tarjeta viejo, Cash USD y Mercado Pago');
+      if (!cashAcc || !mpAcc) {
+        toast.error('Faltan cuentas: Cash USD y Mercado Pago');
         setSubmitting(false);
         return;
       }
       const fxArsUsd = arsToUsd || (tcBlue > 0 ? 1 / tcBlue : 0);
 
-      // 1. Transacciones individuales de las filas del PDF
-      const pdfRows = [...iebraRows, ...kollikerRows, ...santRows].filter(r => r.selected);
-      for (const row of pdfRows) {
-        const cat = categories.find((c: any) => c.name === row.categoryName);
-        await supabase.from('transactions').insert({
-          user_id: user.id,
-          account_id: tarjetaViejoAcc.id,
-          date: row.date,
-          description: row.description,
-          amount: -row.amountARS,
-          currency: 'ARS',
-          fx_rate: fxArsUsd,
-          amount_usd: -(row.amountARS * fxArsUsd),
-          type: 'expense' as const,
-          category_id: cat?.id || null,
-          external_id: row.external_id,
-        });
+      // Construir lista unificada de ítems desglosados por categoría
+      type Line = { description: string; amountARS: number; categoryName: string; external_id?: string; date?: string };
+      const lines: Line[] = [];
+      for (const r of iebraRows.filter(r => r.selected)) {
+        lines.push({ description: r.description, amountARS: r.amountARS, categoryName: r.categoryName, external_id: r.external_id, date: r.date });
+      }
+      for (const r of kollikerRows.filter(r => r.selected)) {
+        lines.push({ description: r.description, amountARS: r.amountARS, categoryName: r.categoryName, external_id: r.external_id, date: r.date });
+      }
+      for (const r of santRows.filter(r => r.selected)) {
+        lines.push({ description: r.description, amountARS: r.amountARS, categoryName: r.categoryName, external_id: r.external_id, date: r.date });
+      }
+      for (const i of items.filter(i => i.editable && i.amountARS > 0)) {
+        lines.push({ description: `${i.label} — ${monthLabel}`, amountARS: i.amountARS, categoryName: i.categoryName });
+      }
+      for (const e of extraItems.filter(e => e.amountARS > 0 && e.label.trim())) {
+        lines.push({ description: `${e.label} — ${monthLabel}`, amountARS: e.amountARS, categoryName: e.categoryName });
       }
 
-      // 2. Ítems manuales: solo los editables con monto > 0 (los autollenados de tarjeta vienen del PDF)
-      const allItems = [
-        ...items.filter(i => i.editable && i.amountARS > 0),
-        ...extraItems.filter(e => e.amountARS > 0 && e.label.trim()),
-      ];
-      for (const item of allItems) {
-        const cat = categories.find((c: any) => c.name === item.categoryName);
-        await supabase.from('transactions').insert({
-          user_id: user.id,
-          account_id: tarjetaViejoAcc.id,
-          date: settlementDate,
-          description: `${item.label} — ${monthLabel}`,
-          amount: -item.amountARS,
-          currency: 'ARS',
-          fx_rate: fxArsUsd,
-          amount_usd: -(item.amountARS * fxArsUsd),
-          type: 'expense' as const,
-          category_id: cat?.id || null,
-        });
-      }
+      const sumLinesARS = lines.reduce((s, l) => s + l.amountARS, 0);
+      const sumLinesUSD = sumLinesARS * fxArsUsd;
+      const roundingUSD = Math.max(0, usdAPagar - sumLinesUSD);
 
-      await supabase.from('transactions').insert({
-        user_id: user.id,
-        account_id: cashAcc.id,
-        date: settlementDate,
-        description: `Liquidación ${monthLabel} — viejo`,
-        amount: -usdAPagar,
-        currency: 'USD',
-        fx_rate: 1,
-        amount_usd: -usdAPagar,
-        type: 'expense' as const,
-        notes: JSON.stringify({
-          settlement: true,
-          month: settlementMonth,
-          breakdown: Object.fromEntries(items.filter((i) => i.amountARS > 0).map((i) => [i.key, i.amountARS])),
-          extras: extraItems.filter(e => e.amountARS > 0 && e.label.trim()).map(e => ({ label: e.label, amountARS: e.amountARS, categoryName: e.categoryName })),
-          mamaRows: iebraRows.filter(r => r.selected).map(r => ({ date: r.date, description: r.description, amountARS: r.amountARS, amountUSD: r.amountUSD, matched: r.matched, categoryName: r.categoryName })),
-          papaRows: kollikerRows.filter(r => r.selected).map(r => ({ date: r.date, description: r.description, amountARS: r.amountARS, amountUSD: r.amountUSD, matched: r.matched, categoryName: r.categoryName })),
-          santRows: santRows.filter(r => r.selected).map(r => ({ date: r.date, description: r.description, amountARS: r.amountARS, amountUSD: r.amountUSD, matched: r.matched, categoryName: r.categoryName })),
-          tcBlue, totalARS, usdPagado: usdAPagar, vueltoARS,
-        }),
+      const settlementNotes = JSON.stringify({
+        settlement: true,
+        month: settlementMonth,
+        breakdown: Object.fromEntries(items.filter((i) => i.amountARS > 0).map((i) => [i.key, i.amountARS])),
+        extras: extraItems.filter(e => e.amountARS > 0 && e.label.trim()).map(e => ({ label: e.label, amountARS: e.amountARS, categoryName: e.categoryName })),
+        mamaRows: iebraRows.filter(r => r.selected).map(r => ({ date: r.date, description: r.description, amountARS: r.amountARS, amountUSD: r.amountUSD, matched: r.matched, categoryName: r.categoryName })),
+        papaRows: kollikerRows.filter(r => r.selected).map(r => ({ date: r.date, description: r.description, amountARS: r.amountARS, amountUSD: r.amountUSD, matched: r.matched, categoryName: r.categoryName })),
+        santRows: santRows.filter(r => r.selected).map(r => ({ date: r.date, description: r.description, amountARS: r.amountARS, amountUSD: r.amountUSD, matched: r.matched, categoryName: r.categoryName })),
+        tcBlue, totalARS, usdPagado: usdAPagar, vueltoARS,
       });
+
+      // Insertar cada línea como expense en Cash USD con categoría (impacta en Activity desglosado)
+      for (let idx = 0; idx < lines.length; idx++) {
+        const l = lines[idx];
+        const cat = categories.find((c: any) => c.name === l.categoryName);
+        const usdAmount = +(l.amountARS * fxArsUsd).toFixed(2);
+        await supabase.from('transactions').insert({
+          user_id: user.id,
+          account_id: cashAcc.id,
+          date: l.date || settlementDate,
+          description: l.description,
+          amount: -usdAmount,
+          currency: 'USD',
+          fx_rate: 1,
+          amount_usd: -usdAmount,
+          type: 'expense' as const,
+          category_id: cat?.id || null,
+          merchant: `Liquidación ${monthLabel} — viejo`,
+          external_id: l.external_id ? `viejo-${settlementMonth}-${l.external_id}` : null,
+          // El primer ítem lleva la metadata + el prefijo "Liquidación" para que aparezca en el historial
+          ...(idx === 0 ? { description: `Liquidación ${monthLabel} — ${l.description}`, notes: settlementNotes } : {}),
+        });
+      }
+
+      // Marker de redondeo (cuando usdAPagar > totalUSD_exact, el resto se va al viejo "de más")
+      if (roundingUSD > 0.005 || lines.length === 0) {
+        await supabase.from('transactions').insert({
+          user_id: user.id,
+          account_id: cashAcc.id,
+          date: settlementDate,
+          description: `Liquidación ${monthLabel} — viejo (redondeo)`,
+          amount: -roundingUSD,
+          currency: 'USD',
+          fx_rate: 1,
+          amount_usd: -roundingUSD,
+          type: 'expense' as const,
+          ...(lines.length === 0 ? { notes: settlementNotes } : {}),
+        });
+      }
 
       if (vueltoARS > 0) {
         await supabase.from('transactions').insert({
