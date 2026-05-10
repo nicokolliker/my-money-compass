@@ -135,7 +135,7 @@ const POPPINS_URLS = {
   regular: 'https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/poppins/Poppins-Regular.ttf',
   bold:    'https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/poppins/Poppins-Bold.ttf',
 };
-const NOTO_EMOJI_URL = 'https://cdn.jsdelivr.net/gh/googlefonts/noto-emoji@main/fonts/NotoEmoji-Regular.ttf';
+const NOTO_EMOJI_URL = 'https://cdn.jsdelivr.net/npm/@expo-google-fonts/noto-emoji@0.2.3/NotoEmoji_400Regular.ttf';
 
 let poppinsCache: { regular: string; bold: string } | null = null;
 let poppinsLoading: Promise<{ regular: string; bold: string } | null> | null = null;
