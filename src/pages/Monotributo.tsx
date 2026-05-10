@@ -7,10 +7,11 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ExternalLink, Plus, AlertTriangle, CheckCircle2, Clock, Upload } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { ExternalLink, Plus, AlertTriangle, CheckCircle2, Clock, Upload, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { useUserSettings, useUpsertUserSettings, type MonotributoConfig } from '@/hooks/useUserSettings';
 
 const CATEGORIAS = [
   { cat: 'A', tope: 10_277_988.13, cuota: 42_386.74 },
