@@ -570,7 +570,7 @@ export default function ImportPage() {
     setGaliciaResultMsg(null);
     try {
       const buf = await galiciaFile.arrayBuffer();
-      const parsed = parseGalicia(buf);
+      const parsed = parseGalicia(buf, arsToUsd || 0);
       if (parsed.length === 0) {
         toast.error('No se encontraron transacciones');
         setGaliciaRows([]);
