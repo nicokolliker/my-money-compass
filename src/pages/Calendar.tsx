@@ -191,38 +191,66 @@ export default function CalendarPage({ embedded = false }: { embedded?: boolean 
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setCurrentMonth(m => addMonths(m, 1))}><ChevronRight className="h-4 w-4" /></Button>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-7 gap-px">
-              {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(d => (
-                <div key={d} className="text-center text-[10px] text-muted-foreground font-medium py-1">{d}</div>
+            <div className="grid grid-cols-7 gap-1">
+              {['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map(d => (
+                <div key={d} className="text-center text-[10px] text-muted-foreground font-medium py-1 uppercase tracking-wide">{d}</div>
               ))}
               {Array.from({ length: calendarDays.startPad }).map((_, i) => <div key={`pad-${i}`} />)}
               {calendarDays.days.map(day => {
                 const key = format(day, 'yyyy-MM-dd');
                 const events = dayEvents[key] || [];
+                const dayTotalUsd = events.reduce(
+                  (s, e: any) => s + toUSD(Number(e.expected_amount), e.expected_currency, fxRates as FxRateRow[] | undefined),
+                  0,
+                );
+                const allPaid = events.length > 0 && events.every((e: any) => e.isPaid);
+                const hasMissing = events.some((e: any) => e.isMissing);
+                const hasReview = events.some((e: any) => e.isNeedsReview);
+                const accent = hasMissing ? 'border-destructive/40' : hasReview ? 'border-amber-500/40' : allPaid ? 'border-success/40' : events.length ? 'border-primary/30' : 'border-border/50';
                 return (
-                  <div key={key} className={`min-h-[3rem] p-0.5 rounded-lg text-center ${isToday(day) ? 'bg-primary/10 ring-1 ring-primary/30' : ''}`}>
-                    <p className={`text-xs ${isToday(day) ? 'font-bold text-primary' : 'text-foreground'}`}>{format(day, 'd')}</p>
-                    {events.length > 0 && (
-                      <div className="flex flex-col items-center gap-0.5 mt-0.5">
-                        {events.slice(0, 2).map((e: any) => (
+                  <div
+                    key={key}
+                    className={cn(
+                      'min-h-[88px] p-1.5 rounded-lg border bg-card flex flex-col gap-1 text-left',
+                      accent,
+                      isToday(day) && 'bg-primary/5 ring-1 ring-primary/40',
+                      allPaid && 'opacity-70',
+                    )}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className={cn('text-[11px] font-semibold tabular-nums', isToday(day) ? 'text-primary' : 'text-foreground')}>{format(day, 'd')}</span>
+                      {events.length > 0 && (
+                        <span className="text-[9px] tabular-nums text-muted-foreground">{formatUSD(dayTotalUsd)}</span>
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-0.5 flex-1">
+                      {events.slice(0, 3).map((e: any) => {
+                        const name = e.recurring_expenses?.name || 'Recurring';
+                        const dotColor = e.isPaid ? 'bg-success' : e.isMissing ? 'bg-destructive' : e.isNeedsReview ? 'bg-amber-500' : 'bg-primary';
+                        return (
                           <div
                             key={e.id}
-                            className={`w-1.5 h-1.5 rounded-full ${e.isPaid ? 'bg-success' : e.isMissing ? 'bg-destructive' : e.isNeedsReview ? 'bg-amber-500' : 'bg-muted-foreground'}`}
-                            title={`${(e as any).recurring_expenses?.name} · ${e.derived}`}
-                          />
-                        ))}
-                        {events.length > 2 && <span className="text-[8px] text-muted-foreground">+{events.length - 2}</span>}
-                      </div>
-                    )}
+                            className={cn('flex items-center gap-1 px-1 py-0.5 rounded bg-muted/40', e.isPaid && 'line-through opacity-60')}
+                            title={`${name} · ${e.derived} · ${formatCurrency(Number(e.expected_amount), e.expected_currency)}`}
+                          >
+                            <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', dotColor)} />
+                            <span className="text-[9px] text-foreground truncate flex-1">{name}</span>
+                          </div>
+                        );
+                      })}
+                      {events.length > 3 && (
+                        <span className="text-[9px] text-muted-foreground px-1">+{events.length - 3} más</span>
+                      )}
+                    </div>
                   </div>
                 );
               })}
             </div>
-            <div className="flex items-center gap-4 mt-3 pt-3 border-t justify-center">
-              <div className="flex items-center gap-1 text-[10px] text-muted-foreground"><div className="w-2 h-2 rounded-full bg-success" /> Paid</div>
-              <div className="flex items-center gap-1 text-[10px] text-muted-foreground"><div className="w-2 h-2 rounded-full bg-amber-500" /> Needs review</div>
-              <div className="flex items-center gap-1 text-[10px] text-muted-foreground"><div className="w-2 h-2 rounded-full bg-destructive" /> Missing</div>
-              <div className="flex items-center gap-1 text-[10px] text-muted-foreground"><div className="w-2 h-2 rounded-full bg-muted-foreground" /> Upcoming</div>
+            <div className="flex items-center gap-4 mt-3 pt-3 border-t justify-center flex-wrap">
+              <div className="flex items-center gap-1 text-[10px] text-muted-foreground"><div className="w-2 h-2 rounded-full bg-success" /> Pagado</div>
+              <div className="flex items-center gap-1 text-[10px] text-muted-foreground"><div className="w-2 h-2 rounded-full bg-amber-500" /> Revisar</div>
+              <div className="flex items-center gap-1 text-[10px] text-muted-foreground"><div className="w-2 h-2 rounded-full bg-destructive" /> Faltante</div>
+              <div className="flex items-center gap-1 text-[10px] text-muted-foreground"><div className="w-2 h-2 rounded-full bg-primary" /> Próximo</div>
             </div>
           </CardContent>
         </Card>
