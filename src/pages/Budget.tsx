@@ -2,13 +2,15 @@ import React, { useState, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useBudgets, useUpsertBudget } from '@/hooks/useBudgets';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useCategories } from '@/hooks/useCategories';
-import { useCategoryTree } from '@/hooks/useCategoryTree';
-import { ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
+import { useCategoryTree, type CategoryNode } from '@/hooks/useCategoryTree';
+import { ChevronLeft, ChevronRight, ChevronDown, Lightbulb, AlertTriangle, TrendingDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip as RTooltip, Cell, Legend } from 'recharts';
 
 const MONTHS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 const INCOME_CATEGORY_NAME = 'Ingresos Proyectados';
