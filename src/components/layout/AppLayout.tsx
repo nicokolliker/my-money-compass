@@ -104,7 +104,33 @@ export function AppLayout({ children }: { children: ReactNode }) {
   };
 
   return (
-    <div className="flex min-h-screen">
+    <div className="relative flex min-h-screen">
+      {/* Animated gradient orbs background */}
+      <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
+        <div
+          className="absolute top-[-20%] left-[-10%] w-[55vw] h-[55vw] rounded-full opacity-30 blur-3xl"
+          style={{
+            background: 'radial-gradient(circle, hsl(var(--primary)) 0%, transparent 70%)',
+            animation: 'drift 18s ease-in-out infinite',
+          }}
+        />
+        <div
+          className="absolute bottom-[-15%] right-[-10%] w-[50vw] h-[50vw] rounded-full opacity-25 blur-3xl"
+          style={{
+            background: 'radial-gradient(circle, hsl(var(--primary-glow)) 0%, transparent 70%)',
+            animation: 'drift 22s ease-in-out infinite reverse',
+          }}
+        />
+        <div
+          className="absolute top-[30%] right-[20%] w-[35vw] h-[35vw] rounded-full opacity-20 blur-3xl"
+          style={{
+            background: 'radial-gradient(circle, hsl(220 90% 70%) 0%, transparent 70%)',
+            animation: 'drift 26s ease-in-out infinite',
+            animationDelay: '-8s',
+          }}
+        />
+      </div>
+
       {/* Desktop sidebar — glass */}
       <aside className="hidden lg:flex lg:w-64 lg:flex-col lg:fixed lg:inset-y-0 lg:p-3 z-30">
         <div className="flex flex-col h-full glass-panel rounded-2xl shadow-[0_8px_32px_-8px_hsl(220_40%_30%_/_0.12)]">
