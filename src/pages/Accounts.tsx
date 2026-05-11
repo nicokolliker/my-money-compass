@@ -240,7 +240,7 @@ export default function Accounts() {
       <Card className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground border-0 shadow-elevated">
         <CardContent className="pt-5 pb-5">
           <p className="text-sm opacity-80 font-medium">Total Net Worth</p>
-          <p className="text-3xl font-extrabold mt-1 tracking-tight">{formatUSD(totalNetWorth)}</p>
+          <p className="text-3xl font-extrabold mt-1 tracking-tight">{maskAmount(formatUSD(totalNetWorth), isPrivate)}</p>
         </CardContent>
       </Card>
 
