@@ -774,39 +774,173 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                 <h3 className="text-sm font-semibold text-foreground capitalize">Análisis del mes — {monthLabel}</h3>
               </div>
 
-              {/* Bar chart */}
+              {/* Annual evolution chart */}
+              {(() => {
+                const annualData = MONTHS.map((mLabel, i) => {
+                  const budgeted = tree.reduce((s, cat) => s + catBudget(cat, i) + cat.recurringMonthly, 0);
+                  const future = selectedYear > currentYear || (selectedYear === currentYear && i > currentMonth);
+                  const real = future ? null : tree.reduce((s, cat) => s + catSpending(cat, i), 0);
+                  const over = real !== null && real > budgeted && budgeted > 0;
+                  return { month: mLabel, monthIdx: i, budgeted, real, future, over };
+                });
+                const hasReal = annualData.some(d => d.real !== null && d.real > 0);
+                const hasBudget = annualData.some(d => d.budgeted > 0);
+                if (!hasReal && !hasBudget) return null;
+                return (
+                  <div className="p-4 border-b border-border">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs font-medium text-muted-foreground">Presupuestado vs Real — {selectedYear}</p>
+                      <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+                        <span className="flex items-center gap-1"><span className="inline-block w-3 h-0.5 border-t-2 border-dashed border-primary" />Presupuestado</span>
+                        <span className="flex items-center gap-1"><span className="inline-block w-3 h-2 rounded-sm bg-emerald-500/60" />Real</span>
+                      </div>
+                    </div>
+                    <div className="h-72 w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <ComposedChart
+                          data={annualData}
+                          margin={{ top: 8, right: 8, left: 0, bottom: 8 }}
+                          onClick={(e: any) => {
+                            const idx = e?.activePayload?.[0]?.payload?.monthIdx;
+                            if (typeof idx === 'number') setSelectedChartMonth(idx);
+                          }}
+                        >
+                          <defs>
+                            <linearGradient id="realFill" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor="hsl(142 71% 45%)" stopOpacity={0.5} />
+                              <stop offset="100%" stopColor="hsl(142 71% 45%)" stopOpacity={0.05} />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                          <XAxis
+                            dataKey="month"
+                            tick={(props: any) => {
+                              const { x, y, payload } = props;
+                              const isSelected = payload.value === MONTHS[selectedChartMonth];
+                              return (
+                                <text x={x} y={y + 12} textAnchor="middle" fontSize={10}
+                                  fill={isSelected ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground))'}
+                                  fontWeight={isSelected ? 600 : 400}>
+                                  {payload.value}
+                                </text>
+                              );
+                            }}
+                          />
+                          <YAxis
+                            tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                            tickFormatter={(v: number) => v >= 1000 ? `${Math.round(v / 1000)}k` : String(v)}
+                          />
+                          <RTooltip
+                            contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: 8, fontSize: 12 }}
+                            content={({ active, payload, label }: any) => {
+                              if (!active || !payload?.length) return null;
+                              const d = payload[0].payload;
+                              const diff = d.real !== null ? d.real - d.budgeted : null;
+                              return (
+                                <div className="rounded-lg border border-border bg-popover px-3 py-2 text-xs shadow-md">
+                                  <div className="font-semibold mb-1">{label}</div>
+                                  <div className="flex justify-between gap-4"><span className="text-muted-foreground">Presupuestado</span><span className="tabular-nums">{fmt(d.budgeted)}</span></div>
+                                  {d.real !== null && (
+                                    <>
+                                      <div className="flex justify-between gap-4"><span className="text-muted-foreground">Real</span><span className="tabular-nums">{fmt(d.real)}</span></div>
+                                      <div className={cn('flex justify-between gap-4 font-semibold', d.over ? 'text-destructive' : 'text-emerald-600')}>
+                                        <span>Diferencia</span>
+                                        <span className="tabular-nums">{diff! > 0 ? '+' : '−'}{fmt(Math.abs(diff!))}</span>
+                                      </div>
+                                    </>
+                                  )}
+                                  {d.future && <div className="text-muted-foreground italic mt-1">Mes futuro</div>}
+                                </div>
+                              );
+                            }}
+                          />
+                          <Area
+                            type="monotone"
+                            dataKey="real"
+                            stroke="hsl(142 71% 45%)"
+                            strokeWidth={2}
+                            fill="url(#realFill)"
+                            connectNulls={false}
+                            dot={(props: any) => {
+                              const { cx, cy, payload, index } = props;
+                              if (payload.real === null) return null as any;
+                              return (
+                                <circle
+                                  key={index}
+                                  cx={cx}
+                                  cy={cy}
+                                  r={payload.over ? 4 : 3}
+                                  fill={payload.over ? 'hsl(var(--destructive))' : 'hsl(142 71% 45%)'}
+                                  stroke="hsl(var(--background))"
+                                  strokeWidth={1.5}
+                                />
+                              );
+                            }}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="budgeted"
+                            stroke="hsl(var(--primary))"
+                            strokeWidth={2}
+                            strokeDasharray="5 4"
+                            dot={false}
+                          />
+                        </ComposedChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Monthly breakdown — horizontal progress bars */}
               <div className="p-4">
-                <p className="text-xs font-medium text-muted-foreground mb-2">Presupuestado vs Real</p>
-                <div className="h-64 w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
-                      <XAxis
-                        dataKey="name"
-                        tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
-                        interval={0}
-                        angle={-30}
-                        textAnchor="end"
-                        height={60}
-                        tickFormatter={(v: string) => v.length > 10 ? v.slice(0, 10) + '…' : v}
-                      />
-                      <YAxis
-                        tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
-                        tickFormatter={(v: number) => v >= 1000 ? `${Math.round(v / 1000)}k` : String(v)}
-                      />
-                      <RTooltip
-                        contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: 8, fontSize: 12 }}
-                        formatter={(v: number) => fmt(Number(v))}
-                      />
-                      <Legend wrapperStyle={{ fontSize: 11 }} />
-                      <Bar dataKey="budgeted" name="Presupuestado" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="spent" name="Real" radius={[4, 4, 0, 0]}>
-                        {chartData.map((d, idx) => (
-                          <Cell key={idx} fill={d.spent > d.budgeted && d.budgeted > 0 ? 'hsl(var(--destructive))' : 'hsl(142 71% 45%)'} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
+                <p className="text-xs font-medium text-muted-foreground mb-3 capitalize">{monthLabel} — por categoría</p>
+                {chartData.length === 0 ? (
+                  <p className="text-xs text-muted-foreground text-center py-4">Sin datos para este mes.</p>
+                ) : (
+                  <div className="space-y-2.5">
+                    {[...chartData]
+                      .map(d => ({ ...d, pct: d.budgeted > 0 ? (d.spent / d.budgeted) * 100 : (d.spent > 0 ? 999 : 0) }))
+                      .sort((a, b) => {
+                        const aOver = a.pct > 100, bOver = b.pct > 100;
+                        if (aOver !== bOver) return aOver ? -1 : 1;
+                        return b.pct - a.pct;
+                      })
+                      .map(item => {
+                        const isOver = item.pct > 100;
+                        const fillPct = Math.min(item.pct, 100);
+                        const barColor = isOver ? 'bg-red-500' : item.pct >= 80 ? 'bg-amber-500' : 'bg-emerald-500';
+                        const diff = item.spent - item.budgeted;
+                        return (
+                          <div key={item.id} className="grid grid-cols-[minmax(110px,1fr)_2fr_auto] items-center gap-3 text-xs">
+                            <div className="flex items-center gap-1.5 font-medium truncate">
+                              <span>{item.icon}</span>
+                              <span className="truncate">{item.name}</span>
+                            </div>
+                            <div className="relative">
+                              <div className="h-5 bg-muted rounded-md overflow-hidden">
+                                <div className={cn('h-full transition-all', barColor)} style={{ width: `${fillPct}%` }} />
+                              </div>
+                              <span className={cn(
+                                'absolute inset-0 flex items-center px-2 text-[10px] font-semibold',
+                                fillPct > 40 ? 'text-white' : 'text-foreground'
+                              )}>
+                                {item.budgeted > 0 ? `${Math.round(item.pct)}%` : 'sin budget'}
+                              </span>
+                            </div>
+                            <div className="text-right tabular-nums whitespace-nowrap">
+                              <div className={cn('font-semibold', isOver && 'text-destructive')}>{fmt(item.spent)}</div>
+                              <div className="text-[10px] text-muted-foreground">
+                                /{fmt(item.budgeted)} <span className={cn('ml-1', diff > 0 ? 'text-destructive' : 'text-emerald-600')}>
+                                  {diff > 0 ? '+' : '−'}{fmt(Math.abs(diff))}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
               </div>
 
               {/* Variances table */}
