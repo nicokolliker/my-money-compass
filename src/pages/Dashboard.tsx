@@ -40,6 +40,7 @@ export default function Dashboard() {
   const { netWorthUsd: netWorth, totalAssetsUsd: totalAssets, totalLiabilitiesUsd: totalLiabilities } = useNetWorth();
   const { hasDemoData, onCleared: onDemoCleared } = useDemoData();
   const alerts = useHomeAlerts();
+  const { isPrivate } = usePrivacyMode();
 
   const now = new Date();
   const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
