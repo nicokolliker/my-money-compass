@@ -191,10 +191,11 @@ export default function CalendarPage({ embedded = false }: { embedded?: boolean 
                           <CheckCircle2 className="h-5 w-5 text-success shrink-0" />
                         ) : (
                           <Button
-                            size="sm" variant="outline" className="h-7 px-2 text-[11px] shrink-0"
+                            size="sm" variant="ghost" className="h-7 px-2 text-[11px] shrink-0 text-primary hover:text-primary"
                             onClick={() => setMatchInstance(item as any)}
+                            title="Registrar pago"
                           >
-                            Registrar pago →
+                            <Link2 className="h-3.5 w-3.5 mr-1" /> Registrar pago →
                           </Button>
                         )}
                       </div>
