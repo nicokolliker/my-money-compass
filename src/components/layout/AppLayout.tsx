@@ -162,6 +162,14 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
       {/* Main content */}
       <main className="flex-1 lg:ml-64 pb-24 lg:pb-0">
+        {/* Mobile floating privacy toggle */}
+        <button
+          onClick={togglePrivacy}
+          className="lg:hidden fixed top-3 right-3 z-40 h-9 w-9 rounded-full glass-panel border border-border/50 flex items-center justify-center text-muted-foreground active:scale-95 transition-transform"
+          aria-label={isPrivate ? 'Mostrar montos' : 'Ocultar montos'}
+        >
+          {isPrivate ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+        </button>
         <div className="max-w-3xl mx-auto px-4 py-6 lg:px-8 lg:py-10">
           {children}
         </div>
