@@ -31,6 +31,7 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
   const [fixedExpanded, setFixedExpanded] = useState(false);
   const [variableExpanded, setVariableExpanded] = useState(false);
   const [tableView, setTableView] = useState<'split' | 'consolidated'>('split');
+  const [showAllCats, setShowAllCats] = useState(false);
 
   const noSpinClass = '[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none';
 
