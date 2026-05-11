@@ -11,6 +11,7 @@ import { getCategoryColor } from '@/lib/categoryColors';
 import { getCategoryIcon } from '@/lib/brandLogos';
 import { MerchantLogo } from '@/components/MerchantLogo';
 import { TrendingUp, TrendingDown, ArrowUp, ArrowDown, CalendarDays, DollarSign } from 'lucide-react';
+import { usePrivacyMode, maskAmount } from '@/hooks/usePrivacyMode';
 import { useBlueDollarRate } from '@/hooks/useBlueDollar';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
