@@ -80,12 +80,65 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
   );
 
   const getBudgetAmount = useCallback(
-    (categoryId: string | null, monthIndex: number) => {
+    (categoryId: string | null, monthIndex: number, year: number = selectedYear) => {
       if (!categoryId) return 0;
-      const b = (budgets || []).find(b => b.category_id === categoryId && String(b.month).startsWith(monthPrefix(selectedYear, monthIndex)));
+      const b = (budgets || []).find(b => b.category_id === categoryId && String(b.month).startsWith(`${year}-${String(monthIndex + 1).padStart(2, '0')}`));
       return Number(b?.amount || 0);
     },
     [budgets, selectedYear]
+  );
+
+  const spendingForYM = useCallback(
+    (categoryId: string, monthIndex: number, year: number) => {
+      const prefix = `${year}-${String(monthIndex + 1).padStart(2, '0')}`;
+      return Math.abs(
+        (transactions || [])
+          .filter(t => (t.category_id === categoryId || t.subcategory_id === categoryId) && t.type === 'expense' && t.date.startsWith(prefix))
+          .reduce((s, t) => s + Number(t.amount_usd || 0), 0)
+      );
+    },
+    [transactions]
+  );
+
+  // Aggregated helpers: for Digital, sum across children (sub-budgets / sub-spending)
+  const catBudget = useCallback(
+    (cat: CategoryNode, monthIndex: number) => {
+      if (cat.isDigital && cat.children.length) {
+        return cat.children.reduce((s, ch) => s + getBudgetAmount(ch.id, monthIndex), 0);
+      }
+      return getBudgetAmount(cat.id, monthIndex);
+    },
+    [getBudgetAmount]
+  );
+
+  const catSpending = useCallback(
+    (cat: CategoryNode, monthIndex: number) => {
+      if (cat.isDigital && cat.children.length) {
+        const childSum = cat.children.reduce((s, ch) => s + getActualSpending(ch.id, monthIndex), 0);
+        const parentOnly = getActualSpending(cat.id, monthIndex);
+        return Math.max(parentOnly, childSum);
+      }
+      return getActualSpending(cat.id, monthIndex);
+    },
+    [getActualSpending]
+  );
+
+  // Average of last 3 past months for placeholder hint in future inputs
+  const avgLast3 = useCallback(
+    (categoryId: string, monthIndex: number) => {
+      const vals: number[] = [];
+      for (let k = 1; k <= 3; k++) {
+        let m = monthIndex - k;
+        let y = selectedYear;
+        if (m < 0) { m += 12; y -= 1; }
+        const past = y < currentYear || (y === currentYear && m < currentMonth);
+        if (!past) continue;
+        vals.push(spendingForYM(categoryId, m, y));
+      }
+      if (!vals.length) return 0;
+      return vals.reduce((s, v) => s + v, 0) / vals.length;
+    },
+    [spendingForYM, selectedYear, currentYear, currentMonth]
   );
 
   // ----- Save handlers -----
@@ -105,23 +158,16 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
 
   // ----- Chart data: budgeted+fixed vs actual for the selected chart month -----
   const chartData = useMemo(() => {
-    const prefix = monthPrefix(selectedYear, selectedChartMonth);
     return tree
       .map(cat => {
-        const budgetedVar = Number(
-          (budgets || []).find(b => b.category_id === cat.id && String(b.month).startsWith(prefix))?.amount || 0
-        );
+        const budgetedVar = catBudget(cat, selectedChartMonth);
         const budgeted = budgetedVar + cat.recurringMonthly;
-        const spent = Math.abs(
-          (transactions || [])
-            .filter(t => t.category_id === cat.id && t.type === 'expense' && t.date.startsWith(prefix))
-            .reduce((s, t) => s + Number(t.amount_usd || 0), 0)
-        );
+        const spent = catSpending(cat, selectedChartMonth);
         if (budgeted === 0 && spent === 0) return null;
-        return { id: cat.id, name: cat.name, icon: cat.icon, budgeted, spent };
+        return { id: cat.id, name: cat.name, icon: cat.icon, budgeted, spent, variance: spent - budgeted };
       })
-      .filter(Boolean) as Array<{ id: string; name: string; icon: string | null; budgeted: number; spent: number }>;
-  }, [tree, budgets, transactions, selectedYear, selectedChartMonth]);
+      .filter(Boolean) as Array<{ id: string; name: string; icon: string | null; budgeted: number; spent: number; variance: number }>;
+  }, [tree, catBudget, catSpending, selectedChartMonth]);
 
   // ----- Annual totals -----
   const incomeYearTotal = useMemo(() => {
