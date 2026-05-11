@@ -520,21 +520,27 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                           </div>
                         </td>
                         {MONTHS.map((_, i) => {
-                          const actual = getActualSpending(cat.id, i);
-                          const budgeted = getBudgetAmount(cat.id, i);
+                          const actual = catSpending(cat, i);
+                          const budgeted = catBudget(cat, i);
+                          const isDigitalAgg = cat.isDigital && cat.children.length > 0;
+                          const avg = avgLast3(cat.id, i);
                           return (
                             <td key={i} className={cn('px-1.5 py-1.5 text-center', isCurrent(i) && 'bg-primary/5')}>
                               {isPast(i) ? (
-                                <span className={actual > 0 ? 'text-foreground tabular-nums' : 'text-muted-foreground'}>
+                                <span className="text-xs text-muted-foreground tabular-nums">
                                   {actual > 0 ? fmt(actual) : '—'}
+                                </span>
+                              ) : isDigitalAgg ? (
+                                <span className="text-xs text-muted-foreground tabular-nums italic" title="Suma de subcategorías">
+                                  {budgeted > 0 ? fmt(budgeted) : '—'}
                                 </span>
                               ) : (
                                 <Input
                                   key={`${cat.id}-${selectedYear}-${i}-${budgeted}`}
                                   type="number"
                                   defaultValue={budgeted || ''}
-                                  placeholder="0"
-                                  className={cn('h-7 text-xs text-center px-1 tabular-nums border-border/50 rounded-lg', noSpinClass)}
+                                  placeholder={avg > 0 ? `~${Math.round(avg)}` : '0'}
+                                  className={cn('h-7 text-xs text-center px-1 tabular-nums border-border/50 rounded-lg placeholder:text-muted-foreground/50 placeholder:italic', noSpinClass)}
                                   onBlur={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) saveBudget(cat.id, i, v); }}
                                 />
                               )}
