@@ -43,14 +43,26 @@ const NAV: NavEntry[] = [
   { path: '/integrations', label: 'Integrations', icon: Plug },
 ];
 
-const MOBILE_TOP = [
+const MOBILE_LEFT = [
   { path: '/', label: 'Home', icon: LayoutDashboard },
   { path: '/accounts', label: 'Accounts', icon: Wallet },
+];
+const MOBILE_RIGHT = [
   { path: '/transactions', label: 'Activity', icon: ArrowLeftRight },
 ];
-const MOBILE_BOTTOM = [
-  { path: '/planning/recurring', label: 'Planning', icon: Target },
+
+const MORE_ITEMS: { path: string; label: string; icon: any }[] = [
+  { path: '/debts', label: 'Deudas y créditos', icon: CreditCard },
+  { path: '/monotributo', label: 'Monotributo', icon: Receipt },
+  { path: '/planning/recurring', label: 'Planning · Recurring', icon: Repeat },
+  { path: '/planning/budget', label: 'Planning · Budget', icon: Target },
   { path: '/analytics', label: 'Analytics', icon: BarChart3 },
+  { path: '/rules', label: 'Rules', icon: BookOpen },
+  { path: '/rules/categories', label: 'Categories', icon: Tag },
+  { path: '/rules/merchants', label: 'Merchants', icon: Store },
+  { path: '/rules/fx', label: 'FX Rates', icon: DollarSign },
+  { path: '/integrations', label: 'Integrations', icon: Plug },
+  { path: '/settings', label: 'Settings', icon: LayoutGrid },
 ];
 
 function isLeaf(e: NavEntry): e is NavLeaf {
