@@ -2,7 +2,7 @@ import { ReactNode, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Wallet, ArrowLeftRight, BarChart3, Repeat, BookOpen, Plus,
-  CalendarDays, Target, LogOut, Upload, ChevronDown, ChevronRight, Tag, Store, DollarSign, Plug, LayoutGrid, CreditCard, Receipt,
+  CalendarDays, Target, LogOut, Upload, ChevronDown, ChevronRight, Tag, Store, DollarSign, Plug, LayoutGrid, CreditCard, Receipt, Eye, EyeOff,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { TransactionForm } from '@/components/transactions/TransactionForm';
 import { DebugPanel } from '@/components/DebugPanel';
 import { useAuth } from '@/hooks/useAuth';
+import { usePrivacyMode } from '@/hooks/usePrivacyMode';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -60,6 +61,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const { signOut } = useAuth();
+  const { isPrivate, togglePrivacy } = usePrivacyMode();
   const qc = useQueryClient();
 
   const initialOpen: Record<string, boolean> = {};
@@ -139,6 +141,15 @@ export function AppLayout({ children }: { children: ReactNode }) {
           })}
           </nav>
           <div className="p-3 border-t border-border/40 space-y-2">
+            <Button
+              variant="outline"
+              className="w-full rounded-xl h-9 justify-start text-muted-foreground hover:text-foreground"
+              onClick={togglePrivacy}
+              title={isPrivate ? 'Mostrar montos' : 'Ocultar montos'}
+            >
+              {isPrivate ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
+              {isPrivate ? 'Mostrar montos' : 'Modo privado'}
+            </Button>
             <Button className="w-full rounded-xl h-11 shadow-[0_4px_16px_-4px_hsl(var(--primary)/0.5)]" onClick={() => setShowQuickAdd(true)}>
               <Plus className="h-4 w-4 mr-2" /> Quick Add
             </Button>
@@ -151,6 +162,14 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
       {/* Main content */}
       <main className="flex-1 lg:ml-64 pb-24 lg:pb-0">
+        {/* Mobile floating privacy toggle */}
+        <button
+          onClick={togglePrivacy}
+          className="lg:hidden fixed top-3 right-3 z-40 h-9 w-9 rounded-full glass-panel border border-border/50 flex items-center justify-center text-muted-foreground active:scale-95 transition-transform"
+          aria-label={isPrivate ? 'Mostrar montos' : 'Ocultar montos'}
+        >
+          {isPrivate ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+        </button>
         <div className="max-w-3xl mx-auto px-4 py-6 lg:px-8 lg:py-10">
           {children}
         </div>

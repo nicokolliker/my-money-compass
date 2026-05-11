@@ -4,6 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
+import { PrivacyModeProvider } from "@/hooks/usePrivacyMode";
 import { AppLayout } from "@/components/layout/AppLayout";
 import Dashboard from "./pages/Dashboard";
 import Accounts from "./pages/Accounts";
@@ -83,11 +84,13 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
-          <Routes>
-            <Route path="/auth" element={<AuthGuard />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/*" element={<ProtectedRoutes />} />
-          </Routes>
+          <PrivacyModeProvider>
+            <Routes>
+              <Route path="/auth" element={<AuthGuard />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/*" element={<ProtectedRoutes />} />
+            </Routes>
+          </PrivacyModeProvider>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
