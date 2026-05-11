@@ -102,12 +102,8 @@ export default function Dashboard() {
       <Card className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground border-0 shadow-elevated">
         <CardContent className="pt-6 pb-6">
           <p className="text-sm opacity-80 font-medium">Net Worth</p>
-          <p className="text-4xl font-extrabold mt-1 tracking-tight">{formatUSD(netWorth)}</p>
+          <p className="text-4xl font-extrabold mt-1 tracking-tight">{maskAmount(formatUSD(netWorth), isPrivate)}</p>
           <p className="text-xs opacity-60 mt-1">Actualizado hoy</p>
-          <div className="flex gap-6 mt-4 text-sm">
-            <div className="flex items-center gap-1.5"><TrendingUp className="h-4 w-4" /><span>Activos: {formatUSD(totalAssets)}</span></div>
-            <div className="flex items-center gap-1.5"><TrendingDown className="h-4 w-4" /><span>Deuda: {formatUSD(totalLiabilities)}</span></div>
-          </div>
         </CardContent>
       </Card>
 
