@@ -67,6 +67,7 @@ export default function Accounts() {
   const deleteGroup = useDeleteAccountGroup();
   const { hasDemoData, onCleared: onDemoCleared } = useDemoData();
   const { netWorthUsd: totalNetWorth } = useNetWorth();
+  const { isPrivate } = usePrivacyMode();
   const { data: userSettings } = useUserSettings();
   const binanceBalances: any[] = (userSettings as any)?.binance_balances || [];
   const binanceTotalUsd = binanceBalances.reduce((s: number, b: any) => s + (b.value_usd || 0), 0);
