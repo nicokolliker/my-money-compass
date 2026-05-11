@@ -73,6 +73,7 @@ function isLeaf(e: NavEntry): e is NavLeaf {
 export function AppLayout({ children }: { children: ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
+  const [showMore, setShowMore] = useState(false);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const { signOut } = useAuth();
   const { isPrivate, togglePrivacy } = usePrivacyMode();
