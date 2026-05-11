@@ -1,5 +1,6 @@
 import { ReactNode, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
   LayoutDashboard, Wallet, ArrowLeftRight, BarChart3, Repeat, BookOpen, Plus,
   CalendarDays, Target, LogOut, Upload, ChevronDown, ChevronRight, Tag, Store, DollarSign, Plug, LayoutGrid, CreditCard, Receipt, Eye, EyeOff,
