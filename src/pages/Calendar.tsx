@@ -295,13 +295,22 @@ export default function CalendarPage({ embedded = false }: { embedded?: boolean 
                                   <RecurringStatusBadge state={item.derived} />
                                 </div>
                                 {!item.isPaid && (
-                                  <Button
-                                    size="sm" variant="ghost" className="h-7 w-7 p-0 shrink-0"
-                                    onClick={() => markPaid.mutateAsync(item.id).then(() => toast.success('Marked paid'))}
-                                    title="Mark paid"
-                                  >
-                                    <CheckCircle2 className="h-3.5 w-3.5" />
-                                  </Button>
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    <Button
+                                      size="sm" variant="ghost" className="h-7 w-7 p-0 text-primary hover:text-primary hover:bg-primary/10"
+                                      onClick={() => setMatchInstance(item as any)}
+                                      title="Registrar pago"
+                                    >
+                                      <Link2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                    <Button
+                                      size="sm" variant="ghost" className="h-7 w-7 p-0"
+                                      onClick={() => markPaid.mutateAsync(item.id).then(() => toast.success('Marked paid'))}
+                                      title="Mark paid"
+                                    >
+                                      <CheckCircle2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </div>
                                 )}
                               </div>
                             );
