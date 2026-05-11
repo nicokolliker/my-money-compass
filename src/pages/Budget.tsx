@@ -213,15 +213,71 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
             className="flex items-center justify-between px-5 py-4 cursor-pointer"
             onClick={() => setTrackingExpanded(v => !v)}
           >
-            <div className="flex items-center gap-3" onClick={e => e.stopPropagation()}>
-              <select
-                value={selectedChartMonth}
-                onChange={e => setSelectedChartMonth(Number(e.target.value))}
-                className="text-base font-semibold bg-transparent border-0 focus:outline-none cursor-pointer capitalize pr-1"
+            <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => {
+                  if (selectedChartMonth === 0) {
+                    setSelectedChartMonth(11);
+                    setSelectedYear(y => y - 1);
+                  } else {
+                    setSelectedChartMonth(m => m - 1);
+                  }
+                }}
               >
-                {MONTHS.map((m, i) => <option key={m} value={i}>{m}</option>)}
-              </select>
-              <span className="text-base font-semibold text-foreground">{selectedYear}</span>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button className="text-base font-semibold text-foreground capitalize px-2 py-1 rounded-md hover:bg-muted transition-colors min-w-[140px]">
+                    {monthLabel}
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-64 p-2" align="center">
+                  <div className="flex items-center justify-between mb-2 px-1">
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setSelectedYear(y => y - 1)}>
+                      <ChevronLeft className="h-3.5 w-3.5" />
+                    </Button>
+                    <span className="text-sm font-semibold tabular-nums">{selectedYear}</span>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setSelectedYear(y => y + 1)}>
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1">
+                    {MONTHS.map((m, i) => (
+                      <button
+                        key={m}
+                        onClick={() => setSelectedChartMonth(i)}
+                        className={cn(
+                          'text-xs py-1.5 rounded-md transition-colors',
+                          i === selectedChartMonth
+                            ? 'bg-primary text-primary-foreground font-semibold'
+                            : 'hover:bg-muted text-foreground'
+                        )}
+                      >
+                        {m}
+                      </button>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => {
+                  if (selectedChartMonth === 11) {
+                    setSelectedChartMonth(0);
+                    setSelectedYear(y => y + 1);
+                  } else {
+                    setSelectedChartMonth(m => m + 1);
+                  }
+                }}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
             </div>
             <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', trackingExpanded && 'rotate-180')} onClick={() => setTrackingExpanded(v => !v)} />
           </div>
