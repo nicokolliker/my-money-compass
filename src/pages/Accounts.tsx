@@ -28,6 +28,7 @@ import { ArqReconciliationSheet } from '@/components/accounts/ArqReconciliationS
 import { AccountReconciliationSheet } from '@/components/accounts/AccountReconciliationSheet';
 import { AccountDetailSheet } from '@/components/accounts/AccountDetailSheet';
 import { useQuery } from '@tanstack/react-query';
+import { usePrivacyMode, maskAmount } from '@/hooks/usePrivacyMode';
 import { useUserId } from '@/hooks/useAuthUser';
 import { useUserSettings } from '@/hooks/useUserSettings';
 import {
