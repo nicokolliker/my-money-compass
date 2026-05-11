@@ -1,5 +1,6 @@
 import { ReactNode, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
   LayoutDashboard, Wallet, ArrowLeftRight, BarChart3, Repeat, BookOpen, Plus,
   CalendarDays, Target, LogOut, Upload, ChevronDown, ChevronRight, Tag, Store, DollarSign, Plug, LayoutGrid, CreditCard, Receipt, Eye, EyeOff,
@@ -103,7 +104,33 @@ export function AppLayout({ children }: { children: ReactNode }) {
   };
 
   return (
-    <div className="flex min-h-screen">
+    <div className="relative flex min-h-screen">
+      {/* Animated gradient orbs background */}
+      <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
+        <div
+          className="absolute top-[-20%] left-[-10%] w-[55vw] h-[55vw] rounded-full opacity-30 blur-3xl"
+          style={{
+            background: 'radial-gradient(circle, hsl(var(--primary)) 0%, transparent 70%)',
+            animation: 'drift 18s ease-in-out infinite',
+          }}
+        />
+        <div
+          className="absolute bottom-[-15%] right-[-10%] w-[50vw] h-[50vw] rounded-full opacity-25 blur-3xl"
+          style={{
+            background: 'radial-gradient(circle, hsl(var(--primary-glow)) 0%, transparent 70%)',
+            animation: 'drift 22s ease-in-out infinite reverse',
+          }}
+        />
+        <div
+          className="absolute top-[30%] right-[20%] w-[35vw] h-[35vw] rounded-full opacity-20 blur-3xl"
+          style={{
+            background: 'radial-gradient(circle, hsl(220 90% 70%) 0%, transparent 70%)',
+            animation: 'drift 26s ease-in-out infinite',
+            animationDelay: '-8s',
+          }}
+        />
+      </div>
+
       {/* Desktop sidebar — glass */}
       <aside className="hidden lg:flex lg:w-64 lg:flex-col lg:fixed lg:inset-y-0 lg:p-3 z-30">
         <div className="flex flex-col h-full glass-panel rounded-2xl shadow-[0_8px_32px_-8px_hsl(220_40%_30%_/_0.12)]">
@@ -171,7 +198,17 @@ export function AppLayout({ children }: { children: ReactNode }) {
           {isPrivate ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
         </button>
         <div className="max-w-3xl mx-auto px-4 py-6 lg:px-8 lg:py-10">
-          {children}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={location.pathname}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.18, ease: 'easeOut' }}
+            >
+              {children}
+            </motion.div>
+          </AnimatePresence>
         </div>
       </main>
 

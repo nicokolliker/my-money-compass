@@ -179,3 +179,30 @@ body.privacy-mode .tabular-nums:hover,
 body.privacy-mode [data-private]:hover {
   filter: blur(0);
 }
+
+/* Animated background orbs */
+@keyframes drift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%      { transform: translate(30px, -20px) scale(1.05); }
+  66%      { transform: translate(-20px, 15px) scale(0.97); }
+}
+
+/* Card micro-interaction */
+.card-elevated,
+.card-solid {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.card-elevated:hover,
+.card-solid:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px -8px hsl(var(--primary) / 0.15);
+}
+
+/* Number counter — fade-up on initial reveal */
+@keyframes count-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-count-in {
+  animation: count-in 0.4s ease-out both;
+}
