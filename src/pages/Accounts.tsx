@@ -28,6 +28,7 @@ import { ArqReconciliationSheet } from '@/components/accounts/ArqReconciliationS
 import { AccountReconciliationSheet } from '@/components/accounts/AccountReconciliationSheet';
 import { AccountDetailSheet } from '@/components/accounts/AccountDetailSheet';
 import { useQuery } from '@tanstack/react-query';
+import { usePrivacyMode, maskAmount } from '@/hooks/usePrivacyMode';
 import { useUserId } from '@/hooks/useAuthUser';
 import { useUserSettings } from '@/hooks/useUserSettings';
 import {
@@ -66,6 +67,7 @@ export default function Accounts() {
   const deleteGroup = useDeleteAccountGroup();
   const { hasDemoData, onCleared: onDemoCleared } = useDemoData();
   const { netWorthUsd: totalNetWorth } = useNetWorth();
+  const { isPrivate } = usePrivacyMode();
   const { data: userSettings } = useUserSettings();
   const binanceBalances: any[] = (userSettings as any)?.binance_balances || [];
   const binanceTotalUsd = binanceBalances.reduce((s: number, b: any) => s + (b.value_usd || 0), 0);
@@ -239,7 +241,7 @@ export default function Accounts() {
       <Card className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground border-0 shadow-elevated">
         <CardContent className="pt-5 pb-5">
           <p className="text-sm opacity-80 font-medium">Total Net Worth</p>
-          <p className="text-3xl font-extrabold mt-1 tracking-tight">{formatUSD(totalNetWorth)}</p>
+          <p className="text-3xl font-extrabold mt-1 tracking-tight">{maskAmount(formatUSD(totalNetWorth), isPrivate)}</p>
         </CardContent>
       </Card>
 
