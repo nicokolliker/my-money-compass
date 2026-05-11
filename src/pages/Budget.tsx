@@ -2,13 +2,15 @@ import React, { useState, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useBudgets, useUpsertBudget } from '@/hooks/useBudgets';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useCategories } from '@/hooks/useCategories';
-import { useCategoryTree } from '@/hooks/useCategoryTree';
-import { ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
+import { useCategoryTree, type CategoryNode } from '@/hooks/useCategoryTree';
+import { ChevronLeft, ChevronRight, ChevronDown, Lightbulb, AlertTriangle, TrendingDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip as RTooltip, Cell, Legend } from 'recharts';
 
 const MONTHS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 const INCOME_CATEGORY_NAME = 'Ingresos Proyectados';
@@ -78,12 +80,65 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
   );
 
   const getBudgetAmount = useCallback(
-    (categoryId: string | null, monthIndex: number) => {
+    (categoryId: string | null, monthIndex: number, year: number = selectedYear) => {
       if (!categoryId) return 0;
-      const b = (budgets || []).find(b => b.category_id === categoryId && String(b.month).startsWith(monthPrefix(selectedYear, monthIndex)));
+      const b = (budgets || []).find(b => b.category_id === categoryId && String(b.month).startsWith(`${year}-${String(monthIndex + 1).padStart(2, '0')}`));
       return Number(b?.amount || 0);
     },
     [budgets, selectedYear]
+  );
+
+  const spendingForYM = useCallback(
+    (categoryId: string, monthIndex: number, year: number) => {
+      const prefix = `${year}-${String(monthIndex + 1).padStart(2, '0')}`;
+      return Math.abs(
+        (transactions || [])
+          .filter(t => (t.category_id === categoryId || t.subcategory_id === categoryId) && t.type === 'expense' && t.date.startsWith(prefix))
+          .reduce((s, t) => s + Number(t.amount_usd || 0), 0)
+      );
+    },
+    [transactions]
+  );
+
+  // Aggregated helpers: for Digital, sum across children (sub-budgets / sub-spending)
+  const catBudget = useCallback(
+    (cat: CategoryNode, monthIndex: number) => {
+      if (cat.isDigital && cat.children.length) {
+        return cat.children.reduce((s, ch) => s + getBudgetAmount(ch.id, monthIndex), 0);
+      }
+      return getBudgetAmount(cat.id, monthIndex);
+    },
+    [getBudgetAmount]
+  );
+
+  const catSpending = useCallback(
+    (cat: CategoryNode, monthIndex: number) => {
+      if (cat.isDigital && cat.children.length) {
+        const childSum = cat.children.reduce((s, ch) => s + getActualSpending(ch.id, monthIndex), 0);
+        const parentOnly = getActualSpending(cat.id, monthIndex);
+        return Math.max(parentOnly, childSum);
+      }
+      return getActualSpending(cat.id, monthIndex);
+    },
+    [getActualSpending]
+  );
+
+  // Average of last 3 past months for placeholder hint in future inputs
+  const avgLast3 = useCallback(
+    (categoryId: string, monthIndex: number) => {
+      const vals: number[] = [];
+      for (let k = 1; k <= 3; k++) {
+        let m = monthIndex - k;
+        let y = selectedYear;
+        if (m < 0) { m += 12; y -= 1; }
+        const past = y < currentYear || (y === currentYear && m < currentMonth);
+        if (!past) continue;
+        vals.push(spendingForYM(categoryId, m, y));
+      }
+      if (!vals.length) return 0;
+      return vals.reduce((s, v) => s + v, 0) / vals.length;
+    },
+    [spendingForYM, selectedYear, currentYear, currentMonth]
   );
 
   // ----- Save handlers -----
@@ -103,23 +158,16 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
 
   // ----- Chart data: budgeted+fixed vs actual for the selected chart month -----
   const chartData = useMemo(() => {
-    const prefix = monthPrefix(selectedYear, selectedChartMonth);
     return tree
       .map(cat => {
-        const budgetedVar = Number(
-          (budgets || []).find(b => b.category_id === cat.id && String(b.month).startsWith(prefix))?.amount || 0
-        );
+        const budgetedVar = catBudget(cat, selectedChartMonth);
         const budgeted = budgetedVar + cat.recurringMonthly;
-        const spent = Math.abs(
-          (transactions || [])
-            .filter(t => t.category_id === cat.id && t.type === 'expense' && t.date.startsWith(prefix))
-            .reduce((s, t) => s + Number(t.amount_usd || 0), 0)
-        );
+        const spent = catSpending(cat, selectedChartMonth);
         if (budgeted === 0 && spent === 0) return null;
-        return { id: cat.id, name: cat.name, icon: cat.icon, budgeted, spent };
+        return { id: cat.id, name: cat.name, icon: cat.icon, budgeted, spent, variance: spent - budgeted };
       })
-      .filter(Boolean) as Array<{ id: string; name: string; icon: string | null; budgeted: number; spent: number }>;
-  }, [tree, budgets, transactions, selectedYear, selectedChartMonth]);
+      .filter(Boolean) as Array<{ id: string; name: string; icon: string | null; budgeted: number; spent: number; variance: number }>;
+  }, [tree, catBudget, catSpending, selectedChartMonth]);
 
   // ----- Annual totals -----
   const incomeYearTotal = useMemo(() => {
@@ -165,15 +213,71 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
             className="flex items-center justify-between px-5 py-4 cursor-pointer"
             onClick={() => setTrackingExpanded(v => !v)}
           >
-            <div className="flex items-center gap-3" onClick={e => e.stopPropagation()}>
-              <select
-                value={selectedChartMonth}
-                onChange={e => setSelectedChartMonth(Number(e.target.value))}
-                className="text-base font-semibold bg-transparent border-0 focus:outline-none cursor-pointer capitalize pr-1"
+            <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => {
+                  if (selectedChartMonth === 0) {
+                    setSelectedChartMonth(11);
+                    setSelectedYear(y => y - 1);
+                  } else {
+                    setSelectedChartMonth(m => m - 1);
+                  }
+                }}
               >
-                {MONTHS.map((m, i) => <option key={m} value={i}>{m}</option>)}
-              </select>
-              <span className="text-base font-semibold text-foreground">{selectedYear}</span>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button className="text-base font-semibold text-foreground capitalize px-2 py-1 rounded-md hover:bg-muted transition-colors min-w-[140px]">
+                    {monthLabel}
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-64 p-2" align="center">
+                  <div className="flex items-center justify-between mb-2 px-1">
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setSelectedYear(y => y - 1)}>
+                      <ChevronLeft className="h-3.5 w-3.5" />
+                    </Button>
+                    <span className="text-sm font-semibold tabular-nums">{selectedYear}</span>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setSelectedYear(y => y + 1)}>
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1">
+                    {MONTHS.map((m, i) => (
+                      <button
+                        key={m}
+                        onClick={() => setSelectedChartMonth(i)}
+                        className={cn(
+                          'text-xs py-1.5 rounded-md transition-colors',
+                          i === selectedChartMonth
+                            ? 'bg-primary text-primary-foreground font-semibold'
+                            : 'hover:bg-muted text-foreground'
+                        )}
+                      >
+                        {m}
+                      </button>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => {
+                  if (selectedChartMonth === 11) {
+                    setSelectedChartMonth(0);
+                    setSelectedYear(y => y + 1);
+                  } else {
+                    setSelectedChartMonth(m => m + 1);
+                  }
+                }}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
             </div>
             <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', trackingExpanded && 'rotate-180')} onClick={() => setTrackingExpanded(v => !v)} />
           </div>
@@ -388,7 +492,7 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                         </div>
                       </td>
                       {MONTHS.map((_, i) => {
-                        const varTotal = tree.reduce((s, c) => s + (isPast(i) ? getActualSpending(c.id, i) : getBudgetAmount(c.id, i)), 0);
+                        const varTotal = tree.reduce((s, c) => s + (isPast(i) ? catSpending(c, i) : catBudget(c, i)), 0);
                         return (
                           <td key={i} className={cn('px-2 py-2 text-center tabular-nums text-xs font-medium', isCurrent(i) && 'bg-primary/5')}>
                             {varTotal > 0 ? fmt(varTotal) : <span className="text-muted-foreground">—</span>}
@@ -396,7 +500,7 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                         );
                       })}
                       <td className="px-4 py-2 text-right tabular-nums text-xs font-semibold">
-                        {fmt(MONTHS.reduce((s, _, i) => s + tree.reduce((a, c) => a + (isPast(i) ? getActualSpending(c.id, i) : getBudgetAmount(c.id, i)), 0), 0))}
+                        {fmt(MONTHS.reduce((s, _, i) => s + tree.reduce((a, c) => a + (isPast(i) ? catSpending(c, i) : catBudget(c, i)), 0), 0))}
                       </td>
                     </tr>
 
@@ -416,21 +520,27 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                           </div>
                         </td>
                         {MONTHS.map((_, i) => {
-                          const actual = getActualSpending(cat.id, i);
-                          const budgeted = getBudgetAmount(cat.id, i);
+                          const actual = catSpending(cat, i);
+                          const budgeted = catBudget(cat, i);
+                          const isDigitalAgg = cat.isDigital && cat.children.length > 0;
+                          const avg = avgLast3(cat.id, i);
                           return (
                             <td key={i} className={cn('px-1.5 py-1.5 text-center', isCurrent(i) && 'bg-primary/5')}>
                               {isPast(i) ? (
-                                <span className={actual > 0 ? 'text-foreground tabular-nums' : 'text-muted-foreground'}>
+                                <span className="text-xs text-muted-foreground tabular-nums">
                                   {actual > 0 ? fmt(actual) : '—'}
+                                </span>
+                              ) : isDigitalAgg ? (
+                                <span className="text-xs text-muted-foreground tabular-nums italic" title="Suma de subcategorías">
+                                  {budgeted > 0 ? fmt(budgeted) : '—'}
                                 </span>
                               ) : (
                                 <Input
                                   key={`${cat.id}-${selectedYear}-${i}-${budgeted}`}
                                   type="number"
                                   defaultValue={budgeted || ''}
-                                  placeholder="0"
-                                  className={cn('h-7 text-xs text-center px-1 tabular-nums border-border/50 rounded-lg', noSpinClass)}
+                                  placeholder={avg > 0 ? `~${Math.round(avg)}` : '0'}
+                                  className={cn('h-7 text-xs text-center px-1 tabular-nums border-border/50 rounded-lg placeholder:text-muted-foreground/50 placeholder:italic', noSpinClass)}
                                   onBlur={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) saveBudget(cat.id, i, v); }}
                                 />
                               )}
@@ -438,7 +548,7 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                           );
                         })}
                         <td className="px-4 py-2 text-right tabular-nums font-medium">
-                          {fmt(MONTHS.reduce((s, _, i) => s + (isPast(i) ? getActualSpending(cat.id, i) : getBudgetAmount(cat.id, i)), 0))}
+                          {fmt(MONTHS.reduce((s, _, i) => s + (isPast(i) ? catSpending(cat, i) : catBudget(cat, i)), 0))}
                         </td>
                       </tr>
                       {cat.isDigital && digitalExpanded && cat.children.map(child => (
@@ -450,10 +560,11 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                           {MONTHS.map((_, i) => {
                             const actual = getActualSpending(child.id, i);
                             const budgeted = getBudgetAmount(child.id, i);
+                            const avg = avgLast3(child.id, i);
                             return (
                               <td key={i} className={cn('px-1.5 py-1.5 text-center', isCurrent(i) && 'bg-primary/5')}>
                                 {isPast(i) ? (
-                                  <span className={actual > 0 ? 'text-xs text-foreground tabular-nums' : 'text-xs text-muted-foreground'}>
+                                  <span className="text-xs text-muted-foreground tabular-nums">
                                     {actual > 0 ? fmt(actual) : '—'}
                                   </span>
                                 ) : (
@@ -461,8 +572,8 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                                     key={`${child.id}-${selectedYear}-${i}-${budgeted}`}
                                     type="number"
                                     defaultValue={budgeted || ''}
-                                    placeholder="0"
-                                    className={cn('h-7 text-xs text-center px-1 tabular-nums border-border/50 rounded-lg', noSpinClass)}
+                                    placeholder={avg > 0 ? `~${Math.round(avg)}` : '0'}
+                                    className={cn('h-7 text-xs text-center px-1 tabular-nums border-border/50 rounded-lg placeholder:text-muted-foreground/50 placeholder:italic', noSpinClass)}
                                     onBlur={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) saveBudget(child.id, i, v); }}
                                   />
                                 )}
@@ -482,7 +593,7 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                 {/* ── CONSOLIDATED VIEW ── */}
                 {tableView === 'consolidated' && tree.map(cat => {
                   const yearTotal = MONTHS.reduce((s, _, i) => {
-                    return s + cat.recurringMonthly + (isPast(i) ? getActualSpending(cat.id, i) : getBudgetAmount(cat.id, i));
+                    return s + cat.recurringMonthly + (isPast(i) ? catSpending(cat, i) : catBudget(cat, i));
                   }, 0);
                   return (
                     <React.Fragment key={`c-frag-${cat.id}`}>
@@ -500,7 +611,7 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                         </div>
                       </td>
                       {MONTHS.map((_, i) => {
-                        const total = cat.recurringMonthly + (isPast(i) ? getActualSpending(cat.id, i) : getBudgetAmount(cat.id, i));
+                        const total = cat.recurringMonthly + (isPast(i) ? catSpending(cat, i) : catBudget(cat, i));
                         return (
                           <td key={i} className={cn('px-2 py-2.5 text-center tabular-nums', isCurrent(i) && 'bg-primary/5')}>
                             {total > 0 ? (
@@ -546,7 +657,7 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                   </td>
                   {MONTHS.map((_, i) => {
                     const fixed = totalRecurringMonthly;
-                    const variable = tree.reduce((s, c) => s + (isPast(i) ? getActualSpending(c.id, i) : getBudgetAmount(c.id, i)), 0);
+                    const variable = tree.reduce((s, c) => s + (isPast(i) ? catSpending(c, i) : catBudget(c, i)), 0);
                     return (
                       <td key={i} className={cn('px-2 py-2.5 text-center tabular-nums text-xs font-semibold', isCurrent(i) && 'bg-primary/10')}>
                         {fmt(fixed + variable)}
@@ -554,7 +665,7 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                     );
                   })}
                   <td className="px-4 py-2.5 text-right tabular-nums text-xs font-semibold">
-                    {fmt(MONTHS.reduce((s, _, i) => s + totalRecurringMonthly + tree.reduce((a, c) => a + (isPast(i) ? getActualSpending(c.id, i) : getBudgetAmount(c.id, i)), 0), 0))}
+                    {fmt(MONTHS.reduce((s, _, i) => s + totalRecurringMonthly + tree.reduce((a, c) => a + (isPast(i) ? catSpending(c, i) : catBudget(c, i)), 0), 0))}
                   </td>
                 </tr>
 
@@ -567,7 +678,7 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                   {MONTHS.map((_, i) => {
                     const income = isPast(i) ? getActualIncome(i) : getBudgetAmount(incomeCategoryId, i);
                     const fixed = totalRecurringMonthly;
-                    const variable = tree.reduce((s, c) => s + (isPast(i) ? getActualSpending(c.id, i) : getBudgetAmount(c.id, i)), 0);
+                    const variable = tree.reduce((s, c) => s + (isPast(i) ? catSpending(c, i) : catBudget(c, i)), 0);
                     const result = income - fixed - variable;
                     const noIncome = !isPast(i) && !isCurrent(i) && income === 0;
                     return (
@@ -583,7 +694,7 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                       const yr = MONTHS.reduce((s, _, i) => {
                         const income = isPast(i) ? getActualIncome(i) : getBudgetAmount(incomeCategoryId, i);
                         if (!isPast(i) && !isCurrent(i) && income === 0) return s;
-                        return s + income - totalRecurringMonthly - tree.reduce((a, c) => a + (isPast(i) ? getActualSpending(c.id, i) : getBudgetAmount(c.id, i)), 0);
+                        return s + income - totalRecurringMonthly - tree.reduce((a, c) => a + (isPast(i) ? catSpending(c, i) : catBudget(c, i)), 0);
                       }, 0);
                       return <span className={yr >= 0 ? 'text-emerald-600' : 'text-destructive'}>{yr >= 0 ? '+' : ''}{Math.round(yr).toLocaleString('en-US')}</span>;
                     })()}
@@ -595,6 +706,166 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
           </div>
         </div>
       </div>
+
+      {/* ─── ANÁLISIS DEL MES ─── */}
+      {(() => {
+        const variances = chartData
+          .map(d => ({ ...d }))
+          .filter(d => Math.abs(d.variance) > 5)
+          .sort((a, b) => b.variance - a.variance);
+
+        const totalBudgeted = chartData.reduce((s, d) => s + d.budgeted, 0);
+        const totalSpent = chartData.reduce((s, d) => s + d.spent, 0);
+        const pctUsed = totalBudgeted > 0 ? (totalSpent / totalBudgeted) * 100 : 0;
+
+        const recs: Array<{ kind: 'warn' | 'info' | 'tip'; text: string }> = [];
+
+        // Over budget alerts
+        chartData
+          .filter(d => d.variance > 0 && d.budgeted > 0)
+          .sort((a, b) => b.variance - a.variance)
+          .slice(0, 2)
+          .forEach(d => {
+            const suggested = Math.round((d.spent * 1.1) / 10) * 10;
+            recs.push({
+              kind: 'warn',
+              text: `${d.name} excedió el presupuesto en ${fmt(d.variance)} este mes — considerá ajustar el budget a ${fmt(suggested)}`,
+            });
+          });
+
+        // Consistently under-spending last 3 months
+        tree.forEach(cat => {
+          const checks: number[] = [];
+          for (let k = 1; k <= 3; k++) {
+            let m = selectedChartMonth - k;
+            let y = selectedYear;
+            if (m < 0) { m += 12; y -= 1; }
+            const past = y < currentYear || (y === currentYear && m < currentMonth);
+            if (!past) return;
+            const b = (budgets || []).find(b => b.category_id === cat.id && String(b.month).startsWith(`${y}-${String(m + 1).padStart(2, '0')}`));
+            const budget = Number(b?.amount || 0);
+            if (budget <= 0) return;
+            const spent = spendingForYM(cat.id, m, y);
+            checks.push(budget - spent);
+          }
+          if (checks.length === 3 && checks.every(v => v > 20)) {
+            const avgUnused = checks.reduce((s, v) => s + v, 0) / 3;
+            recs.push({
+              kind: 'tip',
+              text: `${cat.name} tiene ${fmt(avgUnused)} sin usar en promedio en los últimos 3 meses — podés reducir el presupuesto`,
+            });
+          }
+        });
+
+        if (totalBudgeted > 0 && pctUsed > 90 && totalSpent <= totalBudgeted) {
+          recs.push({
+            kind: 'info',
+            text: `Estás al ${Math.round(pctUsed)}% del presupuesto total — quedan ${fmt(totalBudgeted - totalSpent)} disponibles`,
+          });
+        }
+
+        const topRecs = recs.slice(0, 3);
+        if (chartData.length === 0) return null;
+
+        return (
+          <div className="relative left-1/2 w-screen -translate-x-1/2 px-4 lg:w-[calc(100vw-16rem)] lg:px-6">
+            <div className="rounded-2xl border border-border bg-card overflow-hidden">
+              <div className="px-5 py-3 border-b border-border">
+                <h3 className="text-sm font-semibold text-foreground capitalize">Análisis del mes — {monthLabel}</h3>
+              </div>
+
+              {/* Bar chart */}
+              <div className="p-4">
+                <p className="text-xs font-medium text-muted-foreground mb-2">Presupuestado vs Real</p>
+                <div className="h-64 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
+                      <XAxis
+                        dataKey="name"
+                        tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                        interval={0}
+                        angle={-30}
+                        textAnchor="end"
+                        height={60}
+                        tickFormatter={(v: string) => v.length > 10 ? v.slice(0, 10) + '…' : v}
+                      />
+                      <YAxis
+                        tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                        tickFormatter={(v: number) => v >= 1000 ? `${Math.round(v / 1000)}k` : String(v)}
+                      />
+                      <RTooltip
+                        contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: 8, fontSize: 12 }}
+                        formatter={(v: number) => fmt(Number(v))}
+                      />
+                      <Legend wrapperStyle={{ fontSize: 11 }} />
+                      <Bar dataKey="budgeted" name="Presupuestado" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="spent" name="Real" radius={[4, 4, 0, 0]}>
+                        {chartData.map((d, idx) => (
+                          <Cell key={idx} fill={d.spent > d.budgeted && d.budgeted > 0 ? 'hsl(var(--destructive))' : 'hsl(142 71% 45%)'} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Variances table */}
+              {variances.length > 0 && (
+                <div className="border-t border-border p-4">
+                  <p className="text-xs font-medium text-muted-foreground mb-2">Variaciones</p>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-border text-muted-foreground">
+                          <th className="text-left py-1.5 font-medium">Categoría</th>
+                          <th className="text-right py-1.5 font-medium">Presupuestado</th>
+                          <th className="text-right py-1.5 font-medium">Real</th>
+                          <th className="text-right py-1.5 font-medium">Variación</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {variances.map(v => (
+                          <tr key={v.id} className="border-b border-border/40">
+                            <td className="py-1.5 text-foreground">
+                              <span className="mr-1">{v.icon}</span>{v.name}
+                            </td>
+                            <td className="py-1.5 text-right tabular-nums text-muted-foreground">{fmt(v.budgeted)}</td>
+                            <td className="py-1.5 text-right tabular-nums text-foreground">{fmt(v.spent)}</td>
+                            <td className={cn('py-1.5 text-right tabular-nums font-semibold', v.variance > 0 ? 'text-destructive' : 'text-emerald-600')}>
+                              {v.variance > 0 ? '+' : '−'}{fmt(Math.abs(v.variance))}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Recommendations */}
+              {topRecs.length > 0 && (
+                <div className="border-t border-border p-4 space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground">Recomendaciones</p>
+                  {topRecs.map((r, idx) => {
+                    const styles = r.kind === 'warn'
+                      ? 'bg-amber-500/10 border-amber-500/30 text-amber-900 dark:text-amber-200'
+                      : r.kind === 'tip'
+                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-900 dark:text-emerald-200'
+                      : 'bg-primary/10 border-primary/30 text-foreground';
+                    const Icon = r.kind === 'warn' ? AlertTriangle : r.kind === 'tip' ? TrendingDown : Lightbulb;
+                    return (
+                      <div key={idx} className={cn('flex items-start gap-2 rounded-lg border px-3 py-2 text-xs', styles)}>
+                        <Icon className="h-4 w-4 mt-0.5 shrink-0" />
+                        <span>{r.text}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
     </div>
   );
