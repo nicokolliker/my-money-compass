@@ -44,7 +44,7 @@ export default function Auth() {
             <Wallet className="h-6 w-6 text-primary-foreground" />
           </div>
           <CardTitle className="text-xl font-bold">
-            {mode === 'login' ? 'Sign in to FinTrack' : mode === 'signup' ? 'Create your account' : 'Reset password'}
+            {mode === 'login' ? 'Sign in to My Money Compass' : mode === 'signup' ? 'Create your account' : 'Reset password'}
           </CardTitle>
         </CardHeader>
         <CardContent>
