@@ -141,6 +141,15 @@ export function AppLayout({ children }: { children: ReactNode }) {
           })}
           </nav>
           <div className="p-3 border-t border-border/40 space-y-2">
+            <Button
+              variant="outline"
+              className="w-full rounded-xl h-9 justify-start text-muted-foreground hover:text-foreground"
+              onClick={togglePrivacy}
+              title={isPrivate ? 'Mostrar montos' : 'Ocultar montos'}
+            >
+              {isPrivate ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
+              {isPrivate ? 'Mostrar montos' : 'Modo privado'}
+            </Button>
             <Button className="w-full rounded-xl h-11 shadow-[0_4px_16px_-4px_hsl(var(--primary)/0.5)]" onClick={() => setShowQuickAdd(true)}>
               <Plus className="h-4 w-4 mr-2" /> Quick Add
             </Button>
