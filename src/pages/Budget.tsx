@@ -7,7 +7,7 @@ import { useBudgets, useUpsertBudget } from '@/hooks/useBudgets';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useCategories } from '@/hooks/useCategories';
 import { useCategoryTree, type CategoryNode } from '@/hooks/useCategoryTree';
-import { ChevronLeft, ChevronRight, ChevronDown, Lightbulb, AlertTriangle, TrendingDown } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { ComposedChart, Area, Line, XAxis, YAxis, ResponsiveContainer, Tooltip as RTooltip, CartesianGrid, Legend } from 'recharts';
@@ -31,6 +31,7 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
   const [fixedExpanded, setFixedExpanded] = useState(false);
   const [variableExpanded, setVariableExpanded] = useState(false);
   const [tableView, setTableView] = useState<'split' | 'consolidated'>('split');
+  const [showAllCats, setShowAllCats] = useState(false);
 
   const noSpinClass = '[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none';
 
@@ -709,62 +710,8 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
 
       {/* ─── ANÁLISIS DEL MES ─── */}
       {(() => {
-        const variances = chartData
-          .map(d => ({ ...d }))
-          .filter(d => Math.abs(d.variance) > 5)
-          .sort((a, b) => b.variance - a.variance);
-
         const totalBudgeted = chartData.reduce((s, d) => s + d.budgeted, 0);
         const totalSpent = chartData.reduce((s, d) => s + d.spent, 0);
-        const pctUsed = totalBudgeted > 0 ? (totalSpent / totalBudgeted) * 100 : 0;
-
-        const recs: Array<{ kind: 'warn' | 'info' | 'tip'; text: string }> = [];
-
-        // Over budget alerts
-        chartData
-          .filter(d => d.variance > 0 && d.budgeted > 0)
-          .sort((a, b) => b.variance - a.variance)
-          .slice(0, 2)
-          .forEach(d => {
-            const suggested = Math.round((d.spent * 1.1) / 10) * 10;
-            recs.push({
-              kind: 'warn',
-              text: `${d.name} excedió el presupuesto en ${fmt(d.variance)} este mes — considerá ajustar el budget a ${fmt(suggested)}`,
-            });
-          });
-
-        // Consistently under-spending last 3 months
-        tree.forEach(cat => {
-          const checks: number[] = [];
-          for (let k = 1; k <= 3; k++) {
-            let m = selectedChartMonth - k;
-            let y = selectedYear;
-            if (m < 0) { m += 12; y -= 1; }
-            const past = y < currentYear || (y === currentYear && m < currentMonth);
-            if (!past) return;
-            const b = (budgets || []).find(b => b.category_id === cat.id && String(b.month).startsWith(`${y}-${String(m + 1).padStart(2, '0')}`));
-            const budget = Number(b?.amount || 0);
-            if (budget <= 0) return;
-            const spent = spendingForYM(cat.id, m, y);
-            checks.push(budget - spent);
-          }
-          if (checks.length === 3 && checks.every(v => v > 20)) {
-            const avgUnused = checks.reduce((s, v) => s + v, 0) / 3;
-            recs.push({
-              kind: 'tip',
-              text: `${cat.name} tiene ${fmt(avgUnused)} sin usar en promedio en los últimos 3 meses — podés reducir el presupuesto`,
-            });
-          }
-        });
-
-        if (totalBudgeted > 0 && pctUsed > 90 && totalSpent <= totalBudgeted) {
-          recs.push({
-            kind: 'info',
-            text: `Estás al ${Math.round(pctUsed)}% del presupuesto total — quedan ${fmt(totalBudgeted - totalSpent)} disponibles`,
-          });
-        }
-
-        const topRecs = recs.slice(0, 3);
         if (chartData.length === 0) return null;
 
         return (
@@ -892,21 +839,32 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                 );
               })()}
 
+              {/* Section header */}
+              <div className="px-4 pt-4">
+                <h4 className="text-xs font-semibold text-foreground capitalize">Análisis · {monthLabel}</h4>
+              </div>
+
               {/* Monthly breakdown — horizontal progress bars */}
-              <div className="p-4">
-                <p className="text-xs font-medium text-muted-foreground mb-3 capitalize">{monthLabel} — por categoría</p>
-                {chartData.length === 0 ? (
-                  <p className="text-xs text-muted-foreground text-center py-4">Sin datos para este mes.</p>
-                ) : (
-                  <div className="space-y-2.5">
-                    {[...chartData]
-                      .map(d => ({ ...d, pct: d.budgeted > 0 ? (d.spent / d.budgeted) * 100 : (d.spent > 0 ? 999 : 0) }))
-                      .sort((a, b) => {
-                        const aOver = a.pct > 100, bOver = b.pct > 100;
-                        if (aOver !== bOver) return aOver ? -1 : 1;
-                        return b.pct - a.pct;
-                      })
-                      .map(item => {
+              <div className="p-4 pt-3 space-y-4">
+                {(() => {
+                  const threshold = totalRecurringMonthly * 0.05;
+                  const allRows = [...chartData]
+                    .map(d => ({ ...d, pct: d.budgeted > 0 ? (d.spent / d.budgeted) * 100 : (d.spent > 0 ? 999 : 0) }))
+                    .sort((a, b) => {
+                      const aOver = a.pct > 100, bOver = b.pct > 100;
+                      if (aOver !== bOver) return aOver ? -1 : 1;
+                      return b.pct - a.pct;
+                    });
+                  const meaningful = allRows.filter(d => d.spent > 0 || d.budgeted > threshold);
+                  const visible = showAllCats ? allRows : meaningful;
+                  const hiddenCount = allRows.length - meaningful.length;
+
+                  if (allRows.length === 0) {
+                    return <p className="text-xs text-muted-foreground text-center py-4">Sin datos para este mes.</p>;
+                  }
+                  return (
+                    <div className="space-y-2.5">
+                      {visible.map(item => {
                         const isOver = item.pct > 100;
                         const fillPct = Math.min(item.pct, 100);
                         const barColor = isOver ? 'bg-red-500' : item.pct >= 80 ? 'bg-amber-500' : 'bg-emerald-500';
@@ -939,63 +897,95 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                           </div>
                         );
                       })}
-                  </div>
-                )}
+                      {hiddenCount > 0 && (
+                        <button
+                          onClick={() => setShowAllCats(v => !v)}
+                          className="text-[11px] text-primary hover:underline pt-1"
+                        >
+                          {showAllCats ? 'Ocultar categorías sin actividad' : `Ver todas → (${hiddenCount} ocultas)`}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
 
-              {/* Variances table */}
-              {variances.length > 0 && (
-                <div className="border-t border-border p-4">
-                  <p className="text-xs font-medium text-muted-foreground mb-2">Variaciones</p>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="border-b border-border text-muted-foreground">
-                          <th className="text-left py-1.5 font-medium">Categoría</th>
-                          <th className="text-right py-1.5 font-medium">Presupuestado</th>
-                          <th className="text-right py-1.5 font-medium">Real</th>
-                          <th className="text-right py-1.5 font-medium">Variación</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {variances.map(v => (
-                          <tr key={v.id} className="border-b border-border/40">
-                            <td className="py-1.5 text-foreground">
-                              <span className="mr-1">{v.icon}</span>{v.name}
-                            </td>
-                            <td className="py-1.5 text-right tabular-nums text-muted-foreground">{fmt(v.budgeted)}</td>
-                            <td className="py-1.5 text-right tabular-nums text-foreground">{fmt(v.spent)}</td>
-                            <td className={cn('py-1.5 text-right tabular-nums font-semibold', v.variance > 0 ? 'text-destructive' : 'text-emerald-600')}>
-                              {v.variance > 0 ? '+' : '−'}{fmt(Math.abs(v.variance))}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
+              {/* Insights */}
+              {(() => {
+                const insights: Array<{ kind: 'red' | 'amber' | 'green' | 'blue'; icon: string; text: string }> = [];
 
-              {/* Recommendations */}
-              {topRecs.length > 0 && (
-                <div className="border-t border-border p-4 space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground">Recomendaciones</p>
-                  {topRecs.map((r, idx) => {
-                    const styles = r.kind === 'warn'
-                      ? 'bg-amber-500/10 border-amber-500/30 text-amber-900 dark:text-amber-200'
-                      : r.kind === 'tip'
-                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-900 dark:text-emerald-200'
-                      : 'bg-primary/10 border-primary/30 text-foreground';
-                    const Icon = r.kind === 'warn' ? AlertTriangle : r.kind === 'tip' ? TrendingDown : Lightbulb;
-                    return (
-                      <div key={idx} className={cn('flex items-start gap-2 rounded-lg border px-3 py-2 text-xs', styles)}>
-                        <Icon className="h-4 w-4 mt-0.5 shrink-0" />
-                        <span>{r.text}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+                // 🔴 Biggest overspend
+                const overs = chartData.filter(d => d.variance > 0 && d.budgeted > 0).sort((a, b) => b.variance - a.variance);
+                if (overs.length > 0) {
+                  const top = overs[0];
+                  insights.push({
+                    kind: 'red',
+                    icon: '🔴',
+                    text: `${top.name} superó el budget por ${fmt(top.variance)}${overs.length > 1 ? ' — el mayor desvío del mes' : ''}`,
+                  });
+                }
+
+                // 🟡 High usage (80-100%)
+                const highUse = chartData
+                  .filter(d => d.budgeted > 0 && d.spent <= d.budgeted && (d.spent / d.budgeted) >= 0.8)
+                  .sort((a, b) => (b.spent / b.budgeted) - (a.spent / a.budgeted));
+                if (highUse.length > 0) {
+                  const h = highUse[0];
+                  const pct = Math.round((h.spent / h.budgeted) * 100);
+                  insights.push({
+                    kind: 'amber',
+                    icon: '🟡',
+                    text: `${h.name} usó el ${pct}% del budget (${fmt(h.spent)} de ${fmt(h.budgeted)})`,
+                  });
+                }
+
+                // 🟢 On track count
+                const onTrack = chartData.filter(d => d.budgeted > 0 && d.spent > 0 && (d.spent / d.budgeted) < 0.8);
+                if (onTrack.length > 0) {
+                  insights.push({
+                    kind: 'green',
+                    icon: '🟢',
+                    text: `${onTrack.length} ${onTrack.length === 1 ? 'categoría' : 'categorías'} dentro del rango esperado`,
+                  });
+                }
+
+                // 📊 Summary
+                if (totalBudgeted > 0) {
+                  const daysInMonth = new Date(selectedYear, selectedChartMonth + 1, 0).getDate();
+                  const isCur = selectedYear === currentYear && selectedChartMonth === currentMonth;
+                  const dayOfMonth = isCur ? today.getDate() : daysInMonth;
+                  const monthPct = Math.round((dayOfMonth / daysInMonth) * 100);
+                  insights.push({
+                    kind: 'blue',
+                    icon: '📊',
+                    text: `Total gastado: ${fmt(totalSpent)} de ${fmt(totalBudgeted)} presupuestados (${monthPct}% del mes transcurrido)`,
+                  });
+                }
+
+                const top4 = insights.slice(0, 4);
+                if (top4.length === 0) return null;
+
+                const borderColors: Record<string, string> = {
+                  red: 'border-l-red-500 bg-red-500/5',
+                  amber: 'border-l-amber-500 bg-amber-500/5',
+                  green: 'border-l-emerald-500 bg-emerald-500/5',
+                  blue: 'border-l-primary bg-primary/5',
+                };
+
+                return (
+                  <div className="border-t border-border p-4 space-y-3">
+                    <p className="text-xs font-semibold text-foreground">💡 Insights del mes</p>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {top4.map((ins, idx) => (
+                        <div key={idx} className={cn('flex items-start gap-2 rounded-lg border border-border border-l-4 px-3 py-2 text-xs', borderColors[ins.kind])}>
+                          <span className="text-base leading-tight">{ins.icon}</span>
+                          <span className="text-foreground">{ins.text}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         );
