@@ -855,7 +855,7 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                       if (aOver !== bOver) return aOver ? -1 : 1;
                       return b.pct - a.pct;
                     });
-                  const meaningful = allRows.filter(d => d.spent > 0 || d.budgeted > threshold);
+                  const meaningful = allRows.filter(d => d.spent > 0);
                   const visible = showAllCats ? allRows : meaningful;
                   const hiddenCount = allRows.length - meaningful.length;
 
@@ -870,12 +870,16 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                         const barColor = isOver ? 'bg-red-500' : item.pct >= 80 ? 'bg-amber-500' : 'bg-emerald-500';
                         const diff = item.spent - item.budgeted;
                         return (
-                          <div key={item.id} className="grid grid-cols-[minmax(110px,1fr)_2fr_auto] items-center gap-3 text-xs">
-                            <div className="flex items-center gap-1.5 font-medium truncate">
-                              <span>{item.icon}</span>
+                          <div
+                            key={item.id}
+                            className="items-center gap-3 text-xs"
+                            style={{ display: 'grid', gridTemplateColumns: '160px 1fr 140px' }}
+                          >
+                            <div className="flex items-center gap-1.5 font-medium min-w-0">
+                              <span className="shrink-0">{item.icon}</span>
                               <span className="truncate">{item.name}</span>
                             </div>
-                            <div className="relative">
+                            <div className="relative w-full">
                               <div className="h-5 bg-muted rounded-md overflow-hidden">
                                 <div className={cn('h-full transition-all', barColor)} style={{ width: `${fillPct}%` }} />
                               </div>
@@ -902,7 +906,7 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                           onClick={() => setShowAllCats(v => !v)}
                           className="text-[11px] text-primary hover:underline pt-1"
                         >
-                          {showAllCats ? 'Ocultar categorías sin actividad' : `Ver todas → (${hiddenCount} ocultas)`}
+                          {showAllCats ? 'Ocultar sin actividad' : `Ver categorías sin actividad (${hiddenCount})`}
                         </button>
                       )}
                     </div>
@@ -965,21 +969,20 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                 const top4 = insights.slice(0, 4);
                 if (top4.length === 0) return null;
 
-                const borderColors: Record<string, string> = {
-                  red: 'border-l-red-500 bg-red-500/5',
-                  amber: 'border-l-amber-500 bg-amber-500/5',
-                  green: 'border-l-emerald-500 bg-emerald-500/5',
-                  blue: 'border-l-primary bg-primary/5',
+                const styles: Record<string, string> = {
+                  red: 'border-l-red-500 bg-red-500/10 text-red-900 dark:text-red-100',
+                  amber: 'border-l-amber-500 bg-amber-500/10 text-amber-900 dark:text-amber-100',
+                  green: 'border-l-emerald-500 bg-emerald-500/10 text-emerald-900 dark:text-emerald-100',
+                  blue: 'border-l-blue-500 bg-blue-500/10 text-blue-900 dark:text-blue-100',
                 };
 
                 return (
                   <div className="border-t border-border p-4 space-y-3">
-                    <p className="text-xs font-semibold text-foreground">💡 Insights del mes</p>
-                    <div className="grid gap-2 sm:grid-cols-2">
+                    <p className="text-sm font-semibold text-foreground">Insights del mes</p>
+                    <div className="space-y-2">
                       {top4.map((ins, idx) => (
-                        <div key={idx} className={cn('flex items-start gap-2 rounded-lg border border-border border-l-4 px-3 py-2 text-xs', borderColors[ins.kind])}>
-                          <span className="text-base leading-tight">{ins.icon}</span>
-                          <span className="text-foreground">{ins.text}</span>
+                        <div key={idx} className={cn('border-l-4 rounded-r-lg px-4 py-3', styles[ins.kind])}>
+                          <p className="text-sm font-medium">{ins.text}</p>
                         </div>
                       ))}
                     </div>
