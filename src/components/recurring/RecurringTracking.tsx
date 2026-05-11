@@ -171,15 +171,20 @@ export default function RecurringTracking() {
                     )}
                   </div>
                 )}
-                <div className="flex gap-2 mt-2">
+                <div className="flex gap-2 mt-2 items-center justify-end">
                   {canLink && (
-                    <Button size="sm" variant="outline" className="h-7 text-xs flex-1"
-                      onClick={() => setLinkTarget(i)}>
-                      <Link2 className="h-3 w-3 mr-1" /> Link transaction
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 px-2 text-[11px] text-primary hover:text-primary hover:bg-primary/10"
+                      onClick={() => setLinkTarget(i)}
+                      title="Registrar pago"
+                    >
+                      <Link2 className="h-3.5 w-3.5 mr-1" /> Registrar pago →
                     </Button>
                   )}
                   {!isPaid && (
-                    <Button size="sm" variant="outline" className="h-7 text-xs flex-1"
+                    <Button size="sm" variant="outline" className="h-7 text-xs"
                       onClick={() => markPaid.mutateAsync(i.id).then(() => toast.success('Marked paid'))}>
                       <CheckCircle2 className="h-3 w-3 mr-1" /> Mark paid
                     </Button>
