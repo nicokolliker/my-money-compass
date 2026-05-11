@@ -492,7 +492,7 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                         </div>
                       </td>
                       {MONTHS.map((_, i) => {
-                        const varTotal = tree.reduce((s, c) => s + (isPast(i) ? getActualSpending(c.id, i) : getBudgetAmount(c.id, i)), 0);
+                        const varTotal = tree.reduce((s, c) => s + (isPast(i) ? catSpending(c, i) : catBudget(c, i)), 0);
                         return (
                           <td key={i} className={cn('px-2 py-2 text-center tabular-nums text-xs font-medium', isCurrent(i) && 'bg-primary/5')}>
                             {varTotal > 0 ? fmt(varTotal) : <span className="text-muted-foreground">—</span>}
@@ -500,7 +500,7 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                         );
                       })}
                       <td className="px-4 py-2 text-right tabular-nums text-xs font-semibold">
-                        {fmt(MONTHS.reduce((s, _, i) => s + tree.reduce((a, c) => a + (isPast(i) ? getActualSpending(c.id, i) : getBudgetAmount(c.id, i)), 0), 0))}
+                        {fmt(MONTHS.reduce((s, _, i) => s + tree.reduce((a, c) => a + (isPast(i) ? catSpending(c, i) : catBudget(c, i)), 0), 0))}
                       </td>
                     </tr>
 
@@ -542,7 +542,7 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                           );
                         })}
                         <td className="px-4 py-2 text-right tabular-nums font-medium">
-                          {fmt(MONTHS.reduce((s, _, i) => s + (isPast(i) ? getActualSpending(cat.id, i) : getBudgetAmount(cat.id, i)), 0))}
+                          {fmt(MONTHS.reduce((s, _, i) => s + (isPast(i) ? catSpending(cat, i) : catBudget(cat, i)), 0))}
                         </td>
                       </tr>
                       {cat.isDigital && digitalExpanded && cat.children.map(child => (
@@ -586,7 +586,7 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                 {/* ── CONSOLIDATED VIEW ── */}
                 {tableView === 'consolidated' && tree.map(cat => {
                   const yearTotal = MONTHS.reduce((s, _, i) => {
-                    return s + cat.recurringMonthly + (isPast(i) ? getActualSpending(cat.id, i) : getBudgetAmount(cat.id, i));
+                    return s + cat.recurringMonthly + (isPast(i) ? catSpending(cat, i) : catBudget(cat, i));
                   }, 0);
                   return (
                     <React.Fragment key={`c-frag-${cat.id}`}>
@@ -604,7 +604,7 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                         </div>
                       </td>
                       {MONTHS.map((_, i) => {
-                        const total = cat.recurringMonthly + (isPast(i) ? getActualSpending(cat.id, i) : getBudgetAmount(cat.id, i));
+                        const total = cat.recurringMonthly + (isPast(i) ? catSpending(cat, i) : catBudget(cat, i));
                         return (
                           <td key={i} className={cn('px-2 py-2.5 text-center tabular-nums', isCurrent(i) && 'bg-primary/5')}>
                             {total > 0 ? (
@@ -650,7 +650,7 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                   </td>
                   {MONTHS.map((_, i) => {
                     const fixed = totalRecurringMonthly;
-                    const variable = tree.reduce((s, c) => s + (isPast(i) ? getActualSpending(c.id, i) : getBudgetAmount(c.id, i)), 0);
+                    const variable = tree.reduce((s, c) => s + (isPast(i) ? catSpending(c, i) : catBudget(c, i)), 0);
                     return (
                       <td key={i} className={cn('px-2 py-2.5 text-center tabular-nums text-xs font-semibold', isCurrent(i) && 'bg-primary/10')}>
                         {fmt(fixed + variable)}
@@ -658,7 +658,7 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                     );
                   })}
                   <td className="px-4 py-2.5 text-right tabular-nums text-xs font-semibold">
-                    {fmt(MONTHS.reduce((s, _, i) => s + totalRecurringMonthly + tree.reduce((a, c) => a + (isPast(i) ? getActualSpending(c.id, i) : getBudgetAmount(c.id, i)), 0), 0))}
+                    {fmt(MONTHS.reduce((s, _, i) => s + totalRecurringMonthly + tree.reduce((a, c) => a + (isPast(i) ? catSpending(c, i) : catBudget(c, i)), 0), 0))}
                   </td>
                 </tr>
 
@@ -671,7 +671,7 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                   {MONTHS.map((_, i) => {
                     const income = isPast(i) ? getActualIncome(i) : getBudgetAmount(incomeCategoryId, i);
                     const fixed = totalRecurringMonthly;
-                    const variable = tree.reduce((s, c) => s + (isPast(i) ? getActualSpending(c.id, i) : getBudgetAmount(c.id, i)), 0);
+                    const variable = tree.reduce((s, c) => s + (isPast(i) ? catSpending(c, i) : catBudget(c, i)), 0);
                     const result = income - fixed - variable;
                     const noIncome = !isPast(i) && !isCurrent(i) && income === 0;
                     return (
@@ -687,7 +687,7 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                       const yr = MONTHS.reduce((s, _, i) => {
                         const income = isPast(i) ? getActualIncome(i) : getBudgetAmount(incomeCategoryId, i);
                         if (!isPast(i) && !isCurrent(i) && income === 0) return s;
-                        return s + income - totalRecurringMonthly - tree.reduce((a, c) => a + (isPast(i) ? getActualSpending(c.id, i) : getBudgetAmount(c.id, i)), 0);
+                        return s + income - totalRecurringMonthly - tree.reduce((a, c) => a + (isPast(i) ? catSpending(c, i) : catBudget(c, i)), 0);
                       }, 0);
                       return <span className={yr >= 0 ? 'text-emerald-600' : 'text-destructive'}>{yr >= 0 ? '+' : ''}{Math.round(yr).toLocaleString('en-US')}</span>;
                     })()}
