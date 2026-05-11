@@ -186,7 +186,7 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
 
       {/* ─── PAGE HEADER ─── */}
       {!embedded && (
-        <div className="relative left-1/2 w-screen -translate-x-1/2 px-4 lg:w-[calc(100vw-16rem)] lg:px-6">
+        <div className="relative left-1/2 w-screen -translate-x-1/2 px-4 lg:w-[calc(100vw-18rem)] lg:px-6">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-foreground">Budget</h1>
@@ -206,7 +206,7 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
       )}
 
       {/* ─── SEGUIMIENTO DEL MES ─── */}
-      <div className="relative left-1/2 w-screen -translate-x-1/2 px-4 lg:w-[calc(100vw-16rem)] lg:px-6">
+      <div className="relative left-1/2 w-screen -translate-x-1/2 px-4 lg:w-[calc(100vw-18rem)] lg:px-6">
         <div className="rounded-2xl border border-border bg-card overflow-hidden">
 
           {/* Header row */}
@@ -370,7 +370,7 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
       </div>
 
       {/* ─── ANNUAL TABLE ─── */}
-      <div className="relative left-1/2 w-screen -translate-x-1/2 px-4 lg:w-[calc(100vw-16rem)] lg:px-6">
+      <div className="relative left-1/2 w-screen -translate-x-1/2 px-4 lg:w-[calc(100vw-18rem)] lg:px-6">
         <div className="rounded-2xl border border-border bg-card overflow-hidden">
 
           <div className="flex items-center justify-between px-5 py-3 border-b border-border">
@@ -715,7 +715,7 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
         if (chartData.length === 0) return null;
 
         return (
-          <div className="relative left-1/2 w-screen -translate-x-1/2 px-4 lg:w-[calc(100vw-16rem)] lg:px-6">
+          <div className="relative left-1/2 w-screen -translate-x-1/2 px-4 lg:w-[calc(100vw-18rem)] lg:px-6">
             <div className="rounded-2xl border border-border bg-card overflow-hidden">
               <div className="px-5 py-3 border-b border-border">
                 <h3 className="text-sm font-semibold text-foreground capitalize">Análisis del mes — {monthLabel}</h3>

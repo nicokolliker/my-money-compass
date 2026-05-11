@@ -28,7 +28,7 @@ export default function Planning({ initialTab }: { initialTab?: PlanningTab } = 
 
   return (
     <div className={fullWidth ? 'space-y-4' : 'space-y-4 max-w-5xl'}>
-      <div className={fullWidth ? 'relative left-1/2 w-screen -translate-x-1/2 px-4 lg:w-[calc(100vw-16rem)] lg:px-6' : ''}>
+      <div className={fullWidth ? 'relative left-1/2 w-screen -translate-x-1/2 px-4 lg:w-[calc(100vw-18rem)] lg:px-6' : ''}>
         <h1 className="text-2xl font-bold text-foreground">{meta.label}</h1>
         <p className="text-sm text-muted-foreground">{meta.description}</p>
       </div>

@@ -146,7 +146,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
       </div>
 
       {/* Desktop sidebar — glass */}
-      <aside className="hidden lg:flex lg:w-64 lg:flex-col lg:fixed lg:inset-y-0 lg:p-3 z-30">
+      <aside className="hidden lg:flex lg:w-72 lg:flex-col lg:fixed lg:inset-y-0 lg:p-3 z-30">
         <div className="flex flex-col h-full glass-panel rounded-2xl shadow-[0_8px_32px_-8px_hsl(220_40%_30%_/_0.12)]">
           <div className="flex h-16 items-center gap-2.5 px-5 border-b border-border/40">
             <img src="/compass.svg" alt="My Money Compass" className="h-7 w-7 shrink-0" />
@@ -202,7 +202,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 lg:ml-64 pb-24 lg:pb-0">
+      <main className="flex-1 lg:ml-72 pb-24 lg:pb-0">
         {/* Mobile floating privacy toggle */}
         <button
           onClick={togglePrivacy}
@@ -211,7 +211,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
         >
           {isPrivate ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
         </button>
-        <div className="max-w-3xl mx-auto px-4 py-6 lg:px-8 lg:py-10">
+        <div className="max-w-5xl mx-auto px-4 py-6 lg:px-6 lg:py-10">
           <AnimatePresence mode="wait">
             <motion.div
               key={location.pathname}
