@@ -10,7 +10,7 @@ import { useCategoryTree, type CategoryNode } from '@/hooks/useCategoryTree';
 import { ChevronLeft, ChevronRight, ChevronDown, Lightbulb, AlertTriangle, TrendingDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip as RTooltip, Cell, Legend } from 'recharts';
+import { ComposedChart, Area, Line, XAxis, YAxis, ResponsiveContainer, Tooltip as RTooltip, CartesianGrid, Legend } from 'recharts';
 
 const MONTHS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 const INCOME_CATEGORY_NAME = 'Ingresos Proyectados';
