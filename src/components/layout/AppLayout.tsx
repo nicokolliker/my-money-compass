@@ -105,9 +105,10 @@ export function AppLayout({ children }: { children: ReactNode }) {
       {/* Desktop sidebar — glass */}
       <aside className="hidden lg:flex lg:w-64 lg:flex-col lg:fixed lg:inset-y-0 lg:p-3 z-30">
         <div className="flex flex-col h-full glass-panel rounded-2xl shadow-[0_8px_32px_-8px_hsl(220_40%_30%_/_0.12)]">
-          <div className="flex h-16 items-center px-5 border-b border-border/40">
+          <div className="flex h-16 items-center gap-2.5 px-5 border-b border-border/40">
+            <img src="/compass.svg" alt="My Money Compass" className="h-7 w-7 shrink-0" />
             <h1 className="text-base font-bold tracking-tight bg-gradient-to-r from-primary to-[hsl(var(--primary-glow))] bg-clip-text text-transparent">
-              FinTrack
+              My Money Compass
             </h1>
           </div>
           <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
