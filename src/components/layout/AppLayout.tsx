@@ -227,43 +227,92 @@ export function AppLayout({ children }: { children: ReactNode }) {
       </main>
 
       {/* Mobile bottom nav — glass */}
-      <nav className="lg:hidden fixed bottom-0 inset-x-0 glass-panel border-t border-border/50 z-50 safe-area-bottom">
-        <div className="flex items-center justify-around h-16">
-          {MOBILE_TOP.map(item => (
-            <button
-              key={item.path}
-              onClick={() => navigate(item.path)}
-              className={cn(
-                'flex flex-col items-center gap-0.5 py-1.5 px-3 text-[10px] font-medium transition-colors',
-                location.pathname === item.path ? 'text-primary' : 'text-muted-foreground'
-              )}
-            >
-              <item.icon className={cn('h-5 w-5 transition-transform', location.pathname === item.path && 'scale-110')} />
-              {item.label}
-            </button>
-          ))}
+      {(() => {
+        const moreActive = MORE_ITEMS.some(i => location.pathname === i.path || location.pathname.startsWith(i.path + '/'));
+        const renderTab = (item: { path: string; label: string; icon: any }) => (
           <button
-            onClick={() => setShowQuickAdd(true)}
-            className="flex items-center justify-center -mt-7 rounded-2xl bg-primary text-primary-foreground shadow-elevated active:scale-95 transition-transform"
-            style={{ width: 52, height: 52 }}
+            key={item.path}
+            onClick={() => navigate(item.path)}
+            className={cn(
+              'flex flex-col items-center gap-0.5 py-1.5 px-3 text-[10px] font-medium transition-colors',
+              location.pathname === item.path ? 'text-primary' : 'text-muted-foreground'
+            )}
           >
-            <Plus className="h-6 w-6" />
+            <item.icon className={cn('h-5 w-5 transition-transform', location.pathname === item.path && 'scale-110')} />
+            {item.label}
           </button>
-          {MOBILE_BOTTOM.map(item => (
-            <button
-              key={item.path}
-              onClick={() => navigate(item.path)}
-              className={cn(
-                'flex flex-col items-center gap-0.5 py-1.5 px-3 text-[10px] font-medium transition-colors',
-                location.pathname === item.path ? 'text-primary' : 'text-muted-foreground'
-              )}
-            >
-              <item.icon className={cn('h-5 w-5 transition-transform', location.pathname === item.path && 'scale-110')} />
-              {item.label}
-            </button>
-          ))}
-        </div>
-      </nav>
+        );
+        return (
+          <nav className="lg:hidden fixed bottom-0 inset-x-0 glass-panel border-t border-border/50 z-50 safe-area-bottom">
+            <div className="flex items-center justify-around h-16">
+              {MOBILE_LEFT.map(renderTab)}
+              <button
+                onClick={() => setShowQuickAdd(true)}
+                className="flex items-center justify-center -mt-7 rounded-2xl bg-primary text-primary-foreground shadow-elevated active:scale-95 transition-transform"
+                style={{ width: 52, height: 52 }}
+              >
+                <Plus className="h-6 w-6" />
+              </button>
+              {MOBILE_RIGHT.map(renderTab)}
+              <button
+                onClick={() => setShowMore(true)}
+                className={cn(
+                  'relative flex flex-col items-center gap-0.5 py-1.5 px-3 text-[10px] font-medium transition-colors',
+                  moreActive ? 'text-primary' : 'text-muted-foreground'
+                )}
+              >
+                <MoreHorizontal className={cn('h-5 w-5 transition-transform', moreActive && 'scale-110')} />
+                More
+                {moreActive && (
+                  <span className="absolute top-1 right-2 h-1.5 w-1.5 rounded-full bg-primary" />
+                )}
+              </button>
+            </div>
+          </nav>
+        );
+      })()}
+
+      {/* Mobile "More" drawer */}
+      <Sheet open={showMore} onOpenChange={setShowMore}>
+        <SheetContent
+          side="bottom"
+          className="lg:hidden rounded-t-2xl max-h-[80vh] overflow-y-auto p-0 border-t border-border/60"
+        >
+          <div className="sticky top-0 bg-background/95 backdrop-blur-sm pt-3 pb-2 px-5 border-b border-border/40">
+            <div className="mx-auto h-1.5 w-10 rounded-full bg-muted-foreground/30 mb-3" />
+            <h2 className="text-sm font-semibold">Más opciones</h2>
+          </div>
+          <div className="p-3 space-y-1">
+            {MORE_ITEMS.map(item => {
+              const active = location.pathname === item.path;
+              return (
+                <button
+                  key={item.path}
+                  onClick={() => { navigate(item.path); setShowMore(false); }}
+                  className={cn(
+                    'flex items-center gap-3 w-full rounded-xl px-3 py-3 text-sm font-medium transition-all',
+                    active
+                      ? 'bg-gradient-to-r from-primary to-[hsl(var(--primary-glow))] text-primary-foreground'
+                      : 'text-foreground hover:bg-accent'
+                  )}
+                >
+                  <item.icon className="h-4 w-4 shrink-0" />
+                  {item.label}
+                </button>
+              );
+            })}
+            <div className="pt-2 mt-2 border-t border-border/40">
+              <button
+                onClick={() => { setShowMore(false); signOut(); }}
+                className="flex items-center gap-3 w-full rounded-xl px-3 py-3 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground transition-all"
+              >
+                <LogOut className="h-4 w-4 shrink-0" />
+                Sign Out
+              </button>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {/* Quick Add Dialog */}
       <Dialog open={showQuickAdd} onOpenChange={setShowQuickAdd}>
