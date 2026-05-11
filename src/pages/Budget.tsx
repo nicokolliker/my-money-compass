@@ -710,62 +710,8 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
 
       {/* ─── ANÁLISIS DEL MES ─── */}
       {(() => {
-        const variances = chartData
-          .map(d => ({ ...d }))
-          .filter(d => Math.abs(d.variance) > 5)
-          .sort((a, b) => b.variance - a.variance);
-
         const totalBudgeted = chartData.reduce((s, d) => s + d.budgeted, 0);
         const totalSpent = chartData.reduce((s, d) => s + d.spent, 0);
-        const pctUsed = totalBudgeted > 0 ? (totalSpent / totalBudgeted) * 100 : 0;
-
-        const recs: Array<{ kind: 'warn' | 'info' | 'tip'; text: string }> = [];
-
-        // Over budget alerts
-        chartData
-          .filter(d => d.variance > 0 && d.budgeted > 0)
-          .sort((a, b) => b.variance - a.variance)
-          .slice(0, 2)
-          .forEach(d => {
-            const suggested = Math.round((d.spent * 1.1) / 10) * 10;
-            recs.push({
-              kind: 'warn',
-              text: `${d.name} excedió el presupuesto en ${fmt(d.variance)} este mes — considerá ajustar el budget a ${fmt(suggested)}`,
-            });
-          });
-
-        // Consistently under-spending last 3 months
-        tree.forEach(cat => {
-          const checks: number[] = [];
-          for (let k = 1; k <= 3; k++) {
-            let m = selectedChartMonth - k;
-            let y = selectedYear;
-            if (m < 0) { m += 12; y -= 1; }
-            const past = y < currentYear || (y === currentYear && m < currentMonth);
-            if (!past) return;
-            const b = (budgets || []).find(b => b.category_id === cat.id && String(b.month).startsWith(`${y}-${String(m + 1).padStart(2, '0')}`));
-            const budget = Number(b?.amount || 0);
-            if (budget <= 0) return;
-            const spent = spendingForYM(cat.id, m, y);
-            checks.push(budget - spent);
-          }
-          if (checks.length === 3 && checks.every(v => v > 20)) {
-            const avgUnused = checks.reduce((s, v) => s + v, 0) / 3;
-            recs.push({
-              kind: 'tip',
-              text: `${cat.name} tiene ${fmt(avgUnused)} sin usar en promedio en los últimos 3 meses — podés reducir el presupuesto`,
-            });
-          }
-        });
-
-        if (totalBudgeted > 0 && pctUsed > 90 && totalSpent <= totalBudgeted) {
-          recs.push({
-            kind: 'info',
-            text: `Estás al ${Math.round(pctUsed)}% del presupuesto total — quedan ${fmt(totalBudgeted - totalSpent)} disponibles`,
-          });
-        }
-
-        const topRecs = recs.slice(0, 3);
         if (chartData.length === 0) return null;
 
         return (
