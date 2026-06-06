@@ -916,11 +916,9 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                                 <span className="text-muted-foreground font-normal"> / {fmt(item.budgeted)}</span>
                               </div>
                               {isOver ? (
-                                <div className="text-[10px] text-muted-foreground">
-                                  /{fmt(item.budgeted)} <span className="ml-1 text-destructive">
-                                    +{fmt(Math.abs(diff))}
-                                  </span>
-                                </div>
+                                <span className="inline-block text-[10px] font-medium px-1.5 py-0.5 rounded-full border border-red-300 bg-red-50 text-red-600">
+                                  +{Math.round((item.spent / item.budgeted - 1) * 100)}% excedido
+                                </span>
                               ) : (
                                 <div className="text-[10px] text-muted-foreground">
                                   {Math.round((item.spent / item.budgeted) * 100)}% usado
