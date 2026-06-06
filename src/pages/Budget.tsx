@@ -892,7 +892,7 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                             <div className="relative w-full">
                               <div className="relative h-5 bg-muted rounded-md overflow-hidden">
                                 {/* Divider marker at 72% (budget threshold) */}
-                                <div className="absolute top-0 bottom-0 w-px bg-border/80 z-10" style={{ left: '72%' }} />
+                                <div className="absolute top-0 bottom-0 bg-muted-foreground/40 z-10" style={{ left: '72%', width: '2px' }} />
                                 <div className={cn('h-full transition-all', barColor)} style={{ width: `${totalFillPct}%` }} />
                               </div>
                               <span className={cn(
