@@ -37,8 +37,11 @@ export function useLatestFxRate(fromCurrency: string, toCurrency = 'USD') {
   if (exact?.rate) return exact.rate;
 
   // Secondary: most recent rate from the source currency, regardless of target.
-  const anyFrom = rates.find(r => r.from_currency === fromCurrency);
-  if (anyFrom?.rate) return anyFrom.rate;
+  const fromMatches = rates.filter(r => r.from_currency === fromCurrency);
+  if (fromMatches.length > 0) {
+    const mostRecent = fromMatches.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+    if (mostRecent?.rate) return mostRecent.rate;
+  }
 
   return FALLBACK_TO_USD[fromCurrency] ?? 1;
 }
