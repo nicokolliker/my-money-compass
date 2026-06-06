@@ -19,12 +19,18 @@ function formatLongDate(d: string | Date): string {
 }
 
 export function CreditCardDebtCard() {
-  // 1) Resolve the Viejo account id (used to scope the cuotas query)
+  const navigate = useNavigate();
+
+  // 1) Resolve own-card account ids (used to scope the cuotas query)
   const { data: balances } = useAccountBalances();
-  const viejoAccountId = useMemo(() => {
-    const a = (balances || []).find((acc: any) => /viejo/i.test(acc.name));
-    return a?.id || null;
+  const ownCardAccountIds = useMemo(() => {
+    const ids = (balances || [])
+      .filter((acc: any) => (acc as any).is_own_card === true)
+      .map((acc: any) => acc.id as string);
+    return ids;
   }, [balances]);
+
+  const hasOwnCards = ownCardAccountIds.length > 0;
 
   // 2) "Última actualización" from the most recent santander / banco_ciudad import
   const { data: lastImport } = useQuery({
@@ -41,9 +47,9 @@ export function CreditCardDebtCard() {
     },
   });
 
-  // 3) Pending cuotas — scoped to Viejo account OR descriptions mentioning "viejo"
+  // 3) Pending cuotas — scoped to own-card accounts
   const { data: cuotaTxs } = useQuery({
-    queryKey: ['pending-cuotas-viejo', viejoAccountId],
+    queryKey: ['pending-cuotas-own-cards', ownCardAccountIds],
     queryFn: async () => {
       let q = supabase
         .from('transactions')
@@ -51,14 +57,16 @@ export function CreditCardDebtCard() {
         .ilike('description', '%cuota%')
         .order('date', { ascending: false })
         .limit(500);
-      if (viejoAccountId) {
-        q = q.or(`account_id.eq.${viejoAccountId},description.ilike.%viejo%`);
+      if (ownCardAccountIds.length > 0) {
+        q = q.in('account_id', ownCardAccountIds);
       } else {
-        q = q.ilike('description', '%viejo%');
+        // No own cards: return empty set
+        q = q.eq('id', 'no-match');
       }
       const { data } = await q;
       return data || [];
     },
+    enabled: hasOwnCards,
   });
 
   const pendingCuotas = useMemo(() => {
