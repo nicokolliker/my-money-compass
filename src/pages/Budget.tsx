@@ -911,7 +911,10 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                               </span>
                             </div>
                             <div className="text-right tabular-nums whitespace-nowrap">
-                              <div className={cn('font-semibold', isOver && 'text-destructive')}>{fmt(item.spent)}</div>
+                              <div className="font-semibold">
+                                <span className={cn(isOver && 'text-destructive')}>{fmt(item.spent)}</span>
+                                <span className="text-muted-foreground font-normal"> / {fmt(item.budgeted)}</span>
+                              </div>
                               {isOver ? (
                                 <div className="text-[10px] text-muted-foreground">
                                   /{fmt(item.budgeted)} <span className="ml-1 text-destructive">
