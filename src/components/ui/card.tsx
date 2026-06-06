@@ -8,14 +8,14 @@ interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
 
 const Card = React.forwardRef<HTMLDivElement, CardProps>(({ className, variant = "elevated", ...props }, ref) => {
   const variantClass =
-    variant === "solid" ? "card-solid" :
+    variant === "solid" ? "bg-card border border-border flowit-card-hover" :
     variant === "glass" ? "glass-panel" :
-    "card-elevated";
+    "bg-card border border-border flowit-card-hover";
   return (
     <div
       ref={ref}
       className={cn(
-        "rounded-2xl text-card-foreground transition-all duration-200",
+        "rounded-2xl text-card-foreground",
         variantClass,
         className,
       )}
