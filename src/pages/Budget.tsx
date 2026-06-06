@@ -869,15 +869,18 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                   return (
                     <div className="space-y-2.5">
                       {visible.map(item => {
-                        const isOver = item.pct > 100;
-                        const normalFillPct = item.budgeted > 0
-                          ? Math.min(item.spent / item.budgeted, 1) * 72
-                          : (item.spent > 0 ? 72 : 0);
+                        const spentPct = item.budgeted > 0 ? (item.spent / item.budgeted) * 100 : 0;
+                        const isOver = spentPct > 100;
+                        const fillPct = Math.min(spentPct / 100, 1) * 72;
                         const overflowExtPct = isOver
                           ? Math.min((item.spent - item.budgeted) / maxOverage, 1) * 28
                           : 0;
-                        const totalFillPct = normalFillPct + overflowExtPct;
-                        const barColor = isOver ? 'bg-red-500' : item.pct >= 80 ? 'bg-amber-500' : 'bg-emerald-500';
+                        const totalFillPct = fillPct + overflowExtPct;
+                        const barColor = isOver
+                          ? 'bg-red-500'
+                          : spentPct >= 80
+                            ? 'bg-amber-500'
+                            : 'bg-emerald-500';
                         const diff = item.spent - item.budgeted;
                         return (
                           <div
