@@ -1,11 +1,13 @@
 import { useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Layers } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useAccountBalances } from '@/hooks/useAccounts';
+import { useNavigate } from 'react-router-dom';
 
 function formatARS(n: number): string {
   return '$' + Math.round(n).toLocaleString('es-AR');
