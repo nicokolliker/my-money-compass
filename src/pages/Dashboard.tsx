@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHeader } from '@/components/layout/PageHeader';
 
 import { useNetWorth } from '@/hooks/useNetWorth';
 import { useTransactions } from '@/hooks/useTransactions';
@@ -90,22 +91,24 @@ export default function Dashboard() {
     <div className="space-y-5">
       {hasDemoData && <DemoDataBanner onCleared={onDemoCleared} />}
 
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">{greeting()}, Nico</h1>
-        <p className="text-sm text-muted-foreground capitalize">
-          {format(now, "EEEE d 'de' MMMM, yyyy", { locale: es })}
-        </p>
-      </div>
+      <PageHeader
+        eyebrow={format(now, "EEEE d 'de' MMMM, yyyy", { locale: es })}
+        eyebrowIcon={CalendarDays}
+        title={`${greeting()}, Nico`}
+        description="Resumen de tu actividad financiera y patrimonio."
+      />
 
       {/* Net Worth */}
-      <Card className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground border-0 shadow-elevated">
+      <Card className="border-border">
         <CardContent className="pt-6 pb-6">
-          <p className="text-sm opacity-80 font-medium">Net Worth</p>
-          <p className="text-4xl font-extrabold mt-1 tracking-tight">{maskAmount(formatUSD(netWorth), isPrivate)}</p>
-          <p className="text-xs opacity-60 mt-1">Actualizado hoy</p>
+          <p className="text-xs uppercase tracking-[0.14em] text-primary/80 font-semibold">Net Worth</p>
+          <p className="font-display text-4xl font-semibold mt-1.5 tracking-tight flowit-gradient-text">
+            {maskAmount(formatUSD(netWorth), isPrivate)}
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">Actualizado hoy</p>
         </CardContent>
       </Card>
+
 
       <FundFlowDiagram />
 

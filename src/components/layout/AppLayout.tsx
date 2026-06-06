@@ -104,11 +104,11 @@ export function AppLayout({ children }: { children: ReactNode }) {
         key={item.path}
         onClick={() => navigate(item.path)}
         className={cn(
-          'flex items-center gap-3 w-full rounded-xl text-sm font-medium transition-all duration-200',
+          'flex items-center gap-3 w-full rounded-lg text-sm font-medium transition-all duration-200',
           indent ? 'pl-9 pr-3 py-2 text-[13px]' : 'px-3 py-2.5',
           active
-            ? 'bg-gradient-to-r from-primary to-[hsl(var(--primary-glow))] text-primary-foreground shadow-[0_4px_14px_-4px_hsl(var(--primary)/0.5)]'
-            : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground'
+            ? 'flowit-tab-active'
+            : 'text-muted-foreground hover:bg-muted hover:text-foreground'
         )}
       >
         <item.icon className="h-4 w-4 shrink-0" />
@@ -119,38 +119,30 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="relative flex min-h-screen">
-      {/* Animated gradient orbs background */}
+      {/* Animated gradient orbs background — indigo/violet */}
       <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
         <div
-          className="absolute top-[-20%] left-[-10%] w-[55vw] h-[55vw] rounded-full opacity-30 blur-3xl"
+          className="absolute top-[-20%] left-[-10%] w-[55vw] h-[55vw] rounded-full opacity-[0.18] blur-3xl"
           style={{
             background: 'radial-gradient(circle, hsl(var(--primary)) 0%, transparent 70%)',
             animation: 'drift 18s ease-in-out infinite',
           }}
         />
         <div
-          className="absolute bottom-[-15%] right-[-10%] w-[50vw] h-[50vw] rounded-full opacity-25 blur-3xl"
+          className="absolute bottom-[-15%] right-[-10%] w-[50vw] h-[50vw] rounded-full opacity-[0.15] blur-3xl"
           style={{
             background: 'radial-gradient(circle, hsl(var(--primary-glow)) 0%, transparent 70%)',
             animation: 'drift 22s ease-in-out infinite reverse',
           }}
         />
-        <div
-          className="absolute top-[30%] right-[20%] w-[35vw] h-[35vw] rounded-full opacity-20 blur-3xl"
-          style={{
-            background: 'radial-gradient(circle, hsl(220 90% 70%) 0%, transparent 70%)',
-            animation: 'drift 26s ease-in-out infinite',
-            animationDelay: '-8s',
-          }}
-        />
       </div>
 
-      {/* Desktop sidebar — glass */}
+      {/* Desktop sidebar — clean white card */}
       <aside className="hidden lg:flex lg:w-72 lg:flex-col lg:fixed lg:inset-y-0 lg:p-3 z-30">
-        <div className="flex flex-col h-full glass-panel rounded-2xl shadow-[0_8px_32px_-8px_hsl(220_40%_30%_/_0.12)]">
-          <div className="flex h-16 items-center gap-2.5 px-5 border-b border-border/40">
+        <div className="flex flex-col h-full bg-white border border-border rounded-2xl shadow-[0_8px_28px_-18px_rgba(94,108,246,0.25)]">
+          <div className="flex h-16 items-center gap-2.5 px-5 border-b border-border">
             <img src="/compass.svg" alt="My Money Compass" className="h-7 w-7 shrink-0" />
-            <h1 className="text-base font-bold tracking-tight bg-gradient-to-r from-primary to-[hsl(var(--primary-glow))] bg-clip-text text-transparent">
+            <h1 className="font-display text-base font-semibold tracking-tight text-foreground">
               My Money Compass
             </h1>
           </div>
@@ -164,8 +156,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
                 <button
                   onClick={() => setOpenGroups(g => ({ ...g, [entry.label]: !open }))}
                   className={cn(
-                    'flex items-center gap-3 w-full rounded-xl px-3 py-2.5 text-sm font-medium transition-all',
-                    hasActive ? 'text-foreground' : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                    'flex items-center gap-3 w-full rounded-lg px-3 py-2.5 text-sm font-medium transition-all',
+                    hasActive ? 'text-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                   )}
                 >
                   <entry.icon className="h-4 w-4 shrink-0" />
@@ -181,20 +173,20 @@ export function AppLayout({ children }: { children: ReactNode }) {
             );
           })}
           </nav>
-          <div className="p-3 border-t border-border/40 space-y-2">
+          <div className="p-3 border-t border-border space-y-2">
             <Button
               variant="outline"
-              className="w-full rounded-xl h-9 justify-start text-muted-foreground hover:text-foreground"
+              className="w-full rounded-lg h-9 justify-start text-muted-foreground hover:text-foreground"
               onClick={togglePrivacy}
               title={isPrivate ? 'Mostrar montos' : 'Ocultar montos'}
             >
               {isPrivate ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
               {isPrivate ? 'Mostrar montos' : 'Modo privado'}
             </Button>
-            <Button className="w-full rounded-xl h-11 shadow-[0_4px_16px_-4px_hsl(var(--primary)/0.5)]" onClick={() => setShowQuickAdd(true)}>
+            <Button className="w-full rounded-lg h-11" onClick={() => setShowQuickAdd(true)}>
               <Plus className="h-4 w-4 mr-2" /> Quick Add
             </Button>
-            <Button variant="ghost" className="w-full rounded-xl h-9 text-muted-foreground hover:text-foreground" onClick={() => signOut()}>
+            <Button variant="ghost" className="w-full rounded-lg h-9 text-muted-foreground hover:text-foreground" onClick={() => signOut()}>
               <LogOut className="h-4 w-4 mr-2" /> Sign Out
             </Button>
           </div>
@@ -243,12 +235,12 @@ export function AppLayout({ children }: { children: ReactNode }) {
           </button>
         );
         return (
-          <nav className="lg:hidden fixed bottom-0 inset-x-0 glass-panel border-t border-border/50 z-50 safe-area-bottom">
+          <nav className="lg:hidden fixed bottom-0 inset-x-0 bg-white border-t border-border z-50 safe-area-bottom">
             <div className="flex items-center justify-around h-16">
               {MOBILE_LEFT.map(renderTab)}
               <button
                 onClick={() => setShowQuickAdd(true)}
-                className="flex items-center justify-center -mt-7 rounded-2xl bg-primary text-primary-foreground shadow-elevated active:scale-95 transition-transform"
+                className="flowit-gradient flex items-center justify-center -mt-7 rounded-2xl text-white shadow-[0_8px_20px_-8px_rgba(94,108,246,0.55)] active:scale-95 transition-transform"
                 style={{ width: 52, height: 52 }}
               >
                 <Plus className="h-6 w-6" />
@@ -290,10 +282,10 @@ export function AppLayout({ children }: { children: ReactNode }) {
                   key={item.path}
                   onClick={() => { navigate(item.path); setShowMore(false); }}
                   className={cn(
-                    'flex items-center gap-3 w-full rounded-xl px-3 py-3 text-sm font-medium transition-all',
+                    'flex items-center gap-3 w-full rounded-lg px-3 py-3 text-sm font-medium transition-all',
                     active
-                      ? 'bg-gradient-to-r from-primary to-[hsl(var(--primary-glow))] text-primary-foreground'
-                      : 'text-foreground hover:bg-accent'
+                      ? 'flowit-tab-active'
+                      : 'text-foreground hover:bg-muted'
                   )}
                 >
                   <item.icon className="h-4 w-4 shrink-0" />
