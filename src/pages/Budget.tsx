@@ -873,7 +873,7 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                           <div
                             key={item.id}
                             className="items-center gap-3 text-xs"
-                            style={{ display: 'grid', gridTemplateColumns: '160px 1fr 140px' }}
+                            style={{ display: 'grid', gridTemplateColumns: '120px 1fr 160px' }}
                           >
                             <div className="flex items-center gap-1.5 font-medium min-w-0">
                               <span className="shrink-0">{item.icon}</span>
