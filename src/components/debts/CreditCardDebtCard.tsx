@@ -121,7 +121,16 @@ export function CreditCardDebtCard() {
       </div>
 
       <CardContent className="p-5 space-y-3">
-        {pendingCuotas.length === 0 ? (
+        {!hasOwnCards ? (
+          <div className="text-center space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Configurá tus tarjetas en Accounts → editar → Mi tarjeta personal
+            </p>
+            <Button variant="outline" size="sm" onClick={() => navigate('/accounts')}>
+              Ir a Accounts
+            </Button>
+          </div>
+        ) : pendingCuotas.length === 0 ? (
           <p className="text-xs text-muted-foreground">
             No hay cuotas pendientes detectadas en los resúmenes importados.
           </p>
