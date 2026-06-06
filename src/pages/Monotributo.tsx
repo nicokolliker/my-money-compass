@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ExternalLink, Plus, AlertTriangle, CheckCircle2, Clock, Upload, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -577,7 +578,21 @@ function MonotributoConfigDialog({
           </div>
           <div>
             <label className="text-xs text-muted-foreground">Categoría actual</label>
-            <Input value={catActual} onChange={(e) => setCatActual(e.target.value)} placeholder="A" />
+            <Select
+              value={catActual}
+              onValueChange={(v) => {
+                setCatActual(v);
+                const found = CATEGORIAS.find(c => c.cat === v);
+                if (found) setCuotaActual(String(found.cuota));
+              }}
+            >
+              <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+              <SelectContent>
+                {CATEGORIAS.map(c => (
+                  <SelectItem key={c.cat} value={c.cat}>{c.cat} — cuota {formatARS(c.cuota)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div>
             <label className="text-xs text-muted-foreground">Cuota mensual (ARS)</label>
