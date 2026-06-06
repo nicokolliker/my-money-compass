@@ -1,63 +1,94 @@
+## Objetivo
 
-What I already verified
+Llevar el look de la app al lenguaje **Flowit "Limpio Sereno"**: superficies blancas con border, fondo `#FAFBFF`, gradiente de marca indigo→violet (`#5E6CF6 → #8B5CF6`), tipografía Outfit/Figtree, sombras violet-tinted y headers de módulo con banner pastel `rounded-3xl`.
 
-- This exact preview is connected to this exact backend/project. The preview network traffic, `supabase/config.toml`, and the backend project ref all match, so this is not a wrong preview/project problem.
-- The current session is authenticated correctly. The live session shows the logged-in user as `nicolaskolliker@gmail.com` with user id `88c3c139-7a95-43e0-ae95-8a755e8e7f54`.
-- The frontend is reading that same authenticated user’s backend state correctly:
-  - `profiles.has_demo_data` returns `false`
-  - `accounts` returns `[]`
-  - `transactions` returns `[]`
-  - `recurring_expenses` returns `[]`
-  - `net_worth_snapshots` returns `[]`
-- So the current issue is not “data exists but the UI is reading another user”. The UI is hitting the right backend and reading the current auth session correctly.
-- Important timing clue: the current user was created at `05:42 UTC`, but the demo-data migration was added later (`20260412054837...`, about `05:48 UTC`). That means this specific user was never seeded retroactively.
-- There is also a backend consistency warning: the migration files define `handle_new_user` + `on_auth_user_created`, but the live backend schema snapshot reports no database triggers. That strongly suggests signup seeding is not reliably installed in the live backend right now.
+El alcance es **puramente visual** (tokens + componentes de chrome). No toco lógica, datos, hooks ni queries.
 
-Conclusion
+---
 
-- A) is the current real problem for the logged-in user: demo data was not created.
-- B) is not the main issue in the current session: the UI is reading the logged-in user correctly.
-- C) does not look like a wrong preview/project: code, preview, and backend match. The mismatch is backend rollout/state, not the route/project.
+## 1. Tokens y utilidades globales (`src/index.css` + `tailwind.config.ts`)
 
-Plan to fix once approved
+- Reescribir `:root` y `.dark` con la paleta Flowit:
+  - `--primary: 232 92% 67%` (≈ `#5E6CF6`), `--primary-glow: 258 90% 70%` (≈ `#8B5CF6`)
+  - `--accent: 258 90% 76%` (violet-400)
+  - `--background: 228 100% 99%` (≈ `#FAFBFF`)
+  - `--border: 0 0% 92%` (≈ `#EBEBEB`)
+  - `--ring` = `--primary`
+- `--radius: 0.75rem` (en lugar de 0.875rem). La escala de cards pasa a `rounded-2xl` y banners a `rounded-3xl`.
+- Quitar el `--gradient-app` actual (azul/celeste) y dejar el body con `bg-background` plano. Los orbes animados del AppLayout pasan a tonos indigo/violet con menor opacidad (15%).
+- Sombras: reemplazar las sombras grises del `.card-elevated`/`.card-solid` por **violet-tinted**:
+  - resting: solo `border-border` (sin sombra)
+  - hover: `0 8px 24px -12px rgba(94,108,246,0.22)`
+- Añadir utilidades reutilizables (`@layer components`):
+  - `.flowit-gradient` — `background-image: linear-gradient(135deg,#5E6CF6 0%,#7C6CF6 50%,#8B5CF6 100%)`
+  - `.flowit-gradient-text` — el mismo gradiente clipeado a texto
+  - `.flowit-tab-active` — gradiente + `color:#fff` + sombra `0 4px 12px -6px rgba(94,108,246,0.55)`
+  - `.flowit-header-bg` — fondo pastel radial (white → `#F5F3FF` → `#EDE9FE`)
+  - `.flowit-card-hover` — `transition` + `-translate-y-0.5` + sombra violet en hover
+- Tipografía: cargar **Outfit** (400–800) y **Figtree** (400–700) desde Google Fonts en `index.html`. En `tailwind.config.ts`:
+  - `fontFamily.sans = ['Figtree', ...]`
+  - `fontFamily.display = ['Outfit', ...]`
+- Mantener `.tabular-nums`, `safe-area-bottom`, los keyframes `drift`, `count-in` y la lógica de `privacy-mode`.
 
-1. Repair signup seeding in the backend
-- Create a migration that safely re-creates `handle_new_user` and the `on_auth_user_created` trigger on `auth.users`.
-- Make `seed_demo_data` idempotent so it can be re-run safely without duplicates.
-- Ensure the profile row is created/upserted first, then seed rows are created for that same `auth.uid`, then `has_demo_data` is set to `true`.
+## 2. AppLayout (`src/components/layout/AppLayout.tsx`)
 
-2. Backfill already-affected users
-- Add a one-time repair path for users who already exist, have a profile, but have zero seeded rows and `has_demo_data = false`.
-- This is necessary because fixing the trigger alone will not help users who signed up before demo seeding was added, including the currently affected user.
+- Sidebar desktop: cambiar el shell `glass-panel` por `bg-white border border-border rounded-2xl` (más limpio, sin blur). Sombra resting suave violet.
+- Header del sidebar: logo + título en `font-display`, sin gradiente clip — usar `text-foreground`.
+- Items activos del nav: reemplazar el `bg-gradient-to-r from-primary to-primary-glow` por `.flowit-tab-active` (gradiente Flowit canónico). Items inactivos: `text-muted-foreground hover:text-foreground hover:bg-muted`.
+- Botón **Quick Add**: usar `.flowit-gradient` + `text-white` + sombra violet hover (`hover:-translate-y-0.5`).
+- Orbes animados del fondo: bajar opacidad a 15–20%, colores `--primary` y `--primary-glow` solamente (sin el celeste extra).
+- Bottom nav móvil: `bg-white border-t border-border` (sin glass blur). FAB `+` con `.flowit-gradient`.
+- Sheet "Más opciones": items activos también con `.flowit-tab-active`.
 
-3. Harden frontend auth/data refresh
-- Add auth-ready gating so user-scoped queries only run after auth initialization is complete.
-- Add `user.id` into React Query keys for user-scoped hooks (`useDemoData`, accounts, transactions, recurring, budgets, account groups, FX, sync logs).
-- Invalidate/reset user-scoped queries on auth changes so switching users cannot keep stale empty data or stale previous-user data.
+## 3. Componentes de chrome compartidos
 
-4. Add the temporary debug indicator
-- Add a small debug panel in the protected app shell showing:
-  - current logged-in email
-  - current user id
-  - `has_demo_data`
-  - accounts loaded
-  - transactions loaded
-- Keep it clearly temporary and preview-focused so we can confirm whether the issue is backend creation or frontend rendering/cache.
+- **`src/components/ui/card.tsx`**: el variant `elevated` por defecto deja de usar `card-elevated` (con backdrop-blur) y pasa a un patrón plano Flowit: `bg-white border border-border rounded-2xl flowit-card-hover`. Los variants `solid` y `glass` quedan igual para no romper usos puntuales.
+- **`src/components/ui/button.tsx`**: variant `default` repinta con `.flowit-gradient` + `text-white` + sombra violet, manteniendo `active:scale-[0.98]`. Variants `outline`, `ghost`, `secondary` quedan iguales (ya usan tokens).
+- **`src/components/ui/tabs.tsx`**: el `TabsTrigger` activo aplica `.flowit-tab-active` en lugar de `bg-background shadow`. El contenedor `TabsList` queda con `border border-border bg-white p-1 rounded-lg`.
+- **`src/components/ui/badge.tsx`**: variant `default` con `bg-violet-50 text-violet-700 border-violet-100` (tinte violeta canónico). `secondary`, `destructive`, `outline` quedan igual.
 
-5. Re-verify end to end
-- Sign up a brand new user
-- Confirm email
-- Log in
-- Confirm the profile row exists for that exact user id
-- Confirm seeded accounts, transactions, and recurring rows exist for that same user id
-- Confirm the UI shows them immediately
-- Confirm the demo banner appears
-- Test “Clear demo data” and verify counts drop to zero and `has_demo_data` flips to `false`
+## 4. Page headers (`Dashboard`, `Accounts`, `Transactions`, `Analytics`, `Budget`, `Calendar`, `Planning`, `Debts`, `Monotributo`, `RecurringExpenses`, `Settings`, `Rules`, `Integrations`)
 
-Technical notes
+Crear un componente nuevo **`src/components/layout/PageHeader.tsx`** que replica el patrón `OrgPageHeader` del skill:
 
-- The demo banner is already implemented across the key pages; it is not appearing because `has_demo_data` is currently `false`.
-- The read hooks mostly rely on RLS instead of explicit `.eq('user_id', user.id)`, which is acceptable, but their query keys are not yet user-scoped. That is risky after auth changes and should be corrected in this pass.
-- There is a separate console warning in Settings (`Badge`/ref forwarding). It appears unrelated to the seed/auth issue, so I would keep that as a separate cleanup unless you want it bundled into the same implementation pass.
+```tsx
+<header className="mb-6">
+  <div className="flowit-header-bg relative overflow-hidden rounded-3xl border border-border/80
+                   shadow-[0_8px_28px_-18px_rgba(94,108,246,0.35)]">
+    <div className="relative px-6 lg:px-8 py-6 flex flex-wrap items-end justify-between gap-4">
+      <div className="min-w-0">
+        <div className="text-[11px] uppercase tracking-[0.14em] text-primary/80 font-semibold flex items-center gap-1.5">
+          <Icon className="h-3.5 w-3.5" /> {eyebrow}
+        </div>
+        <h1 className="font-display text-3xl lg:text-[34px] font-semibold tracking-tight mt-1.5">{title}</h1>
+        {description && <p className="text-[15px] text-muted-foreground mt-1.5 max-w-2xl">{description}</p>}
+      </div>
+      {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
+    </div>
+  </div>
+  {children && <div className="mt-4">{children}</div>}
+</header>
+```
 
-Because I’m in read-only mode, I can’t execute the live repair or complete the mutating sign-up test from here. But the evidence above is enough to isolate the current problem and define the exact fix path.
+Reemplazar el `<h1>...<p>` actual al tope de cada página por `<PageHeader eyebrow=… title=… description=… actions=… />`, conservando los toolbars/tabs que cada página ya monta (pasándolos como `actions` o `children`).
+
+## 5. Limpieza menor
+
+- Quitar el gradient-clip azul del título "My Money Compass" (queda en `text-foreground font-display`).
+- En `RecurringTracking.tsx` y `Calendar.tsx`: los botones "Registrar pago" actuales (link icon + texto primary) ya quedan bien con los tokens nuevos, sin cambios.
+- `index.html`: agregar `<link rel="preconnect">` + `<link>` a Google Fonts (Outfit + Figtree). Mantener el viewport y meta SEO actual.
+
+## Out of scope
+
+- No cambio iconografía (logo `compass.svg` se conserva — se ve bien sobre el banner pastel).
+- No toco mocks ni rutas TanStack (el skill las menciona, pero acá usamos `react-router-dom` y queda igual).
+- No agrego AppTopbar / Spotlight / FeedbackButton del skill (son patrones de Flowit ERP, fuera del scope de esta app personal).
+- No toco lógica de negocio, hooks, ni Supabase.
+
+---
+
+## Riesgos / notas
+
+- Cambiar `--radius` global de 14px → 12px afecta a todos los `rounded-md/lg/sm` derivados. Visualmente queda más Flowit, pero conviene revisar 1-2 modales después.
+- Si el cambio de fuente carga lento al inicio, el `font-display: swap` de Google Fonts evita FOIT.
+- El variant `default` del Button ahora siempre lleva gradiente: si en alguna página había un botón primario que esperaba color sólido, conviene confirmarlo al previsualizar.
