@@ -907,11 +907,17 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                             </div>
                             <div className="text-right tabular-nums whitespace-nowrap">
                               <div className={cn('font-semibold', isOver && 'text-destructive')}>{fmt(item.spent)}</div>
-                              <div className="text-[10px] text-muted-foreground">
-                                /{fmt(item.budgeted)} <span className={cn('ml-1', diff > 0 ? 'text-destructive' : 'text-emerald-600')}>
-                                  {diff > 0 ? '+' : '−'}{fmt(Math.abs(diff))}
-                                </span>
-                              </div>
+                              {isOver ? (
+                                <div className="text-[10px] text-muted-foreground">
+                                  /{fmt(item.budgeted)} <span className="ml-1 text-destructive">
+                                    +{fmt(Math.abs(diff))}
+                                  </span>
+                                </div>
+                              ) : (
+                                <div className="text-[10px] text-muted-foreground">
+                                  {Math.round((item.spent / item.budgeted) * 100)}% usado
+                                </div>
+                              )}
                             </div>
                           </div>
                         );
