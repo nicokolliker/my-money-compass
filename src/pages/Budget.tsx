@@ -862,11 +862,21 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                   if (allRows.length === 0) {
                     return <p className="text-xs text-muted-foreground text-center py-4">Sin datos para este mes.</p>;
                   }
+                  const maxOverage = Math.max(
+                    1,
+                    ...visible.map(d => (d.budgeted > 0 && d.spent > d.budgeted ? d.spent - d.budgeted : 0))
+                  );
                   return (
                     <div className="space-y-2.5">
                       {visible.map(item => {
                         const isOver = item.pct > 100;
-                        const fillPct = Math.min(item.pct, 100);
+                        const normalFillPct = item.budgeted > 0
+                          ? Math.min(item.spent / item.budgeted, 1) * 72
+                          : (item.spent > 0 ? 72 : 0);
+                        const overflowExtPct = isOver
+                          ? Math.min((item.spent - item.budgeted) / maxOverage, 1) * 28
+                          : 0;
+                        const totalFillPct = normalFillPct + overflowExtPct;
                         const barColor = isOver ? 'bg-red-500' : item.pct >= 80 ? 'bg-amber-500' : 'bg-emerald-500';
                         const diff = item.spent - item.budgeted;
                         return (
@@ -880,12 +890,14 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                               <span className="truncate">{item.name}</span>
                             </div>
                             <div className="relative w-full">
-                              <div className="h-5 bg-muted rounded-md overflow-hidden">
-                                <div className={cn('h-full transition-all', barColor)} style={{ width: `${fillPct}%` }} />
+                              <div className="relative h-5 bg-muted rounded-md overflow-hidden">
+                                {/* Divider marker at 72% (budget threshold) */}
+                                <div className="absolute top-0 bottom-0 w-px bg-border/80 z-10" style={{ left: '72%' }} />
+                                <div className={cn('h-full transition-all', barColor)} style={{ width: `${totalFillPct}%` }} />
                               </div>
                               <span className={cn(
                                 'absolute inset-0 flex items-center px-2 text-[10px] font-semibold',
-                                fillPct > 40 ? 'text-white' : 'text-foreground'
+                                totalFillPct > 40 ? 'text-white' : 'text-foreground'
                               )}>
                                 {item.budgeted > 0 ? `${Math.round(item.pct)}%` : 'sin budget'}
                               </span>
@@ -901,6 +913,7 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                           </div>
                         );
                       })}
+
                       {hiddenCount > 0 && (
                         <button
                           onClick={() => setShowAllCats(v => !v)}
