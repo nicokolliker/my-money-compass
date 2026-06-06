@@ -1633,7 +1633,7 @@ function SplitwiseSettlementWizard({ open, onOpenChange }: { open: boolean; onOp
                   <div>
                     <p className="text-sm font-semibold">Gastos a conciliar — {lastMonthInfo.label}</p>
                     <p className="text-[11px] text-muted-foreground">
-                      Solo lo que otros pagaron por vos y aún no está registrado
+                      Solo lo que otros pagaron por vos
                     </p>
                   </div>
                   {toImport.length === 0 ? (
