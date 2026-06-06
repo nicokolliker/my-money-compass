@@ -893,7 +893,12 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                               <span className="truncate">{item.name}</span>
                             </div>
                             <div className="relative w-full">
-                              <div className="relative h-5 bg-muted rounded-md overflow-hidden">
+                              <div className="relative h-5 rounded-md overflow-hidden">
+                                {/* Budget zone: 72% of track */}
+                                <div
+                                  className="absolute top-0 bottom-0 bg-muted border border-border rounded-l-md"
+                                  style={{ left: 0, width: '72%' }}
+                                />
                                 {/* Overflow zone: 28% of track, starting at 72% */}
                                 <div
                                   className="absolute top-0 bottom-0 bg-red-50 border-t border-r border-b border-dashed border-red-300 rounded-r-md"
