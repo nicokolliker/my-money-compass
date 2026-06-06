@@ -596,7 +596,7 @@ function MonotributoConfigDialog({
           </div>
           <div>
             <label className="text-xs text-muted-foreground">Cuota mensual (ARS)</label>
-            <Input type="number" value={cuotaActual} onChange={(e) => setCuotaActual(e.target.value)} placeholder="45700.74" />
+            <Input type="number" value={cuotaActual} onChange={(e) => setCuotaActual(e.target.value)} placeholder="25741" />
           </div>
           <p className="text-xs text-muted-foreground">
             Actualizá estos valores cuando ARCA publique nueva tabla de Monotributo.
