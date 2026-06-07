@@ -19,9 +19,9 @@ function notify() {
   for (const fn of subscribers) fn();
 }
 
-export function subscribeInferredCategory(fn: () => void) {
+export function subscribeInferredCategory(fn: () => void): () => void {
   subscribers.add(fn);
-  return () => subscribers.delete(fn);
+  return () => { subscribers.delete(fn); };
 }
 
 export function getCachedInferredCategory(merchant: string): CacheValue | undefined {
