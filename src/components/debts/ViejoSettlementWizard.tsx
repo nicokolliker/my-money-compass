@@ -21,7 +21,6 @@ import { parseSantanderWithSubtotals } from '@/lib/importers/santanderParser';
 import type { ParsedTransaction } from '@/lib/importers/arqParser';
 import { inferCategoryName } from '@/hooks/useRuleSuggestions';
 import { extractPdfText } from '@/lib/pdfReader';
-import { parseAmexTotal } from '@/lib/importers/amexParser';
 import { CARD_KEYS, ITEM_GROUPS, formatARS } from './CycleHistoryList';
 
 const STORAGE_KEY = 'settlement_defaults';
@@ -70,8 +69,6 @@ export function ViejoSettlementWizard({ open, onOpenChange, onSantTotalDetected 
   const [iebraFile, setIebraFile] = useState<File | null>(null);
   const [kollikerFile, setKollikerFile] = useState<File | null>(null);
   const [santFile, setSantFile] = useState<File | null>(null);
-  const [amexFile, setAmexFile] = useState<File | null>(null);
-  const [amexARS, setAmexARS] = useState(0);
   const [bcTotalARS, setBcTotalARS] = useState(0);
   const [santTotalARS, setSantTotalARS] = useState(0);
   const [visaCiudadMamaARS, setVisaCiudadMamaARS] = useState(0);
@@ -113,7 +110,7 @@ export function ViejoSettlementWizard({ open, onOpenChange, onSantTotalDetected 
         if (today.getDate() < 20) d.setMonth(d.getMonth() - 1);
         return format(d, 'yyyy-MM');
       })());
-      setIebraFile(null); setKollikerFile(null); setSantFile(null); setAmexFile(null); setAmexARS(0);
+      setIebraFile(null); setKollikerFile(null); setSantFile(null);
       setBcTotalARS(0); setSantTotalARS(0); setVisaCiudadMamaARS(0); setVisaCiudadPapaARS(0);
       setExtraItems([]);
       setItems([]);
@@ -132,7 +129,6 @@ export function ViejoSettlementWizard({ open, onOpenChange, onSantTotalDetected 
       { key: 'visa_ciudad_mama', label: 'VISA Ciudad — Mamá', emoji: '🏦', amountARS: visaCiudadMamaARS, editable: visaCiudadMamaARS === 0, categoryName: '' },
       { key: 'visa_ciudad_papa', label: 'VISA Ciudad — Papá', emoji: '🏦', amountARS: visaCiudadPapaARS, editable: visaCiudadPapaARS === 0, categoryName: '' },
       { key: 'visa_santander', label: 'VISA Santander',    emoji: '🏦', amountARS: santTotalARS || saved.visa_santander || 0, editable: santTotalARS === 0, categoryName: '' },
-      { key: 'amex',           label: 'AMEX Santander',    emoji: '💳', amountARS: amexARS || saved.amex || 0, editable: true, categoryName: 'Casa' },
       { key: 'expensas',       label: 'Expensas',          emoji: '🏠', amountARS: saved.expensas || 0,    editable: true, categoryName: 'Casa' },
       { key: 'prestamo',       label: 'Préstamo + Seguro', emoji: '🚗', amountARS: saved.prestamo || 0,    editable: true, categoryName: 'Auto' },
       { key: 'cochera',        label: 'Cochera + Lavado',  emoji: '🅿️', amountARS: saved.cochera || 0,     editable: true, categoryName: 'Auto' },
@@ -151,7 +147,7 @@ export function ViejoSettlementWizard({ open, onOpenChange, onSantTotalDetected 
       setExtraItems([]);
     }
     setTcBlue(defaultBlueRate);
-  }, [step, bcTotalARS, santTotalARS, visaCiudadMamaARS, visaCiudadPapaARS, amexARS, defaultBlueRate]);
+  }, [step, bcTotalARS, santTotalARS, visaCiudadMamaARS, visaCiudadPapaARS, defaultBlueRate]);
 
   const totalARS = items.reduce((s, i) => s + (i.amountARS || 0), 0) + extraItems.reduce((s, i) => s + (i.amountARS || 0), 0);
   const usdExacto = tcBlue > 0 ? totalARS / tcBlue : 0;
@@ -240,12 +236,6 @@ export function ViejoSettlementWizard({ open, onOpenChange, onSantTotalDetected 
       if (sant > 0) onSantTotalDetected?.(sant);
       setVisaCiudadMamaARS(visaCiudadMama);
       setVisaCiudadPapaARS(visaCiudadPapa);
-
-      if (amexFile) {
-        const text = await extractPdfText(amexFile);
-        const total = parseAmexTotal(text);
-        setAmexARS(total);
-      }
 
       setStep(2);
     } catch (e: any) {
@@ -576,7 +566,6 @@ export function ViejoSettlementWizard({ open, onOpenChange, onSantTotalDetected 
               <FileSlot label="BC mamá (resumen)" file={iebraFile} onChange={setIebraFile} />
               <FileSlot label="BC papá (resumen)" file={kollikerFile} onChange={setKollikerFile} />
               <FileSlot label="Santander VISA" file={santFile} onChange={setSantFile} />
-              <FileSlot label="AMEX Santander" file={amexFile} onChange={setAmexFile} />
             </div>
             <DialogFooter className="border-t pt-4 mt-4 min-w-0">
               <Button onClick={handleProcessFiles} disabled={processing}>
