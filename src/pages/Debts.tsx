@@ -205,6 +205,7 @@ export default function DebtsPage() {
           onMarkVuelto={(pc) => setConfirmingVuelto(pc)}
         />
         <SplitwiseCard
+          settlementMonth={settlementMonth}
           account={splitwiseAccount}
           importLog={importLog || []}
           onOpenCsv={() => setOpenSw(true)}
