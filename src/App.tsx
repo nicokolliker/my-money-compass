@@ -42,6 +42,7 @@ function ProtectedRoutes() {
 
 function AuthedApp() {
   useEnsureDigitalSubcategories();
+  return (
     <AppLayout>
       <Routes>
         <Route path="/" element={<Dashboard />} />
