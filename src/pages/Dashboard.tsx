@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader } from '@/components/layout/PageHeader';
 
@@ -11,10 +11,10 @@ import { formatUSD, formatCurrency } from '@/lib/constants';
 import { getCategoryColor } from '@/lib/categoryColors';
 import { getCategoryIcon } from '@/lib/brandLogos';
 import { MerchantLogo } from '@/components/MerchantLogo';
-import { TrendingUp, TrendingDown, ArrowUp, ArrowDown, CalendarDays, DollarSign } from 'lucide-react';
+import { TrendingUp, TrendingDown, ArrowUp, ArrowDown, CalendarDays, DollarSign, ChevronRight, CheckCircle2 } from 'lucide-react';
 import { usePrivacyMode, maskAmount } from '@/hooks/usePrivacyMode';
 import { useBlueDollarRate } from '@/hooks/useBlueDollar';
-import { format } from 'date-fns';
+import { format, addDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { RecurringStatusBadge } from '@/components/recurring/RecurringStatusBadge';
 import { DemoDataBanner } from '@/components/DemoDataBanner';
@@ -23,6 +23,7 @@ import { useHomeAlerts } from '@/hooks/useHomeAlerts';
 import { cn } from '@/lib/utils';
 import { FundFlowDiagram } from '@/components/accounts/FundFlowDiagram';
 import { PendingCreditsBanner } from '@/components/PendingCreditsBanner';
+import { isDerivedPaid } from '@/lib/money';
 
 function greeting() {
   const h = new Date().getHours();
