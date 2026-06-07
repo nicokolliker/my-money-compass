@@ -1152,9 +1152,13 @@ export default function ImportPage() {
       </div>
 
 
-
+      <RecurringSuggestionsDialog
+        open={suggestionsOpen}
+        onOpenChange={setSuggestionsOpen}
+      />
     </div>
   );
+
 }
 
 const SOURCES: { key: 'arq' | 'mercadopago' | 'galicia' | 'wise'; label: string }[] = [
