@@ -828,13 +828,6 @@ export default function Transactions() {
                       const derivedType = selectedCat
                         ? (selectedCat.name || '').toLowerCase().replace(/\s+/g, '_')
                         : 'otros';
-                      // Resolve subcategory_id for Digital
-                      let subcategoryId: string | null = null;
-                      if (digitalCatId && recurringDialog.categoryId === digitalCatId && recurringDialog.subtype) {
-                        const label = DIGITAL_SUBTYPES[recurringDialog.subtype]?.label?.toLowerCase();
-                        const match = (digitalSubcats as any[]).find(s => (s.name || '').toLowerCase() === label);
-                        subcategoryId = match?.id || null;
-                      }
                       await createRecurring.mutateAsync({
                         name: recurringDialog.name,
                         amount: amt,
@@ -844,7 +837,6 @@ export default function Transactions() {
                         subtype: recurringDialog.subtype || null,
                         category_id: recurringDialog.categoryId || null,
                         linked_category_id: recurringDialog.categoryId || null,
-                        subcategory_id: subcategoryId,
                         account_id: recurringDialog.accountId || null,
                         next_due_date: recurringDialog.nextDueDate || null,
                         is_active: true,
