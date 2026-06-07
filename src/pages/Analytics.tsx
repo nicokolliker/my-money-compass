@@ -6,7 +6,7 @@ import { useTransactions } from '@/hooks/useTransactions';
 import { useAccounts } from '@/hooks/useAccounts';
 import { useCategories, useSubcategories } from '@/hooks/useCategories';
 import { useCategoryTree } from '@/hooks/useCategoryTree';
-import { useBudgets } from '@/hooks/useBudgets';
+
 import { formatUSD } from '@/lib/constants';
 import { getCategoryHex } from '@/lib/categoryColors';
 import { getCategoryIcon } from '@/lib/brandLogos';
