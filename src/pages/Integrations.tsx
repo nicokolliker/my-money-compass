@@ -100,11 +100,13 @@ export default function IntegrationsPage() {
     }
     setConnecting(true);
     try {
-      const res = await fetch('https://api.wise.com/v1/profiles', {
-        headers: { Authorization: `Bearer ${token.trim()}` },
+      const { data, error } = await supabase.functions.invoke('wise-sync', {
+        body: { action: 'get-profiles', apiToken: token.trim() },
       });
-      if (!res.ok) throw new Error('Token inválido');
-      const profiles = await res.json();
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      const profiles = data?.profiles || [];
       const personal = profiles.find((p: any) => p.type === 'personal') || profiles[0];
       if (!personal) throw new Error('No se encontraron perfiles');
 
@@ -112,6 +114,7 @@ export default function IntegrationsPage() {
         wise_token: token.trim(),
         wise_profile_id: String(personal.id),
       });
+      qc.invalidateQueries({ queryKey: ['user-settings'] });
       toast.success('Wise conectado');
       setToken('');
     } catch (e: any) {
