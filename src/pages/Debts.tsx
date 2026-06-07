@@ -25,7 +25,7 @@ import { CreditCardDebtCard } from '@/components/debts/CreditCardDebtCard';
 import { UnifiedCycleHistory } from '@/components/debts/UnifiedCycleHistory';
 import { ViejoSettlementWizard } from '@/components/debts/ViejoSettlementWizard';
 import { SplitwiseSettlementWizard } from '@/components/debts/SplitwiseWizard';
-import { SettlementDetail, ITEM_META, CARD_KEYS } from '@/components/debts/CycleHistoryList';
+import { SettlementDetail, ITEM_META, CARD_KEYS, formatARS } from '@/components/debts/CycleHistoryList';
 import { usePendingCredits } from '@/hooks/usePendingCredits';
 
 export default function DebtsPage() {
