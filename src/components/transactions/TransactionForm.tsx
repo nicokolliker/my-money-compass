@@ -347,6 +347,21 @@ export function TransactionForm({ onSuccess, editData }: Props) {
         </div>
       )}
 
+      {/* Digital subtype */}
+      {type !== 'transfer' && isDigitalSelected && (
+        <div>
+          <Label>Digital subtype</Label>
+          <Select value={subtype} onValueChange={setSubtype}>
+            <SelectTrigger className="mt-1"><SelectValue placeholder="Select subtype" /></SelectTrigger>
+            <SelectContent>
+              {Object.entries(DIGITAL_SUBTYPES).map(([key, { label, icon }]) => (
+                <SelectItem key={key} value={key}>{icon} {label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
       {/* Description */}
       <div>
         <Label>Description</Label>
