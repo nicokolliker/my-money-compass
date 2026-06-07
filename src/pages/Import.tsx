@@ -327,6 +327,7 @@ export default function ImportPage() {
       if (!user) throw new Error('Not authenticated');
 
       // PR3: store USD amounts — ARQ is a USD account
+      const rules = await fetchUserRules();
       const payload = toImport.map((r) => {
         const isIncome   = r.type === 'income';
         const isTransfer = r.type === 'transfer';
@@ -338,12 +339,14 @@ export default function ImportPage() {
             : arsToUsd && arsToUsd > 0
               ? 1 / arsToUsd
               : 1000;
+        const merchant = r.transferTarget || r.description;
+        const category_id = matchRuleCategory(rules, r.description, merchant);
         return {
           user_id: user.id,
           account_id: arqAccount.id,
           date: r.date,
           description: r.description,
-          merchant: r.transferTarget || r.description,
+          merchant,
           amount: sign * r.amountUSD,
           currency: 'USD',
           fx_rate: fxRate,
@@ -351,6 +354,7 @@ export default function ImportPage() {
           type: (isIncome ? 'income' : isTransfer ? 'transfer' : 'expense') as any,
           external_id: r.external_id,
           raw_imported_description: r.description,
+          category_id,
         };
       });
 
