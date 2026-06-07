@@ -216,27 +216,29 @@ export function SplitwiseSettlementWizard({ open, onOpenChange, settlementMonth 
                 </div>
                 <div className="rounded-xl border p-3 space-y-2">
                   <div>
-                    <p className="text-sm font-semibold">Gastos a conciliar — {monthInfo.label}</p>
+                    <p className="text-sm font-semibold">Actividad — {monthInfo.label}</p>
                     <p className="text-[11px] text-muted-foreground">
-                      Solo lo que otros pagaron por vos
+                      Movimientos de Nico en el mes seleccionado
                     </p>
                   </div>
-                  {toImport.length === 0 ? (
+                  {monthActivity.length === 0 ? (
                     <p className="text-xs text-muted-foreground py-2">
-                      No hay gastos pagados por otros en {monthInfo.label}.
+                      Sin actividad en {monthInfo.label}.
                     </p>
                   ) : (
                     <div className="max-h-48 overflow-y-auto divide-y -mx-1">
-                      {toImport.map((r, i) => {
+                      {monthActivity.map((r, i) => {
                         const abs = Math.abs(r.userAmount);
+                        const isOwed = r.userAmount < 0;
                         return (
                           <div key={i} className="flex justify-between px-1 py-1.5 text-xs gap-2">
                             <div className="min-w-0 flex-1">
                               <p className="truncate font-medium">{r.description}</p>
                               <p className="text-muted-foreground font-mono">{r.date}</p>
                             </div>
-                            <span className="font-mono text-destructive shrink-0">
-                              −{r.currency === 'ARS'
+                            <span className={cn('font-mono shrink-0', isOwed ? 'text-destructive' : 'text-success')}>
+                              {isOwed ? '−' : '+'}
+                              {r.currency === 'ARS'
                                 ? '$' + Math.round(abs).toLocaleString('es-AR')
                                 : '$' + abs.toFixed(2)}
                               {' '}{r.currency}
