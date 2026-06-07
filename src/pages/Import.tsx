@@ -328,6 +328,7 @@ export default function ImportPage() {
 
       // PR3: store USD amounts — ARQ is a USD account
       const rules = await fetchUserRules();
+      const digitalMap = await fetchDigitalSubcatMap();
       const payload = toImport.map((r) => {
         const isIncome   = r.type === 'income';
         const isTransfer = r.type === 'transfer';
@@ -341,6 +342,7 @@ export default function ImportPage() {
               : 1000;
         const merchant = r.transferTarget || r.description;
         const category_id = matchRuleCategory(rules, r.description, merchant);
+        const subcategory_id = resolveDigitalSubcategoryId(category_id, `${merchant} ${r.description}`, digitalMap);
         return {
           user_id: user.id,
           account_id: arqAccount.id,
@@ -355,6 +357,7 @@ export default function ImportPage() {
           external_id: r.external_id,
           raw_imported_description: r.description,
           category_id,
+          subcategory_id,
         };
       });
 
