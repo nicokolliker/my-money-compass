@@ -92,13 +92,20 @@ export function parseSplitwise(
   const out: SplitwiseRow[] = [];
   const curCount: Record<string, number> = {};
   let netByCurrency: Record<string, number> = {};
+  const officialByCurrency: Record<string, number> = {};
   let earliest: string | null = null;
 
   for (let r = 1; r < lines.length; r++) {
     const cols = parseCsvLine(lines[r]);
     const description = (descIdx >= 0 ? cols[descIdx] : '').trim() || 'Splitwise';
-    // Skip the trailing "Total balance" summary row Splitwise appends
-    if (TOTAL_BALANCE_RE.test(description)) continue;
+    const currencyRaw = ((curIdx >= 0 ? cols[curIdx] : 'USD') || 'USD').trim().toUpperCase();
+
+    // Capture the trailing "Saldo total" summary row Splitwise appends (per currency) and skip it
+    if (TOTAL_BALANCE_RE.test(description)) {
+      const v = parseFloat(((cols[userIdx] || '').trim()).replace(/,/g, ''));
+      if (isFinite(v)) officialByCurrency[currencyRaw] = v;
+      continue;
+    }
 
     const date = normalizeDate(cols[dateIdx] || '');
     if (!date || date < CUTOFF) continue;
@@ -109,7 +116,7 @@ export function parseSplitwise(
     const userAmount = parseFloat(userRaw.replace(/,/g, ''));
     if (!isFinite(userAmount) || Math.abs(userAmount) < 0.01) continue;
 
-    const currency = ((curIdx >= 0 ? cols[curIdx] : 'USD') || 'USD').trim().toUpperCase();
+    const currency = currencyRaw;
     const swType: 'expense' | 'receivable' = userAmount > 0 ? 'expense' : 'receivable';
     const abs = Math.abs(userAmount);
 
@@ -143,9 +150,11 @@ export function parseSplitwise(
     });
   }
 
-  // Dominant currency = most frequent
-  const dominant = (Object.entries(curCount).sort((a, b) => b[1] - a[1])[0]?.[0] || 'USD') as 'USD' | 'ARS';
-  const netBalance = netByCurrency[dominant] || 0;
+  // Prefer ARS "Saldo total" row as official balance; fall back to dominant currency from rows
+  const dominant: 'USD' | 'ARS' = officialByCurrency['ARS'] !== undefined
+    ? 'ARS'
+    : ((Object.entries(curCount).sort((a, b) => b[1] - a[1])[0]?.[0] as 'USD' | 'ARS') || 'USD');
+  const netBalance = officialByCurrency[dominant] ?? (netByCurrency[dominant] || 0);
 
   return {
     rows: out,
