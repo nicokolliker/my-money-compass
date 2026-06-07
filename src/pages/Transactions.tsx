@@ -564,7 +564,7 @@ export default function Transactions() {
                               </Popover>
                             </div>
 
-                            {tx.is_subscription && <Badge variant="secondary" className="text-[10px] h-4 px-1.5 font-medium">🔄 Recurring</Badge>}
+                            {recurringMatchMap[tx.id] && <Badge variant="secondary" className="text-[10px] h-4 px-1.5 font-medium">🔄 Recurring</Badge>}
                             {recurringMatchMap[tx.id] && (
                               <Badge variant="outline" className="text-[10px] h-4 px-1.5 font-medium flex items-center gap-0.5">
                                 <Link2 className="h-2.5 w-2.5" /> {recurringMatchMap[tx.id].recurring_name}
@@ -812,6 +812,16 @@ export default function Transactions() {
                         is_active: true,
                       } as any);
                       await updateTx.mutateAsync({ id: recurringDialog.txId, is_subscription: true });
+                      try {
+                        const { data: { user } } = await supabase.auth.getUser();
+                        if (user) {
+                          await supabase.rpc('refresh_recurring_tracking', { p_user_id: user.id });
+                        }
+                      } catch (err) {
+                        console.warn('refresh_recurring_tracking failed', err);
+                      }
+                      qc.invalidateQueries({ queryKey: ['recurring-instances'] });
+                      qc.invalidateQueries({ queryKey: ['transaction-recurring-map'] });
                       toast.success('Gasto recurrente creado');
                       setRecurringDialog(null);
                     } catch (e: any) {
