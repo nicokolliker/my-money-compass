@@ -79,16 +79,27 @@ export function SplitwiseSettlementWizard({ open, onOpenChange }: { open: boolea
     }
   }
 
-  // Previous calendar month (yyyy-mm) and human label e.g. "Mayo 2026"
+  // Most recent calendar month that has non-zero user activity in the parsed rows
   const lastMonthInfo = useMemo(() => {
-    const now = new Date();
-    const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-    const label = format(d, "LLLL yyyy", { locale: es });
+    const fallback = () => {
+      const d = new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1);
+      const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const label = format(d, 'LLLL yyyy', { locale: es });
+      return { ym, label: label.charAt(0).toUpperCase() + label.slice(1) };
+    };
+    if (!result || result.rows.length === 0) return fallback();
+    const months = new Set<string>();
+    for (const r of result.rows) {
+      if (Math.abs(r.userAmount) >= 0.01) months.add(r.date.slice(0, 7));
+    }
+    if (months.size === 0) return fallback();
+    const ym = Array.from(months).sort().pop()!;
+    const [y, m] = ym.split('-').map(Number);
+    const label = format(new Date(y, m - 1, 1), 'LLLL yyyy', { locale: es });
     return { ym, label: label.charAt(0).toUpperCase() + label.slice(1) };
-  }, []);
+  }, [result]);
 
-  // Rows to reconcile = last month + Nico owes (userAmount < 0)
+  // Rows to reconcile = last active month + Nico owes (userAmount < 0)
   const toImport = useMemo(() => {
     if (!result) return [];
     return result.rows.filter(
