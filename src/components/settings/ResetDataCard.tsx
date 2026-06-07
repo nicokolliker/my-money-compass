@@ -52,6 +52,12 @@ export function ResetDataCard() {
         .eq('user_id', user.id);
       if (accErr) throw new Error(`Failed to reset balances: ${accErr.message}`);
 
+      const { error: profileErr } = await supabase
+        .from('profiles')
+        .update({ has_demo_data: false })
+        .eq('user_id', user.id);
+      if (profileErr) throw new Error(`Failed to update profile: ${profileErr.message}`);
+
       qc.invalidateQueries();
       toast.success('Reset to clean state. All transactional data cleared.');
       setOpen(false);
