@@ -7,7 +7,7 @@ const DIGITAL_SUB_LABELS = [
   'IA',
   'Creatividad & Productividad',
   'Entretenimiento',
-  'Delivery & Movilidad',
+  'Marketplace & Movilidad',
   'Otros',
 ];
 
