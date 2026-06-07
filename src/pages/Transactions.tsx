@@ -6,7 +6,8 @@ import { useTransactions, useDeleteTransaction, useUpdateTransaction } from '@/h
 import { useCreateRecurringExpense } from '@/hooks/useRecurringExpenses';
 import { Label } from '@/components/ui/label';
 import { useAccounts } from '@/hooks/useAccounts';
-import { useCategories } from '@/hooks/useCategories';
+import { useCategories, useSubcategories } from '@/hooks/useCategories';
+import { DIGITAL_SUBTYPES } from '@/lib/digitalSubtypes';
 import { useTransactionRecurringMap } from '@/hooks/useTransactionRecurringMap';
 import { formatCurrency, formatUSD, TRANSACTION_TYPE_LABELS } from '@/lib/constants';
 import { MerchantLogo } from '@/components/MerchantLogo';
