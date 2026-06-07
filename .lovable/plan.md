@@ -1,66 +1,54 @@
-# Sync installments → recurring expenses
+## Problem
 
-## Goal
-After the Viejo wizard finishes, every installment row with `remaining_installments > 0` becomes (or updates) a row in `recurring_expenses` marked as an installment. Items that hit `remaining = 0` are deactivated. Manually-added recurrings need no extra wiring — they already feed budget tracking via their category.
+- Client (`src/hooks/useWiseSync.ts`) calls `supabase.functions.invoke('wise-sync', …)` with actions `get-profiles`, `get-balances`, `sync-transactions`.
+- No `wise-sync` function exists in `supabase/functions/`. Only `sync-wise` does, and it's a different cron-style function (no action router, reads token from `user_settings`).
+- The invoke 404s without CORS headers → browser surfaces "Failed to fetch".
+- `WiseTab.tsx` never asks the user for an API token before calling `Conectar Wise`.
 
-## Identification scheme
-- `subtype = 'installment'` marks the row as installment-managed.
-- `notes` stores a stable key: `installment:<source>:<stripped-description>` where the description has any `Cuota X/Y` token removed and is trimmed/collapsed.
-- Matching is done by `(user_id, subtype='installment', notes=<key>)`. This survives the monthly `Cuota 03/06 → 04/06` change.
+## Changes
 
-## Sync logic (runs at end of Viejo wizard `handleConfirm`, after `installment_debts` upsert)
+### 1. New edge function `supabase/functions/wise-sync/index.ts`
 
-For each of the three sources (`mama`, `papa`, `sant`):
+Action-router that the client already expects, with:
 
-```text
-1. Load existing recurring_expenses where user_id=me AND subtype='installment'
-   AND notes LIKE 'installment:<source>:%'   → existingBySource map by notes key.
+- CORS preflight + headers on every response (including errors).
+- JWT validation via `supabase.auth.getClaims(token)` (function deploys with default `verify_jwt = false`, so we validate in code).
+- API token resolution order:
+  1. `apiToken` in request body (UI-provided, per the request).
+  2. Fallback: `user_settings.wise_token` for the authenticated user (so existing flows keep working).
+  3. If neither is present → 400 with `{ error: "Wise API token requerido" }`.
+- When a body `apiToken` is provided, persist it to `user_settings.wise_token` so subsequent calls (and the existing `sync-wise` cron) keep working.
+- Actions:
+  - `get-profiles` → `GET /v2/profiles`, returns `{ profiles }`.
+  - `get-balances` → `GET /v4/profiles/:id/balances?types=STANDARD`, returns `{ balances }`.
+  - `sync-transactions` → fetch balance statement, upsert into `transactions` with `external_id = wise-…`, compute `official_balance`, `sum_imported`, `tx_count`, `date_range`, `reconciled`, `status`, `diagnostics`; write a row to `wise_sync_log`; return the `WiseSyncResult` shape the client expects.
+- Wrap every action in try/catch; on Wise API failure, include `status`, response text snippet, and the action name in the JSON error so the UI shows a real message instead of "Failed to fetch".
+- `console.error` diagnostics for server-side logs.
 
-2. For each installment row in this source's selection:
-   - parse Cuota X/Y → current, total, remaining = total - current
-   - key  = `installment:${source}:${stripCuota(description)}`
-   - name = stripCuota(description)             (clean display name)
-   - amount = amount_ars, currency = 'ARS'
-   - end_date = addMonths(today, remaining)     (date-fns)
-   - category_id =
-        inferCategoryName(description) → categories.find(name) → id
-        ?? categories.find(name ILIKE 'casa' OR 'hogar').id
-        ?? null
-   - type = 'casa'
-   - frequency = 'monthly'
-   - is_active = remaining > 0
+### 2. `src/components/settings/WiseTab.tsx`
 
-   If remaining === 0:
-     - if existing row found → UPDATE is_active=false (do not delete, to preserve history/matches)
-     - else skip
-   Else:
-     - if existing row found → UPDATE (name, amount, end_date, category_id, is_active=true)
-     - else INSERT new row with the fields above + notes=key + subtype='installment'
+- Add an API token input (password field) shown when not yet connected, with a small helper link to Wise's API tokens page.
+- "Conectar Wise" stays disabled until a token is entered; pass `{ apiToken }` into the first `getProfiles` mutate call.
+- Once connected, hide the token input; show a "Disconnect / change token" affordance.
+- Surface backend error messages directly via the existing `toast.error(e.message)`.
 
-3. After processing this source's current rows, any leftover row in
-   existingBySource that was NOT touched this run → UPDATE is_active=false
-   (the installment was fully paid off or removed in a prior cycle).
-```
+### 3. `src/hooks/useWiseSync.ts`
 
-All writes go through `supabase.from('recurring_expenses')` directly inside `handleConfirm` (same pattern as the existing transaction inserts). At the end, invalidate `['recurring-expenses']` alongside `['installment-debts']`.
+- Extend `useWiseProfiles` to accept an optional `apiToken` and forward it in the body.
+- No other signature changes — `get-balances` and `sync-transactions` continue to use the stored token server-side.
 
-## Manual recurring → budget
-Confirmed in clarifying questions: no schema or auto-budget code. Existing budgets already roll up spend from transactions in the category, so a manually-added recurring with a `category_id` will naturally appear in the matching budget row when its transactions land. No change needed.
+### 4. Deploy
 
-## Technical details
-- New helper (top of `ViejoSettlementWizard.tsx` or `src/lib/installmentRecurring.ts`):
-  - `stripCuota(desc: string): string` — removes `\s*cuota\s*\d+\s*\/\s*\d+\s*` (case-insensitive), collapses spaces, trims.
-  - `buildInstallmentKey(source, desc)` returning `installment:${source}:${stripCuota(desc).toLowerCase()}`.
-- `end_date`: `format(addMonths(new Date(), remaining), 'yyyy-MM-dd')`.
-- Fallback "Casa/Hogar" category: case-insensitive lookup against the already-loaded `categories` array; if missing, leave `category_id` null (do not auto-create).
-- `next_due_date`: leave existing value if updating; on insert set to first of next month so the recurring tracker picks it up.
-- Cast to `as any` only where necessary; `subtype` and `notes` are already typed on the table.
-
-## Files touched
-- `src/components/debts/ViejoSettlementWizard.tsx` — extend `handleConfirm` with the sync block right after the installment_debts insert loop; add `qc.invalidateQueries({ queryKey: ['recurring-expenses'] })`.
-- (Optional) `src/lib/installmentRecurring.ts` — extract `stripCuota` + `buildInstallmentKey` + the sync function so the wizard file stays readable.
+Deploy the new `wise-sync` function after creation so the next "Conectar Wise" click hits the real endpoint.
 
 ## Out of scope
-- Migrations (no schema change).
-- Auto-creating budget rows.
-- Changing the manual "Add recurring expense" form (no new behavior needed there).
+
+- Keep `sync-wise` (cron) untouched.
+- No DB schema or RLS changes — `user_settings.wise_token`, `wise_sync_log`, `transactions` already exist.
+- No changes to the Wise → ARQ reconciliation path.
+
+## Technical notes
+
+- Function file: `supabase/functions/wise-sync/index.ts`, single file, CORS imported via `npm:@supabase/supabase-js@2/cors`.
+- Auth client built per-request with the user's `Authorization` header; service-role client used only for writes that bypass RLS (e.g. `wise_sync_log` insert, `user_settings` upsert of token).
+- Token stored only server-side in `user_settings.wise_token`; never returned to the client.
