@@ -901,6 +901,9 @@ export function ViejoSettlementWizard({ open, onOpenChange, onSantTotalDetected 
       </DialogContent>
     </Dialog>
   );
+}
+
+
 
 export function FileSlot({ label, file, onChange, accept = '.pdf' }: { label: string; file: File | null; onChange: (f: File | null) => void; accept?: string }) {
   const acceptLabel = accept.replace(/^\./, '').toUpperCase().split(',')[0];
