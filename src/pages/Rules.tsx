@@ -244,27 +244,37 @@ function ReapplyRulesButton() {
   const handleClick = async () => {
     setLoading(true);
     try {
-      const { fetchUserRules, matchRuleCategory } = await import('@/lib/applyRules');
+      const { fetchUserRules, matchRuleCategory, fetchDigitalSubcatMap, resolveDigitalSubcategoryId } = await import('@/lib/applyRules');
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
       const rules = await fetchUserRules();
       if (rules.length === 0) { toast.info('No hay reglas para aplicar'); return; }
+      const digitalMap = await fetchDigitalSubcatMap();
       const { data: txs, error } = await supabase
         .from('transactions')
         .select('id, description, merchant')
         .eq('user_id', user.id)
         .is('category_id', null);
       if (error) throw error;
-      const updates: Record<string, string[]> = {};
+      // Group by (category_id, subcategory_id) to minimise round trips.
+      const groups = new Map<string, { category_id: string; subcategory_id: string | null; ids: string[] }>();
       for (const t of (txs || []) as any[]) {
         const catId = matchRuleCategory(rules, t.description, t.merchant);
-        if (catId) (updates[catId] ||= []).push(t.id);
+        if (!catId) continue;
+        const subId = resolveDigitalSubcategoryId(catId, `${t.merchant || ''} ${t.description || ''}`, digitalMap);
+        const key = `${catId}::${subId || ''}`;
+        const g = groups.get(key) || { category_id: catId, subcategory_id: subId, ids: [] };
+        g.ids.push(t.id);
+        groups.set(key, g);
       }
       let total = 0;
-      for (const [catId, ids] of Object.entries(updates)) {
-        const { error: upErr } = await supabase.from('transactions').update({ category_id: catId }).in('id', ids);
+      for (const g of groups.values()) {
+        const { error: upErr } = await supabase
+          .from('transactions')
+          .update({ category_id: g.category_id, subcategory_id: g.subcategory_id })
+          .in('id', g.ids);
         if (upErr) throw upErr;
-        total += ids.length;
+        total += g.ids.length;
       }
       qc.invalidateQueries({ queryKey: ['transactions'] });
       toast.success(total > 0 ? `${total} transacciones categorizadas` : 'No hubo coincidencias');

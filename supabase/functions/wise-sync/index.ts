@@ -338,6 +338,42 @@ Deno.serve(async (req) => {
         return null;
       };
 
+      // Digital category + subcategory map for inferring subcategory_id
+      const { data: digitalCatRow } = await admin
+        .from("categories")
+        .select("id")
+        .eq("user_id", userId)
+        .ilike("name", "digital")
+        .maybeSingle();
+      const digitalCategoryId: string | null = (digitalCatRow as any)?.id ?? null;
+      const digitalSubByLabel: Record<string, string> = {};
+      if (digitalCategoryId) {
+        const { data: subs } = await admin
+          .from("subcategories")
+          .select("id, name")
+          .eq("category_id", digitalCategoryId);
+        for (const s of (subs || []) as Array<{ id: string; name: string }>) {
+          digitalSubByLabel[(s.name || "").toLowerCase()] = s.id;
+        }
+      }
+      // Same name -> subtype label mapping as src/lib/digitalSubtypes.ts
+      const DIGITAL_NAME_MAP: Record<string, string[]> = {
+        "IA": ["chatgpt", "claude", "gemini", "perplexity", "copilot", "openai", "google ai", "midjourney", "runway", "gamma", "notebooklm"],
+        "Entretenimiento": ["netflix", "spotify", "youtube", "amazon prime", "disney", "hbo", "apple tv", "paramount", "crunchyroll", "blinkist"],
+        "Creatividad & Productividad": ["adobe", "figma", "canva", "notion", "loom", "grammarly", "icloud", "apple one", "lovable", "granola"],
+        "Delivery & Movilidad": ["uber", "didi", "rappi", "pedidos ya", "glovo", "cabify"],
+      };
+      const resolveSubcat = (categoryId: string | null, signal: string): string | null => {
+        if (!categoryId || !digitalCategoryId || categoryId !== digitalCategoryId) return null;
+        const lower = (signal || "").toLowerCase();
+        for (const [label, patterns] of Object.entries(DIGITAL_NAME_MAP)) {
+          if (patterns.some(p => lower.includes(p))) {
+            return digitalSubByLabel[label.toLowerCase()] || null;
+          }
+        }
+        return null;
+      };
+
       for (const tx of txs) {
         const ref =
           tx.referenceNumber || tx.id || `${tx.date}-${tx.amount?.value}`;
@@ -355,6 +391,7 @@ Deno.serve(async (req) => {
           type = "transfer";
         }
         const category_id = matchRule(description);
+        const subcategory_id = resolveSubcat(category_id, description);
 
         const amountUsd = amount * fxRate;
 
@@ -373,6 +410,7 @@ Deno.serve(async (req) => {
               type,
               external_id,
               category_id,
+              subcategory_id,
             },
             { onConflict: "external_id", ignoreDuplicates: true },
           )

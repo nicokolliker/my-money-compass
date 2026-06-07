@@ -3,6 +3,8 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useTransactions, useDeleteTransaction, useUpdateTransaction } from '@/hooks/useTransactions';
+import { useCreateRecurringExpense } from '@/hooks/useRecurringExpenses';
+import { Label } from '@/components/ui/label';
 import { useAccounts } from '@/hooks/useAccounts';
 import { useCategories } from '@/hooks/useCategories';
 import { useTransactionRecurringMap } from '@/hooks/useTransactionRecurringMap';
@@ -174,6 +176,11 @@ export default function Transactions() {
   const [showDateFilter, setShowDateFilter] = useState(false);
   const [uncategorizedOnly, setUncategorizedOnly] = useState(false);
   const [editTx, setEditTx] = useState<any>(null);
+  const [recurringDialog, setRecurringDialog] = useState<null | {
+    txId: string; name: string; amount: string; currency: string;
+    frequency: string; categoryId: string; accountId: string; nextDueDate: string;
+  }>(null);
+  const [recurringSaving, setRecurringSaving] = useState(false);
 
   // Clear location state once consumed so refreshes don't re-apply it
   useEffect(() => {
@@ -197,6 +204,7 @@ export default function Transactions() {
   const { data: recurringMatchMap = {} } = useTransactionRecurringMap();
   const deleteTx = useDeleteTransaction();
   const updateTx = useUpdateTransaction();
+  const createRecurring = useCreateRecurringExpense();
   const { hasDemoData, onCleared: onDemoCleared } = useDemoData();
   const { data: importLog } = useImportLog();
   const arsToUsd = useLatestFxRate('ARS', 'USD');
@@ -361,14 +369,24 @@ export default function Transactions() {
 
   const handleCategoryChange = async (txId: string, catId: string | null) => {
     try {
-      const updates: any = { id: txId, category_id: catId };
-      // If switching to Digital, auto-assign a subtype from the tx name signal.
+      const updates: any = { id: txId, category_id: catId, subcategory_id: null };
+      // If switching to Digital, auto-assign a subtype + subcategory_id from the tx name signal.
       const digitalCat = categories?.find(c => c.name === 'Digital');
       if (catId && digitalCat && catId === digitalCat.id) {
         const tx: any = transactions?.find((t: any) => t.id === txId);
         const nameSignal = tx?.merchant || tx?.description || '';
-        const { getDigitalSubtype } = await import('@/lib/digitalSubtypes');
-        updates.subtype = getDigitalSubtype(nameSignal);
+        const { getDigitalSubtype, DIGITAL_SUBTYPES } = await import('@/lib/digitalSubtypes');
+        const subtypeKey = getDigitalSubtype(nameSignal);
+        updates.subtype = subtypeKey;
+        const label = DIGITAL_SUBTYPES[subtypeKey]?.label?.toLowerCase();
+        if (label) {
+          const { data: subs } = await supabase
+            .from('subcategories')
+            .select('id, name')
+            .eq('category_id', digitalCat.id);
+          const match = (subs || []).find((s: any) => (s.name || '').toLowerCase() === label);
+          if (match) updates.subcategory_id = match.id;
+        }
       } else if (catId === null) {
         updates.subtype = null;
       }
@@ -379,7 +397,27 @@ export default function Transactions() {
   };
 
   const handleToggleSubscription = async (txId: string, current: boolean) => {
-    try { await updateTx.mutateAsync({ id: txId, is_subscription: !current }); toast.success(!current ? 'Marked as recurring' : 'Unmarked'); }
+    try {
+      if (current) {
+        // Unmarking — just flip the flag, don't touch existing recurring rows.
+        await updateTx.mutateAsync({ id: txId, is_subscription: false });
+        toast.success('Unmarked');
+        return;
+      }
+      // Marking as recurring → open pre-filled dialog
+      const tx: any = transactions?.find((t: any) => t.id === txId);
+      if (!tx) return;
+      setRecurringDialog({
+        txId: tx.id,
+        name: tx.merchant || tx.description || 'Recurring',
+        amount: String(Math.abs(Number(tx.amount) || 0)),
+        currency: tx.currency || 'USD',
+        frequency: 'monthly',
+        categoryId: tx.category_id || '',
+        accountId: tx.account_id || '',
+        nextDueDate: tx.date || new Date().toISOString().slice(0, 10),
+      });
+    }
     catch (e: any) { toast.error(e.message); }
   };
 
@@ -672,6 +710,122 @@ export default function Transactions() {
               </>
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Mark-as-recurring dialog */}
+      <Dialog open={!!recurringDialog} onOpenChange={(o) => { if (!o) setRecurringDialog(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Crear gasto recurrente</DialogTitle>
+          </DialogHeader>
+          {recurringDialog && (
+            <div className="space-y-3">
+              <div>
+                <Label>Nombre</Label>
+                <Input
+                  value={recurringDialog.name}
+                  onChange={(e) => setRecurringDialog({ ...recurringDialog, name: e.target.value })}
+                  className="mt-1"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Monto</Label>
+                  <Input
+                    type="number"
+                    value={recurringDialog.amount}
+                    onChange={(e) => setRecurringDialog({ ...recurringDialog, amount: e.target.value })}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label>Moneda</Label>
+                  <Input
+                    value={recurringDialog.currency}
+                    onChange={(e) => setRecurringDialog({ ...recurringDialog, currency: e.target.value.toUpperCase() })}
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Frecuencia</Label>
+                  <Select
+                    value={recurringDialog.frequency}
+                    onValueChange={(v) => setRecurringDialog({ ...recurringDialog, frequency: v })}
+                  >
+                    <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="weekly">Semanal</SelectItem>
+                      <SelectItem value="monthly">Mensual</SelectItem>
+                      <SelectItem value="quarterly">Trimestral</SelectItem>
+                      <SelectItem value="yearly">Anual</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Próximo vencimiento</Label>
+                  <Input
+                    type="date"
+                    value={recurringDialog.nextDueDate}
+                    onChange={(e) => setRecurringDialog({ ...recurringDialog, nextDueDate: e.target.value })}
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+              <div>
+                <Label>Categoría</Label>
+                <Select
+                  value={recurringDialog.categoryId || 'none'}
+                  onValueChange={(v) => setRecurringDialog({ ...recurringDialog, categoryId: v === 'none' ? '' : v })}
+                >
+                  <SelectTrigger className="mt-1"><SelectValue placeholder="Sin categoría" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sin categoría</SelectItem>
+                    {(categories || []).map((c: any) => (
+                      <SelectItem key={c.id} value={c.id}>{c.icon} {c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" onClick={() => setRecurringDialog(null)} disabled={recurringSaving}>
+                  Cancelar
+                </Button>
+                <Button
+                  disabled={recurringSaving || !recurringDialog.name || !parseFloat(recurringDialog.amount)}
+                  onClick={async () => {
+                    setRecurringSaving(true);
+                    try {
+                      const amt = Math.abs(parseFloat(recurringDialog.amount));
+                      await createRecurring.mutateAsync({
+                        name: recurringDialog.name,
+                        amount: amt,
+                        currency: recurringDialog.currency || 'USD',
+                        frequency: recurringDialog.frequency as any,
+                        type: 'subscription' as any,
+                        category_id: recurringDialog.categoryId || null,
+                        linked_category_id: recurringDialog.categoryId || null,
+                        account_id: recurringDialog.accountId || null,
+                        next_due_date: recurringDialog.nextDueDate || null,
+                        is_active: true,
+                      } as any);
+                      await updateTx.mutateAsync({ id: recurringDialog.txId, is_subscription: true });
+                      toast.success('Gasto recurrente creado');
+                      setRecurringDialog(null);
+                    } catch (e: any) {
+                      toast.error(e.message || 'Error al crear recurrente');
+                    } finally {
+                      setRecurringSaving(false);
+                    }
+                  }}
+                >
+                  {recurringSaving ? 'Guardando...' : 'Crear recurrente'}
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
