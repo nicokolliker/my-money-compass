@@ -150,7 +150,8 @@ export function UnifiedCycleHistory({ onRowClick }: { onRowClick?: (row: { parse
                 </div>
               )}
               {rows.map((r) => {
-                const clickable = r.kind === 'viejo' && !!r.parsed && !!onRowClick;
+                const clickable = r.kind === 'viejo' && !!onRowClick;
+                const ym = r.parsed?.month || r.date.slice(0, 7);
                 return (
                   <div
                     key={r.id}
@@ -160,8 +161,8 @@ export function UnifiedCycleHistory({ onRowClick }: { onRowClick?: (row: { parse
                     )}
                     onClick={clickable
                       ? () => onRowClick?.({
-                          parsed: r.parsed,
-                          monthLabel: format(new Date((r.parsed?.month || r.date.slice(0, 7)) + '-01T12:00:00'), 'MMMM yyyy', { locale: es }),
+                          parsed: r.parsed || { month: ym },
+                          monthLabel: format(new Date(ym + '-01T12:00:00'), 'MMMM yyyy', { locale: es }),
                           tx: r.tx,
                         })
                       : undefined}
