@@ -147,10 +147,6 @@ Deno.serve(async (req) => {
       }
 
       const diagnostics: string[] = [];
-      const intervalEnd = new Date().toISOString();
-      const intervalStart = new Date(
-        Date.now() - 2 * 365 * 24 * 60 * 60 * 1000,
-      ).toISOString();
 
       // Official balance
       let officialBalance: number | null = null;
@@ -166,21 +162,46 @@ Deno.serve(async (req) => {
         diagnostics.push(`No se pudo leer balance oficial: ${e.message}`);
       }
 
-      // Statement
+      // Statement — Wise caps each request at ~469 days. Chunk ~2 years
+      // into 450-day windows walking backwards from now.
+      const WINDOW_MS = 450 * 24 * 60 * 60 * 1000;
+      const totalMs = 2 * 365 * 24 * 60 * 60 * 1000;
+      const now = Date.now();
       let txs: any[] = [];
-      try {
-        const statement = await wiseFetch(
-          `/v1/profiles/${profileId}/balance-statements/${balanceId}/statement.json` +
-            `?currency=${currency}` +
-            `&intervalStart=${intervalStart}` +
-            `&intervalEnd=${intervalEnd}` +
-            `&type=COMPACT`,
-          token,
-          "balance-statement",
-        );
-        txs = statement?.transactions ?? [];
-      } catch (e: any) {
-        diagnostics.push(`Statement falló: ${e.message}`);
+      let statementOk = false;
+      let windowEnd = now;
+      const earliest = now - totalMs;
+      while (windowEnd > earliest) {
+        const windowStart = Math.max(windowEnd - WINDOW_MS, earliest);
+        const iStart = new Date(windowStart).toISOString();
+        const iEnd = new Date(windowEnd).toISOString();
+        try {
+          const statement = await wiseFetch(
+            `/v1/profiles/${profileId}/balance-statements/${balanceId}/statement.json` +
+              `?currency=${encodeURIComponent(currency)}` +
+              `&intervalStart=${encodeURIComponent(iStart)}` +
+              `&intervalEnd=${encodeURIComponent(iEnd)}` +
+              `&type=COMPACT`,
+            token,
+            `balance-statement ${iStart.slice(0, 10)}→${iEnd.slice(0, 10)}`,
+          );
+          const chunk = statement?.transactions ?? [];
+          txs = txs.concat(chunk);
+          statementOk = true;
+        } catch (e: any) {
+          diagnostics.push(`Statement falló (${iStart.slice(0, 10)}→${iEnd.slice(0, 10)}): ${e.message}`);
+        }
+        windowEnd = windowStart;
+      }
+      if (!statementOk) {
+        return json({
+          error: `Wise rechazó el statement. ${diagnostics.join(" | ")}`,
+          diagnostics,
+          status: "failed",
+          imported: 0,
+          skipped: 0,
+          total_fetched: 0,
+        });
       }
 
       // FX rate
