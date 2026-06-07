@@ -144,7 +144,7 @@ export function SplitwiseSettlementWizard({ open, onOpenChange, settlementMonth 
       await supabase.from('import_log').insert({
         user_id: user.id,
         source: 'splitwise',
-        month: lastMonthInfo.ym,
+        month: monthInfo.ym,
         transaction_count: rows.length,
       });
 
@@ -216,14 +216,14 @@ export function SplitwiseSettlementWizard({ open, onOpenChange, settlementMonth 
                 </div>
                 <div className="rounded-xl border p-3 space-y-2">
                   <div>
-                    <p className="text-sm font-semibold">Gastos a conciliar — {lastMonthInfo.label}</p>
+                    <p className="text-sm font-semibold">Gastos a conciliar — {monthInfo.label}</p>
                     <p className="text-[11px] text-muted-foreground">
                       Solo lo que otros pagaron por vos
                     </p>
                   </div>
                   {toImport.length === 0 ? (
                     <p className="text-xs text-muted-foreground py-2">
-                      No hay gastos pagados por otros en {lastMonthInfo.label}.
+                      No hay gastos pagados por otros en {monthInfo.label}.
                     </p>
                   ) : (
                     <div className="max-h-48 overflow-y-auto divide-y -mx-1">
