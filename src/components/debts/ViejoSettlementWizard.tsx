@@ -82,27 +82,9 @@ export function ViejoSettlementWizard({ open, onOpenChange, settlementMonth, onS
   const [expandedDetails, setExpandedDetails] = useState<Record<string, boolean>>({});
   const [cardSubtotals, setCardSubtotals] = useState<Record<string, number>>({});
 
-  const monthOptions = useMemo(() => {
-    const arr: { ym: string; label: string }[] = [];
-    const today = new Date();
-    // Cap at current month (no future months); show last 12 months newest first.
-    const start = new Date(today.getFullYear(), today.getMonth(), 1);
-    for (let i = 0; i < 12; i++) {
-      const d = new Date(start.getFullYear(), start.getMonth() - i, 1);
-      arr.push({ ym: format(d, 'yyyy-MM'), label: format(d, 'MMMM yyyy', { locale: es }) });
-    }
-    return arr;
-  }, []);
-
   useEffect(() => {
     if (!open) {
       setStep(1);
-      setSettlementMonth((() => {
-        const today = new Date();
-        const d = new Date(today.getFullYear(), today.getMonth(), 1);
-        if (today.getDate() < 20) d.setMonth(d.getMonth() - 1);
-        return format(d, 'yyyy-MM');
-      })());
       setIebraFile(null); setKollikerFile(null); setSantFile(null);
       setBcTotalARS(0); setSantTotalARS(0); setVisaCiudadMamaARS(0); setVisaCiudadPapaARS(0);
       setExtraItems([]);
