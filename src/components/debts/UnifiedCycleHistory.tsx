@@ -13,13 +13,12 @@ import { MerchantLogo } from '@/components/MerchantLogo';
 import { downloadSettlementPdf } from '@/lib/settlementPdf';
 import { useImportLog } from '@/hooks/useImportLog';
 
-const CARD_KEYS = ['visa_ciudad_mama', 'visa_ciudad_papa', 'visa_santander', 'amex'];
+const CARD_KEYS = ['visa_ciudad_mama', 'visa_ciudad_papa', 'visa_santander'];
 
 const ITEM_META: Record<string, { label: string }> = {
   visa_ciudad_mama: { label: 'VISA Ciudad — Mamá' },
   visa_ciudad_papa: { label: 'VISA Ciudad — Papá' },
   visa_santander:   { label: 'VISA Santander' },
-  amex:             { label: 'AMEX Santander' },
   expensas: { label: 'Expensas' },
   prestamo: { label: 'Préstamo' },
   cochera:  { label: 'Cochera' },
