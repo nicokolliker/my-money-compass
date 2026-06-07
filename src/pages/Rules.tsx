@@ -163,9 +163,12 @@ function RulesPanel() {
     <div className="space-y-4">
       <SuggestionsPanel />
 
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <p className="text-sm text-muted-foreground">Auto-categorize transactions by keyword matching.</p>
-        <Button size="sm" onClick={() => setShowForm(true)}><Plus className="h-4 w-4 mr-1" /> Add Rule</Button>
+        <div className="flex items-center gap-2">
+          <ReapplyRulesButton />
+          <Button size="sm" onClick={() => setShowForm(true)}><Plus className="h-4 w-4 mr-1" /> Add Rule</Button>
+        </div>
       </div>
 
       <div className="space-y-2">
@@ -232,6 +235,50 @@ function RulesPanel() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+function ReapplyRulesButton() {
+  const qc = useQueryClient();
+  const [loading, setLoading] = useState(false);
+  const handleClick = async () => {
+    setLoading(true);
+    try {
+      const { fetchUserRules, matchRuleCategory } = await import('@/lib/applyRules');
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+      const rules = await fetchUserRules();
+      if (rules.length === 0) { toast.info('No hay reglas para aplicar'); return; }
+      const { data: txs, error } = await supabase
+        .from('transactions')
+        .select('id, description, merchant')
+        .eq('user_id', user.id)
+        .is('category_id', null);
+      if (error) throw error;
+      const updates: Record<string, string[]> = {};
+      for (const t of (txs || []) as any[]) {
+        const catId = matchRuleCategory(rules, t.description, t.merchant);
+        if (catId) (updates[catId] ||= []).push(t.id);
+      }
+      let total = 0;
+      for (const [catId, ids] of Object.entries(updates)) {
+        const { error: upErr } = await supabase.from('transactions').update({ category_id: catId }).in('id', ids);
+        if (upErr) throw upErr;
+        total += ids.length;
+      }
+      qc.invalidateQueries({ queryKey: ['transactions'] });
+      toast.success(total > 0 ? `${total} transacciones categorizadas` : 'No hubo coincidencias');
+    } catch (e: any) {
+      toast.error(e.message || 'Error al re-aplicar reglas');
+    } finally {
+      setLoading(false);
+    }
+  };
+  return (
+    <Button size="sm" variant="outline" onClick={handleClick} disabled={loading}>
+      <RefreshCw className={`h-4 w-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
+      {loading ? 'Aplicando...' : 'Re-aplicar reglas'}
+    </Button>
   );
 }
 

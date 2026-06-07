@@ -323,6 +323,21 @@ Deno.serve(async (req) => {
       let minDate: string | null = null;
       let maxDate: string | null = null;
 
+      // Fetch user's rules once for auto-categorization
+      const { data: rulesData } = await admin
+        .from("rules")
+        .select("keyword, match_field, category_id")
+        .eq("user_id", userId);
+      const rules: Array<{ keyword: string; match_field: string | null; category_id: string | null }> = (rulesData as any) || [];
+      const matchRule = (description: string) => {
+        const desc = (description || "").toLowerCase();
+        for (const r of rules) {
+          if (!r.keyword || !r.category_id) continue;
+          if (desc.includes(r.keyword.toLowerCase().trim())) return r.category_id;
+        }
+        return null;
+      };
+
       for (const tx of txs) {
         const ref =
           tx.referenceNumber || tx.id || `${tx.date}-${tx.amount?.value}`;
@@ -339,6 +354,7 @@ Deno.serve(async (req) => {
         if ((tx.details?.type || "").toUpperCase() === "TRANSFER") {
           type = "transfer";
         }
+        const category_id = matchRule(description);
 
         const amountUsd = amount * fxRate;
 
@@ -356,10 +372,12 @@ Deno.serve(async (req) => {
               amount_usd: amountUsd,
               type,
               external_id,
+              category_id,
             },
             { onConflict: "external_id", ignoreDuplicates: true },
           )
           .select("id");
+
 
         if (insErr) {
           diagnostics.push(`Upsert error ${external_id}: ${insErr.message}`);

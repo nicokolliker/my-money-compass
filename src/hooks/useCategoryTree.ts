@@ -58,7 +58,7 @@ export function useCategoryTree() {
         : [];
 
       const recurringMonthly = (recurringItems || [])
-        .filter(r => r.is_active && (r as any).linked_category_id === cat.id)
+        .filter(r => r.is_active && ((r as any).linked_category_id === cat.id || (r as any).category_id === cat.id))
         .reduce((sum, r) => {
           const amountUsd = toUSD(Math.abs(Number(r.amount)), r.currency || 'USD', fxRates as any);
           return sum + toMonthlyAmount(amountUsd, r.frequency);

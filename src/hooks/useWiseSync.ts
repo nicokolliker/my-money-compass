@@ -45,11 +45,21 @@ export function useWiseSyncTransactions() {
       accountId: string;
       currency: string;
     }): Promise<WiseSyncResult> => callWise('sync-transactions', params),
-    onSuccess: () => {
+    onSuccess: async () => {
       qc.invalidateQueries({ queryKey: ['transactions'] });
       qc.invalidateQueries({ queryKey: ['account-balances'] });
       qc.invalidateQueries({ queryKey: ['accounts'] });
       qc.invalidateQueries({ queryKey: ['wise-sync-log'] });
+      qc.invalidateQueries({ queryKey: ['recurring-instances'] });
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          await supabase.rpc('refresh_recurring_tracking', { p_user_id: user.id });
+          qc.invalidateQueries({ queryKey: ['recurring-instances'] });
+        }
+      } catch {
+        // non-fatal
+      }
     },
   });
 }

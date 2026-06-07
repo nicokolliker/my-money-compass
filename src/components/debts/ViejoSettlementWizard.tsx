@@ -453,8 +453,9 @@ export function ViejoSettlementWizard({ open, onOpenChange, settlementMonth, onS
                 frequency: 'monthly',
                 end_date: endDate,
                 category_id: existing.category_id || categoryId,
+                linked_category_id: existing.category_id || categoryId,
                 is_active: true,
-              })
+              } as any)
               .eq('id', existing.id);
           } else {
             await supabase.from('recurring_expenses').insert({
@@ -467,11 +468,12 @@ export function ViejoSettlementWizard({ open, onOpenChange, settlementMonth, onS
               frequency: 'monthly',
               notes: p.notesKey,
               category_id: categoryId,
+              linked_category_id: categoryId,
               end_date: endDate,
               next_due_date: format(startOfMonth(addMonths(today, 1)), 'yyyy-MM-dd'),
               is_active: true,
               status: 'expected',
-            });
+            } as any);
           }
         }
 

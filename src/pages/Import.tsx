@@ -73,6 +73,7 @@ import { AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { extractPdfText } from '@/lib/pdfReader';
+import { fetchUserRules, matchRuleCategory } from '@/lib/applyRules';
 
 interface PreviewRow extends ParsedTransaction {
   selected: boolean;
@@ -326,6 +327,7 @@ export default function ImportPage() {
       if (!user) throw new Error('Not authenticated');
 
       // PR3: store USD amounts — ARQ is a USD account
+      const rules = await fetchUserRules();
       const payload = toImport.map((r) => {
         const isIncome   = r.type === 'income';
         const isTransfer = r.type === 'transfer';
@@ -337,12 +339,14 @@ export default function ImportPage() {
             : arsToUsd && arsToUsd > 0
               ? 1 / arsToUsd
               : 1000;
+        const merchant = r.transferTarget || r.description;
+        const category_id = matchRuleCategory(rules, r.description, merchant);
         return {
           user_id: user.id,
           account_id: arqAccount.id,
           date: r.date,
           description: r.description,
-          merchant: r.transferTarget || r.description,
+          merchant,
           amount: sign * r.amountUSD,
           currency: 'USD',
           fx_rate: fxRate,
@@ -350,6 +354,7 @@ export default function ImportPage() {
           type: (isIncome ? 'income' : isTransfer ? 'transfer' : 'expense') as any,
           external_id: r.external_id,
           raw_imported_description: r.description,
+          category_id,
         };
       });
 
@@ -515,6 +520,7 @@ export default function ImportPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
       const fxRate = arsToUsd || 0;
+      const rules = await fetchUserRules();
       const payload = toImport.map((r) => {
         const isIncome = r.type === 'income';
         const sign = isIncome ? 1 : -1;
@@ -531,6 +537,7 @@ export default function ImportPage() {
           type: (isIncome ? 'income' : 'expense') as any,
           external_id: r.external_id,
           raw_imported_description: r.description,
+          category_id: matchRuleCategory(rules, r.description, r.description),
         };
       });
       const { data: insertedRows, error } = await supabase.from('transactions').insert(payload).select('id, date, amount, type');
@@ -637,6 +644,7 @@ export default function ImportPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
       const fxRate = arsToUsd || 0;
+      const rules = await fetchUserRules();
       const payload = toImport.map((r) => {
         const isIncome = r.type === 'income';
         const isTransfer = r.type === 'transfer';
@@ -654,6 +662,7 @@ export default function ImportPage() {
           type: (isIncome ? 'income' : isTransfer ? 'transfer' : 'expense') as any,
           external_id: r.external_id,
           raw_imported_description: r.description,
+          category_id: matchRuleCategory(rules, r.description, r.description),
         };
       });
       const { error } = await supabase.from('transactions').insert(payload);
@@ -760,6 +769,7 @@ export default function ImportPage() {
       if (!user) throw new Error('Not authenticated');
 
       const payload: any[] = [];
+      const rules = await fetchUserRules();
       for (const r of toImport) {
         const cur = (r._currency || 'USD').toUpperCase();
         const amt = r._amount ?? r.amountUSD;
@@ -780,6 +790,7 @@ export default function ImportPage() {
           type: (isIncome ? 'income' : 'expense') as any,
           external_id: r.external_id,
           raw_imported_description: r.description,
+          category_id: matchRuleCategory(rules, r.description, r.description),
         });
       }
       if (payload.length === 0) {
