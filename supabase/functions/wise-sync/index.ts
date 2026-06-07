@@ -194,13 +194,14 @@ Deno.serve(async (req) => {
         windowEnd = windowStart;
       }
       if (!statementOk) {
-        return json(
-          {
-            error: `Wise rechazó el statement. ${diagnostics.join(" | ")}`,
-            diagnostics,
-          },
-          502,
-        );
+        return json({
+          error: `Wise rechazó el statement. ${diagnostics.join(" | ")}`,
+          diagnostics,
+          status: "failed",
+          imported: 0,
+          skipped: 0,
+          total_fetched: 0,
+        });
       }
 
       // FX rate
