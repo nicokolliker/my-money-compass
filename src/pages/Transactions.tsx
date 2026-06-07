@@ -361,14 +361,24 @@ export default function Transactions() {
 
   const handleCategoryChange = async (txId: string, catId: string | null) => {
     try {
-      const updates: any = { id: txId, category_id: catId };
-      // If switching to Digital, auto-assign a subtype from the tx name signal.
+      const updates: any = { id: txId, category_id: catId, subcategory_id: null };
+      // If switching to Digital, auto-assign a subtype + subcategory_id from the tx name signal.
       const digitalCat = categories?.find(c => c.name === 'Digital');
       if (catId && digitalCat && catId === digitalCat.id) {
         const tx: any = transactions?.find((t: any) => t.id === txId);
         const nameSignal = tx?.merchant || tx?.description || '';
-        const { getDigitalSubtype } = await import('@/lib/digitalSubtypes');
-        updates.subtype = getDigitalSubtype(nameSignal);
+        const { getDigitalSubtype, DIGITAL_SUBTYPES } = await import('@/lib/digitalSubtypes');
+        const subtypeKey = getDigitalSubtype(nameSignal);
+        updates.subtype = subtypeKey;
+        const label = DIGITAL_SUBTYPES[subtypeKey]?.label?.toLowerCase();
+        if (label) {
+          const { data: subs } = await supabase
+            .from('subcategories')
+            .select('id, name')
+            .eq('category_id', digitalCat.id);
+          const match = (subs || []).find((s: any) => (s.name || '').toLowerCase() === label);
+          if (match) updates.subcategory_id = match.id;
+        }
       } else if (catId === null) {
         updates.subtype = null;
       }
@@ -379,7 +389,27 @@ export default function Transactions() {
   };
 
   const handleToggleSubscription = async (txId: string, current: boolean) => {
-    try { await updateTx.mutateAsync({ id: txId, is_subscription: !current }); toast.success(!current ? 'Marked as recurring' : 'Unmarked'); }
+    try {
+      if (current) {
+        // Unmarking — just flip the flag, don't touch existing recurring rows.
+        await updateTx.mutateAsync({ id: txId, is_subscription: false });
+        toast.success('Unmarked');
+        return;
+      }
+      // Marking as recurring → open pre-filled dialog
+      const tx: any = transactions?.find((t: any) => t.id === txId);
+      if (!tx) return;
+      setRecurringDialog({
+        txId: tx.id,
+        name: tx.merchant || tx.description || 'Recurring',
+        amount: String(Math.abs(Number(tx.amount) || 0)),
+        currency: tx.currency || 'USD',
+        frequency: 'monthly',
+        categoryId: tx.category_id || '',
+        accountId: tx.account_id || '',
+        nextDueDate: tx.date || new Date().toISOString().slice(0, 10),
+      });
+    }
     catch (e: any) { toast.error(e.message); }
   };
 
