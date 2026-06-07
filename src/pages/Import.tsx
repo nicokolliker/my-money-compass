@@ -644,6 +644,7 @@ export default function ImportPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
       const fxRate = arsToUsd || 0;
+      const rules = await fetchUserRules();
       const payload = toImport.map((r) => {
         const isIncome = r.type === 'income';
         const isTransfer = r.type === 'transfer';
@@ -661,6 +662,7 @@ export default function ImportPage() {
           type: (isIncome ? 'income' : isTransfer ? 'transfer' : 'expense') as any,
           external_id: r.external_id,
           raw_imported_description: r.description,
+          category_id: matchRuleCategory(rules, r.description, r.description),
         };
       });
       const { error } = await supabase.from('transactions').insert(payload);
