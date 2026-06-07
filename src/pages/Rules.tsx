@@ -196,6 +196,10 @@ function RulesPanel() {
         )}
       </div>
 
+      <div className="pt-6">
+        <ResetDataCard />
+      </div>
+
       <Dialog open={showForm} onOpenChange={setShowForm}>
         <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>New rule</DialogTitle></DialogHeader>
