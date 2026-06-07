@@ -87,7 +87,13 @@ export default function WiseTab() {
         currency: balance.currency,
       });
       setSyncResults(prev => ({ ...prev, [balance.currency]: res }));
-      toast.success(`Imported ${res.imported} new transactions (${balance.currency}), skipped ${res.skipped} duplicates`);
+      if (res.status === 'failed' || (res.total_fetched === 0 && res.diagnostics?.length)) {
+        toast.error(`Wise no devolvió transacciones: ${res.diagnostics?.join(' | ') || 'error desconocido'}`);
+      } else if (res.total_fetched === 0) {
+        toast.message(`Sin movimientos nuevos para ${balance.currency}`);
+      } else {
+        toast.success(`Imported ${res.imported} new transactions (${balance.currency}), skipped ${res.skipped} duplicates`);
+      }
     } catch (e: any) {
       toast.error(e.message);
     }
