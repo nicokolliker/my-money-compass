@@ -73,6 +73,7 @@ import { AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { extractPdfText } from '@/lib/pdfReader';
+import { fetchUserRules, matchRuleCategory } from '@/lib/applyRules';
 
 interface PreviewRow extends ParsedTransaction {
   selected: boolean;
