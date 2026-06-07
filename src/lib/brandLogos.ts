@@ -200,6 +200,8 @@ export const BRAND_DOMAINS: Record<string, string> = {
   'supervielle':        'supervielle.com.ar',
   'patagonia':          'bancopatagonia.com.ar',
   'comafi':             'comafi.com.ar',
+};
+
 
 export function getBrandDomain(name: string): string | null {
   if (!name) return null;
