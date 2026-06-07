@@ -179,6 +179,7 @@ export default function Transactions() {
   const [recurringDialog, setRecurringDialog] = useState<null | {
     txId: string; name: string; amount: string; currency: string;
     frequency: string; categoryId: string; accountId: string; nextDueDate: string;
+    subtype: string;
   }>(null);
   const [recurringSaving, setRecurringSaving] = useState(false);
 
