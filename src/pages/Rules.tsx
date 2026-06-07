@@ -21,6 +21,7 @@ import { Plus, Trash2, Zap, RefreshCw, DollarSign, ChevronDown, Lightbulb, Repea
 import { toast } from 'sonner';
 import CategoriesTab from '@/components/settings/CategoriesTab';
 import MerchantsTab from '@/components/settings/MerchantsTab';
+import { ResetDataCard } from '@/components/settings/ResetDataCard';
 
 type RulesTab = 'rules' | 'categories' | 'merchants' | 'fx';
 
@@ -193,6 +194,10 @@ function RulesPanel() {
         {(!rules || rules.length === 0) && (
           <p className="text-sm text-muted-foreground text-center py-8">No rules yet. Create one to auto-categorize.</p>
         )}
+      </div>
+
+      <div className="pt-6">
+        <ResetDataCard />
       </div>
 
       <Dialog open={showForm} onOpenChange={setShowForm}>
