@@ -115,7 +115,30 @@ export default function WiseTab() {
                   Sync your Wise balances and transactions automatically
                 </p>
               </div>
-              <Button onClick={handleConnect} disabled={getProfiles.isPending}>
+              <div className="w-full max-w-sm space-y-2">
+                <Label htmlFor="wise-token" className="text-xs">Wise API token</Label>
+                <input
+                  id="wise-token"
+                  type="password"
+                  value={apiToken}
+                  onChange={(e) => setApiToken(e.target.value)}
+                  placeholder="Pegá tu API token de Wise"
+                  className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  autoComplete="off"
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Generá uno en{' '}
+                  <a
+                    href="https://wise.com/settings/api-tokens"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="underline"
+                  >
+                    wise.com/settings/api-tokens
+                  </a>
+                </p>
+              </div>
+              <Button onClick={handleConnect} disabled={getProfiles.isPending || !apiToken.trim()}>
                 {getProfiles.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Wifi className="h-4 w-4 mr-2" />}
                 Connect Wise
               </Button>
