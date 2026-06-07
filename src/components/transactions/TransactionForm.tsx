@@ -166,6 +166,7 @@ export function TransactionForm({ onSuccess, editData }: Props) {
           amount_usd: selectedAccount!.currency === 'USD' ? signedAmount : signedAmount * rate,
           account_id: accountId,
           category_id: categoryId || null,
+          subtype: isDigitalSelected ? (subtype || null) : null,
           type: type as any,
           is_subscription: isSubscription,
         });
@@ -197,6 +198,7 @@ export function TransactionForm({ onSuccess, editData }: Props) {
           amount_usd: selectedAccount!.currency === 'USD' ? signedAmount : signedAmount * rate,
           account_id: accountId,
           category_id: categoryId || (selectedMerchant as any)?.default_category_id || null,
+          subtype: isDigitalSelected ? (subtype || null) : null,
           type: type as 'expense' | 'income' | 'transfer' | 'adjustment',
           is_subscription: isSubscription,
         });
