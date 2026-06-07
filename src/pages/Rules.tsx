@@ -163,9 +163,12 @@ function RulesPanel() {
     <div className="space-y-4">
       <SuggestionsPanel />
 
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <p className="text-sm text-muted-foreground">Auto-categorize transactions by keyword matching.</p>
-        <Button size="sm" onClick={() => setShowForm(true)}><Plus className="h-4 w-4 mr-1" /> Add Rule</Button>
+        <div className="flex items-center gap-2">
+          <ReapplyRulesButton />
+          <Button size="sm" onClick={() => setShowForm(true)}><Plus className="h-4 w-4 mr-1" /> Add Rule</Button>
+        </div>
       </div>
 
       <div className="space-y-2">
