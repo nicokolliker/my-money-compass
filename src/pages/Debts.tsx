@@ -587,8 +587,8 @@ function ViejoSettlementWizard({ open, onOpenChange, onSantTotalDetected }: { op
   const monthOptions = useMemo(() => {
     const arr: { ym: string; label: string }[] = [];
     const today = new Date();
+    // Cap at current month (no future months); show last 12 months newest first.
     const start = new Date(today.getFullYear(), today.getMonth(), 1);
-    if (today.getDate() < 20) start.setMonth(start.getMonth() - 1);
     for (let i = 0; i < 12; i++) {
       const d = new Date(start.getFullYear(), start.getMonth() - i, 1);
       arr.push({ ym: format(d, 'yyyy-MM'), label: format(d, 'MMMM yyyy', { locale: es }) });
