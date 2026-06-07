@@ -35,6 +35,14 @@ function greeting() {
 export default function Dashboard() {
   const navigate = useNavigate();
   const { isLoading } = useNetWorth();
+
+  const now = new Date();
+  const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+  const monthEnd = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()).padStart(2, '0')}`;
+  const prevMonthStart = now.getMonth() === 0
+    ? `${now.getFullYear() - 1}-12-01`
+    : `${now.getFullYear()}-${String(now.getMonth()).padStart(2, '0')}-01`;
+
   const { data: transactions } = useTransactions();
   const { data: blueDollar } = useBlueDollarRate();
   const { data: recurringItems } = useRecurringExpenses();
@@ -44,13 +52,6 @@ export default function Dashboard() {
   const { hasDemoData, onCleared: onDemoCleared } = useDemoData();
   const alerts = useHomeAlerts();
   const { isPrivate } = usePrivacyMode();
-
-  const now = new Date();
-  const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
-  const monthEnd = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()).padStart(2, '0')}`;
-  const prevMonthStart = now.getMonth() === 0
-    ? `${now.getFullYear() - 1}-12-01`
-    : `${now.getFullYear()}-${String(now.getMonth()).padStart(2, '0')}-01`;
 
   const monthExpenses = transactions?.filter(t => t.type === 'expense' && t.date >= monthStart) || [];
   const prevMonthExpenses = transactions?.filter(t => t.type === 'expense' && t.date >= prevMonthStart && t.date < monthStart) || [];
