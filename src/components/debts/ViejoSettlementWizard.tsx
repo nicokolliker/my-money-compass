@@ -338,6 +338,49 @@ export function ViejoSettlementWizard({ open, onOpenChange, settlementMonth, onS
         });
       }
 
+      // ── Extraer cuotas pendientes (Cuota XX/YY) por source ──────────
+      const cuotaRe = /cuota\s*(\d+)\s*\/\s*(\d+)/i;
+      const sources: Array<{ key: 'mama' | 'papa' | 'sant'; rows: typeof allPdfRows }> = [
+        { key: 'mama', rows: iebraRows.filter(r => r.selected) },
+        { key: 'papa', rows: kollikerRows.filter(r => r.selected) },
+        { key: 'sant', rows: santRows.filter(r => r.selected) },
+      ];
+
+      for (const { key, rows } of sources) {
+        // Last-one-wins: clear existing rows for this source
+        await supabase
+          .from('installment_debts' as any)
+          .delete()
+          .eq('user_id', user.id)
+          .eq('source', key);
+
+        const inserts: any[] = [];
+        for (const r of rows) {
+          const m = (r.description || '').match(cuotaRe);
+          if (!m) continue;
+          const current = parseInt(m[1], 10);
+          const total = parseInt(m[2], 10);
+          if (!Number.isFinite(current) || !Number.isFinite(total) || total <= 0) continue;
+          const remaining = Math.max(0, total - current);
+          inserts.push({
+            user_id: user.id,
+            source: key,
+            description: r.description,
+            amount_ars: r.amountARS,
+            current_installment: current,
+            total_installments: total,
+            remaining_installments: remaining,
+            settlement_month: settlementMonth,
+          });
+        }
+        if (inserts.length > 0) {
+          await supabase.from('installment_debts' as any).insert(inserts);
+        }
+      }
+      qc.invalidateQueries({ queryKey: ['installment-debts'] });
+
+
+
       // ── PASO 2: Ítems manuales → cuenta Viejo en ARS ────────────────
       const manualLines = [
         ...items.filter(i => i.amountARS > 0),
