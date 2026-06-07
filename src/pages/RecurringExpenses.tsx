@@ -375,7 +375,9 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
             </div>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
+
 
       <Tabs value={topTab} onValueChange={(v) => setTopTab(v as any)}>
         <TabsList className="w-full">
