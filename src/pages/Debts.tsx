@@ -205,6 +205,7 @@ export default function DebtsPage() {
           onMarkVuelto={(pc) => setConfirmingVuelto(pc)}
         />
         <SplitwiseCard
+          settlementMonth={settlementMonth}
           account={splitwiseAccount}
           importLog={importLog || []}
           onOpenCsv={() => setOpenSw(true)}
@@ -413,16 +414,19 @@ function ViejoCard({
 // ============================================================================
 
 function SplitwiseCard({
+  settlementMonth,
   account,
   importLog,
   onOpenCsv,
   onOpenPay,
 }: {
+  settlementMonth: string;
   account: any;
   importLog: any[];
   onOpenCsv: () => void;
   onOpenPay: () => void;
 }) {
+  const monthLabel = format(new Date(settlementMonth + '-01T12:00:00'), 'MMMM', { locale: es });
   const swImports = (importLog || [])
     .filter((l: any) => l.source === 'splitwise')
     .sort((a: any, b: any) => (b.imported_at || '').localeCompare(a.imported_at || ''));
@@ -497,7 +501,7 @@ function SplitwiseCard({
             className="w-full"
             onClick={onOpenCsv}
           >
-            Cargar CSV de Splitwise →
+            Liquidar <span className="capitalize">{monthLabel}</span> →
           </Button>
         </div>
       </CardContent>
