@@ -410,6 +410,7 @@ Deno.serve(async (req) => {
               type,
               external_id,
               category_id,
+              subcategory_id,
             },
             { onConflict: "external_id", ignoreDuplicates: true },
           )
