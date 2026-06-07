@@ -6,7 +6,8 @@ import { useTransactions, useDeleteTransaction, useUpdateTransaction } from '@/h
 import { useCreateRecurringExpense } from '@/hooks/useRecurringExpenses';
 import { Label } from '@/components/ui/label';
 import { useAccounts } from '@/hooks/useAccounts';
-import { useCategories } from '@/hooks/useCategories';
+import { useCategories, useSubcategories } from '@/hooks/useCategories';
+import { DIGITAL_SUBTYPES } from '@/lib/digitalSubtypes';
 import { useTransactionRecurringMap } from '@/hooks/useTransactionRecurringMap';
 import { formatCurrency, formatUSD, TRANSACTION_TYPE_LABELS } from '@/lib/constants';
 import { MerchantLogo } from '@/components/MerchantLogo';
@@ -179,6 +180,7 @@ export default function Transactions() {
   const [recurringDialog, setRecurringDialog] = useState<null | {
     txId: string; name: string; amount: string; currency: string;
     frequency: string; categoryId: string; accountId: string; nextDueDate: string;
+    subtype: string;
   }>(null);
   const [recurringSaving, setRecurringSaving] = useState(false);
 
@@ -201,6 +203,11 @@ export default function Transactions() {
   });
   const { data: accounts } = useAccounts();
   const { data: categories } = useCategories();
+  const digitalCatId = useMemo(
+    () => (categories || []).find((c: any) => (c.name || '').toLowerCase() === 'digital')?.id || null,
+    [categories],
+  );
+  const { data: digitalSubcats = [] } = useSubcategories(digitalCatId || undefined);
   const { data: recurringMatchMap = {} } = useTransactionRecurringMap();
   const deleteTx = useDeleteTransaction();
   const updateTx = useUpdateTransaction();
@@ -416,6 +423,7 @@ export default function Transactions() {
         categoryId: tx.category_id || '',
         accountId: tx.account_id || '',
         nextDueDate: tx.date || new Date().toISOString().slice(0, 10),
+        subtype: '',
       });
     }
     catch (e: any) { toast.error(e.message); }
@@ -778,7 +786,7 @@ export default function Transactions() {
                 <Label>Categoría</Label>
                 <Select
                   value={recurringDialog.categoryId || 'none'}
-                  onValueChange={(v) => setRecurringDialog({ ...recurringDialog, categoryId: v === 'none' ? '' : v })}
+                  onValueChange={(v) => setRecurringDialog({ ...recurringDialog, categoryId: v === 'none' ? '' : v, subtype: '' })}
                 >
                   <SelectTrigger className="mt-1"><SelectValue placeholder="Sin categoría" /></SelectTrigger>
                   <SelectContent>
@@ -789,6 +797,23 @@ export default function Transactions() {
                   </SelectContent>
                 </Select>
               </div>
+              {digitalCatId && recurringDialog.categoryId === digitalCatId && digitalSubcats.length > 0 && (
+                <div>
+                  <Label>Subcategoría</Label>
+                  <Select
+                    value={recurringDialog.subtype || 'none'}
+                    onValueChange={(v) => setRecurringDialog({ ...recurringDialog, subtype: v === 'none' ? '' : v })}
+                  >
+                    <SelectTrigger className="mt-1"><SelectValue placeholder="Seleccionar subcategoría" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Sin subcategoría</SelectItem>
+                      {Object.entries(DIGITAL_SUBTYPES).map(([key, def]) => (
+                        <SelectItem key={key} value={key}>{def.icon} {def.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div className="flex justify-end gap-2 pt-2">
                 <Button variant="outline" onClick={() => setRecurringDialog(null)} disabled={recurringSaving}>
                   Cancelar
@@ -799,14 +824,27 @@ export default function Transactions() {
                     setRecurringSaving(true);
                     try {
                       const amt = Math.abs(parseFloat(recurringDialog.amount));
+                      const selectedCat: any = (categories || []).find((c: any) => c.id === recurringDialog.categoryId);
+                      const derivedType = selectedCat
+                        ? (selectedCat.name || '').toLowerCase().replace(/\s+/g, '_')
+                        : 'otros';
+                      // Resolve subcategory_id for Digital
+                      let subcategoryId: string | null = null;
+                      if (digitalCatId && recurringDialog.categoryId === digitalCatId && recurringDialog.subtype) {
+                        const label = DIGITAL_SUBTYPES[recurringDialog.subtype]?.label?.toLowerCase();
+                        const match = (digitalSubcats as any[]).find(s => (s.name || '').toLowerCase() === label);
+                        subcategoryId = match?.id || null;
+                      }
                       await createRecurring.mutateAsync({
                         name: recurringDialog.name,
                         amount: amt,
                         currency: recurringDialog.currency || 'USD',
                         frequency: recurringDialog.frequency as any,
-                        type: 'subscription' as any,
+                        type: derivedType as any,
+                        subtype: recurringDialog.subtype || null,
                         category_id: recurringDialog.categoryId || null,
                         linked_category_id: recurringDialog.categoryId || null,
+                        subcategory_id: subcategoryId,
                         account_id: recurringDialog.accountId || null,
                         next_due_date: recurringDialog.nextDueDate || null,
                         is_active: true,
