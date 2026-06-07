@@ -187,7 +187,54 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Próximos pagos */}
+      {/* Recurrentes pendientes */}
+      {(pendingRecurrentes.length > 0 || allRecurrentesPaid) && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <CalendarDays className="h-4 w-4 text-muted-foreground" />
+              Recurrentes pendientes
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {allRecurrentesPaid && pendingRecurrentes.length === 0 ? (
+              <div className="flex items-center gap-2 py-2">
+                <div className="w-8 h-8 rounded-full bg-success/10 flex items-center justify-center">
+                  <CheckCircle2 className="h-4 w-4 text-success" />
+                </div>
+                <span className="text-sm font-medium text-success">Todo al día este mes</span>
+              </div>
+            ) : (
+              <>
+                {pendingRecurrentes.map((inst: any) => {
+                  const r = inst.recurring_expenses;
+                  const dueDate = new Date(inst.expected_date + 'T12:00:00');
+                  return (
+                    <div key={inst.id} className="flex items-center gap-3 py-1.5">
+                      <MerchantLogo name={r?.name || ''} size={32} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">{r?.name || 'Recurrente'}</p>
+                        <p className="text-[10px] text-muted-foreground truncate">
+                          {format(dueDate, 'd MMM', { locale: es })}
+                        </p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-sm font-semibold text-foreground tabular-nums">
+                          {formatCurrency(Math.abs(Number(inst.expected_amount)), inst.expected_currency)}
+                        </p>
+                        <RecurringStatusBadge state={inst.derived} />
+                      </div>
+                    </div>
+                  );
+                })}
+                <Link to="/recurring" className="flex items-center gap-0.5 text-xs font-medium text-primary hover:underline pt-1">
+                  Ver todos <ChevronRight className="h-3 w-3" />
+                </Link>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      )}
       {upcoming.length > 0 && (
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold flex items-center gap-2"><CalendarDays className="h-4 w-4 text-muted-foreground" /> Próximos pagos</CardTitle></CardHeader>
