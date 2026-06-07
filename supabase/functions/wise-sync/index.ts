@@ -1,11 +1,5 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+import { createClient } from "npm:@supabase/supabase-js@2";
+import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 
 const WISE_BASE = "https://api.wise.com";
 
@@ -40,6 +34,31 @@ async function wiseFetch(path: string, token: string, action: string) {
   return res.json();
 }
 
+async function getAuthenticatedUserId(
+  supabaseUrl: string,
+  anonKey: string,
+  authHeader: string,
+) {
+  const jwt = authHeader.replace("Bearer ", "").trim();
+  const userClient = createClient(supabaseUrl, anonKey, {
+    global: { headers: { Authorization: authHeader } },
+  });
+  const auth = userClient.auth as any;
+
+  if (typeof auth.getClaims === "function") {
+    const { data, error } = await auth.getClaims(jwt);
+    if (!error && data?.claims?.sub) return data.claims.sub as string;
+    console.error("wise-sync getClaims failed:", error?.message || "missing claims");
+  }
+
+  const { data, error } = await userClient.auth.getUser(jwt);
+  if (error || !data?.user?.id) {
+    console.error("wise-sync getUser failed:", error?.message || "missing user");
+    return null;
+  }
+  return data.user.id;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -51,21 +70,18 @@ Deno.serve(async (req) => {
       return json({ error: "No autenticado" }, 401);
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!supabaseUrl || !anonKey || !serviceKey) {
+      console.error("wise-sync missing backend environment variables");
+      return json({ error: "Configuración del backend incompleta" }, 500);
+    }
 
-    const userClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const jwt = authHeader.replace("Bearer ", "");
-    const { data: claims, error: claimsErr } = await userClient.auth.getClaims(
-      jwt,
-    );
-    if (claimsErr || !claims?.claims?.sub) {
+    const userId = await getAuthenticatedUserId(supabaseUrl, anonKey, authHeader);
+    if (!userId) {
       return json({ error: "Sesión inválida" }, 401);
     }
-    const userId = claims.claims.sub as string;
 
     const admin = createClient(supabaseUrl, serviceKey);
 
