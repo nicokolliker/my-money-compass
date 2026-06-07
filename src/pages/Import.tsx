@@ -781,6 +781,7 @@ export default function ImportPage() {
 
       const payload: any[] = [];
       const rules = await fetchUserRules();
+      const digitalMap = await fetchDigitalSubcatMap();
       for (const r of toImport) {
         const cur = (r._currency || 'USD').toUpperCase();
         const amt = r._amount ?? r.amountUSD;
@@ -788,6 +789,8 @@ export default function ImportPage() {
         if (!acct) continue;
         const isIncome = r.type === 'income';
         const sign = isIncome ? 1 : -1;
+        const category_id = matchRuleCategory(rules, r.description, r.description);
+        const subcategory_id = resolveDigitalSubcategoryId(category_id, r.description, digitalMap);
         payload.push({
           user_id: user.id,
           account_id: acct.id,
@@ -801,7 +804,8 @@ export default function ImportPage() {
           type: (isIncome ? 'income' : 'expense') as any,
           external_id: r.external_id,
           raw_imported_description: r.description,
-          category_id: matchRuleCategory(rules, r.description, r.description),
+          category_id,
+          subcategory_id,
         });
       }
       if (payload.length === 0) {
