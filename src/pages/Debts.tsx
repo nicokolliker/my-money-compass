@@ -414,16 +414,19 @@ function ViejoCard({
 // ============================================================================
 
 function SplitwiseCard({
+  settlementMonth,
   account,
   importLog,
   onOpenCsv,
   onOpenPay,
 }: {
+  settlementMonth: string;
   account: any;
   importLog: any[];
   onOpenCsv: () => void;
   onOpenPay: () => void;
 }) {
+  const monthLabel = format(new Date(settlementMonth + '-01T12:00:00'), 'MMMM', { locale: es });
   const swImports = (importLog || [])
     .filter((l: any) => l.source === 'splitwise')
     .sort((a: any, b: any) => (b.imported_at || '').localeCompare(a.imported_at || ''));
