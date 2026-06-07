@@ -72,9 +72,14 @@ export function UncategorizedMerchantsBanner() {
       let createdRules = 0;
       for (const m of toApply) {
         const state = rows[m.key];
+        const isDigital = !!digitalCategoryId && state.categoryId === digitalCategoryId;
+        const update: { category_id: string; subtype?: string | null } = {
+          category_id: state.categoryId,
+          subtype: isDigital ? (state.subtype || getDigitalSubtype(m.name)) : null,
+        };
         const { error } = await supabase
           .from('transactions')
-          .update({ category_id: state.categoryId })
+          .update(update)
           .in('id', m.txIds);
         if (error) throw error;
         updatedTxs += m.txIds.length;
@@ -139,7 +144,8 @@ export function UncategorizedMerchantsBanner() {
 
           <div className="flex-1 overflow-y-auto -mx-6 px-6 space-y-2">
             {merchants.map(m => {
-              const state = rows[m.key] ?? { categoryId: m.inferredCategoryId ?? '', createRule: false };
+              const state: RowState = rows[m.key] ?? { categoryId: m.inferredCategoryId ?? '', subtype: '', createRule: false };
+              const isDigital = !!digitalCategoryId && state.categoryId === digitalCategoryId;
               return (
                 <div
                   key={m.key}
@@ -169,12 +175,17 @@ export function UncategorizedMerchantsBanner() {
                   <div className="flex items-center gap-2 flex-wrap">
                     <Select
                       value={state.categoryId || 'none'}
-                      onValueChange={(v) =>
+                      onValueChange={(v) => {
+                        const nextCat = v === 'none' ? '' : v;
+                        const nextSubtype =
+                          nextCat && nextCat === digitalCategoryId
+                            ? (state.subtype || getDigitalSubtype(m.name))
+                            : '';
                         setRows(prev => ({
                           ...prev,
-                          [m.key]: { ...state, categoryId: v === 'none' ? '' : v },
-                        }))
-                      }
+                          [m.key]: { ...state, categoryId: nextCat, subtype: nextSubtype },
+                        }));
+                      }}
                     >
                       <SelectTrigger className="h-9 flex-1 min-w-[180px] rounded-lg">
                         <SelectValue placeholder="Seleccionar categoría" />
@@ -205,6 +216,27 @@ export function UncategorizedMerchantsBanner() {
                       Crear regla automática
                     </label>
                   </div>
+
+                  {isDigital && (
+                    <Select
+                      value={state.subtype || 'otros'}
+                      onValueChange={(v) =>
+                        setRows(prev => ({
+                          ...prev,
+                          [m.key]: { ...state, subtype: v },
+                        }))
+                      }
+                    >
+                      <SelectTrigger className="h-9 rounded-lg">
+                        <SelectValue placeholder="Subtipo digital" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(DIGITAL_SUBTYPES).map(([key, { label, icon }]) => (
+                          <SelectItem key={key} value={key}>{icon} {label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
               );
             })}
