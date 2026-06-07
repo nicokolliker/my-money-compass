@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Upload, CheckCircle2, X, Plus, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
+import { format, addMonths, startOfMonth } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -340,21 +340,40 @@ export function ViejoSettlementWizard({ open, onOpenChange, settlementMonth, onS
 
       // ── Extraer cuotas pendientes (Cuota XX/YY) por source ──────────
       const cuotaRe = /cuota\s*(\d+)\s*\/\s*(\d+)/i;
+      const stripCuota = (s: string) =>
+        (s || '').replace(/\s*cuota\s*\d+\s*\/\s*\d+\s*/gi, ' ').replace(/\s+/g, ' ').trim();
+      const buildKey = (src: string, desc: string) =>
+        `installment:${src}:${stripCuota(desc).toLowerCase()}`;
+
       const sources: Array<{ key: 'mama' | 'papa' | 'sant'; rows: typeof allPdfRows }> = [
         { key: 'mama', rows: iebraRows.filter(r => r.selected) },
         { key: 'papa', rows: kollikerRows.filter(r => r.selected) },
         { key: 'sant', rows: santRows.filter(r => r.selected) },
       ];
 
+      // Casa/Hogar fallback category
+      const fallbackCat = categories.find((c: any) =>
+        /^(casa|hogar)$/i.test(c.name || '')
+      );
+
       for (const { key, rows } of sources) {
-        // Last-one-wins: clear existing rows for this source
+        // Last-one-wins: clear existing installment_debts rows for this source
         await supabase
           .from('installment_debts' as any)
           .delete()
           .eq('user_id', user.id)
           .eq('source', key);
 
-        const inserts: any[] = [];
+        // Parse installment items from selected rows
+        type Parsed = {
+          description: string;
+          amountARS: number;
+          current: number;
+          total: number;
+          remaining: number;
+          notesKey: string;
+        };
+        const parsed: Parsed[] = [];
         for (const r of rows) {
           const m = (r.description || '').match(cuotaRe);
           if (!m) continue;
@@ -362,22 +381,112 @@ export function ViejoSettlementWizard({ open, onOpenChange, settlementMonth, onS
           const total = parseInt(m[2], 10);
           if (!Number.isFinite(current) || !Number.isFinite(total) || total <= 0) continue;
           const remaining = Math.max(0, total - current);
-          inserts.push({
-            user_id: user.id,
-            source: key,
+          parsed.push({
             description: r.description,
-            amount_ars: r.amountARS,
-            current_installment: current,
-            total_installments: total,
-            remaining_installments: remaining,
-            settlement_month: settlementMonth,
+            amountARS: r.amountARS,
+            current,
+            total,
+            remaining,
+            notesKey: buildKey(key, r.description),
           });
         }
-        if (inserts.length > 0) {
-          await supabase.from('installment_debts' as any).insert(inserts);
+
+        // Insert into installment_debts (only rows with something to track)
+        if (parsed.length > 0) {
+          await supabase.from('installment_debts' as any).insert(
+            parsed.map((p) => ({
+              user_id: user.id,
+              source: key,
+              description: p.description,
+              amount_ars: p.amountARS,
+              current_installment: p.current,
+              total_installments: p.total,
+              remaining_installments: p.remaining,
+              settlement_month: settlementMonth,
+            }))
+          );
+        }
+
+        // ── Sync to recurring_expenses ────────────────────────────────
+        const { data: existingRows } = await supabase
+          .from('recurring_expenses')
+          .select('id, notes, name, amount, end_date, is_active, category_id')
+          .eq('user_id', user.id)
+          .eq('subtype', 'installment')
+          .like('notes', `installment:${key}:%`);
+
+        const existingByKey = new Map<string, any>();
+        (existingRows || []).forEach((row: any) => {
+          if (row.notes) existingByKey.set(row.notes, row);
+        });
+
+        const today = new Date();
+        for (const p of parsed) {
+          const cleanName = stripCuota(p.description) || p.description;
+          const inferredName = inferCategoryName(p.description);
+          const inferredCat = inferredName
+            ? categories.find((c: any) => c.name === inferredName)
+            : null;
+          const categoryId = inferredCat?.id || fallbackCat?.id || null;
+          const endDate = format(addMonths(today, p.remaining), 'yyyy-MM-dd');
+
+          const existing = existingByKey.get(p.notesKey);
+          existingByKey.delete(p.notesKey);
+
+          if (p.remaining === 0) {
+            if (existing) {
+              await supabase
+                .from('recurring_expenses')
+                .update({ is_active: false, amount: p.amountARS, end_date: endDate })
+                .eq('id', existing.id);
+            }
+            continue;
+          }
+
+          if (existing) {
+            await supabase
+              .from('recurring_expenses')
+              .update({
+                name: cleanName,
+                amount: p.amountARS,
+                currency: 'ARS',
+                frequency: 'monthly',
+                end_date: endDate,
+                category_id: existing.category_id || categoryId,
+                is_active: true,
+              })
+              .eq('id', existing.id);
+          } else {
+            await supabase.from('recurring_expenses').insert({
+              user_id: user.id,
+              name: cleanName,
+              amount: p.amountARS,
+              currency: 'ARS',
+              type: 'casa',
+              subtype: 'installment',
+              frequency: 'monthly',
+              notes: p.notesKey,
+              category_id: categoryId,
+              end_date: endDate,
+              next_due_date: format(startOfMonth(addMonths(today, 1)), 'yyyy-MM-dd'),
+              is_active: true,
+              status: 'expected',
+            });
+          }
+        }
+
+        // Any leftover existing installments for this source weren't seen → deactivate
+        for (const stale of existingByKey.values()) {
+          if (stale.is_active) {
+            await supabase
+              .from('recurring_expenses')
+              .update({ is_active: false })
+              .eq('id', stale.id);
+          }
         }
       }
       qc.invalidateQueries({ queryKey: ['installment-debts'] });
+      qc.invalidateQueries({ queryKey: ['recurring-expenses'] });
 
 
 
