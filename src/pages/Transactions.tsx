@@ -203,6 +203,11 @@ export default function Transactions() {
   });
   const { data: accounts } = useAccounts();
   const { data: categories } = useCategories();
+  const digitalCatId = useMemo(
+    () => (categories || []).find((c: any) => (c.name || '').toLowerCase() === 'digital')?.id || null,
+    [categories],
+  );
+  const { data: digitalSubcats = [] } = useSubcategories(digitalCatId || undefined);
   const { data: recurringMatchMap = {} } = useTransactionRecurringMap();
   const deleteTx = useDeleteTransaction();
   const updateTx = useUpdateTransaction();
