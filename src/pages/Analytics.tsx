@@ -6,7 +6,7 @@ import { useTransactions } from '@/hooks/useTransactions';
 import { useAccounts } from '@/hooks/useAccounts';
 import { useCategories, useSubcategories } from '@/hooks/useCategories';
 import { useCategoryTree } from '@/hooks/useCategoryTree';
-import { useBudgets } from '@/hooks/useBudgets';
+
 import { formatUSD } from '@/lib/constants';
 import { getCategoryHex } from '@/lib/categoryColors';
 import { getCategoryIcon } from '@/lib/brandLogos';
@@ -72,7 +72,7 @@ export default function Analytics() {
   const { data: accounts } = useAccounts();
   const { data: categories } = useCategories();
   const { data: allSubcategories } = useSubcategories();
-  const { data: budgets } = useBudgets();
+  
   const { tree: categoryTree, totalRecurringMonthly } = useCategoryTree();
   const [period, setPeriod] = useState<Period>('this_month');
   const [accountFilter, setAccountFilter] = useState('all');
@@ -221,33 +221,6 @@ export default function Analytics() {
     [categoryMonthly, visibleCategoriesForChart]
   );
 
-  const budgetVsActual = useMemo(() => {
-    if (!allTransactions) return [];
-    const now = new Date();
-    const months: string[] = [];
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
-    }
-    return months.map(month => {
-      const actual = allTransactions
-        .filter(t => t.type === 'expense' && t.date.startsWith(month))
-        .reduce((s, t) => s + Math.abs(Number(t.amount_usd)), 0);
-      const budgeted = (budgets || [])
-        .filter(b => String(b.month).startsWith(month))
-        .reduce((s, b) => s + Number(b.amount || 0), 0);
-      const deviation = actual - budgeted;
-      const pct = budgeted > 0 ? Math.round((deviation / budgeted) * 100) : 0;
-      return {
-        month,
-        label: new Date(month + '-01').toLocaleString('es', { month: 'short' }),
-        actual: Math.round(actual),
-        budgeted: Math.round(budgeted),
-        deviation: Math.round(deviation),
-        pct,
-      };
-    });
-  }, [allTransactions, budgets]);
 
   const topMerchants = useMemo(() => {
     const map: Record<string, number> = {};
