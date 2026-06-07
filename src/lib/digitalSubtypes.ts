@@ -6,7 +6,7 @@ export const DIGITAL_SUBTYPES: Record<string, { label: string; icon: string }> =
   ia:                 { label: 'IA',                          icon: '🤖' },
   creatividad:        { label: 'Creatividad & Productividad', icon: '🎨' },
   entretenimiento:    { label: 'Entretenimiento',             icon: '🎬' },
-  delivery_movilidad: { label: 'Delivery & Movilidad',        icon: '🚚' },
+  delivery_movilidad: { label: 'Marketplace & Movilidad',     icon: '🛒' },
   otros:              { label: 'Otros',                       icon: '✨' },
 };
 
