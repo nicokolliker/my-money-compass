@@ -12,6 +12,7 @@ import { useMerchants } from '@/hooks/useMerchants';
 import { useCreateTransaction, useCreateTransfer, useUpdateTransaction } from '@/hooks/useTransactions';
 import { useFxRates } from '@/hooks/useFxRates';
 import { CURRENCIES, TRANSACTION_TYPE_LABELS, formatUSD } from '@/lib/constants';
+import { DIGITAL_SUBTYPES, getDigitalSubtype } from '@/lib/digitalSubtypes';
 import { toast } from 'sonner';
 
 interface Props {
@@ -102,6 +103,22 @@ export function TransactionForm({ onSuccess, editData }: Props) {
   const [fxRate, setFxRate] = useState(editData?.fx_rate ? String(editData.fx_rate) : '1');
   const [toAmount, setToAmount] = useState('');
   const [isSubscription, setIsSubscription] = useState(editData?.is_subscription || false);
+  const [subtype, setSubtype] = useState<string>(editData?.subtype || '');
+
+  // Is the currently-selected category "Digital" (top-level or one of its subcategories)?
+  const isDigitalSelected = !!digitalCategory && (
+    categoryId === digitalCategory.id ||
+    digitalSubcategories.some(s => s.id === categoryId)
+  );
+
+  // Auto-fill subtype when category becomes Digital and we have a name signal.
+  useEffect(() => {
+    if (!isDigitalSelected) return;
+    if (subtype) return;
+    const selectedMerchant = merchants?.find(m => m.id === merchantId);
+    const nameSignal = selectedMerchant?.display_name || selectedMerchant?.name || description || '';
+    if (nameSignal) setSubtype(getDigitalSubtype(nameSignal));
+  }, [isDigitalSelected, merchantId, description, merchants, subtype]);
 
   const activeAccounts = accounts?.filter(a => a.is_active) || [];
   const selectedAccount = activeAccounts.find(a => a.id === accountId);
