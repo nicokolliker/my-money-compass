@@ -1,7 +1,14 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useCategories } from '@/hooks/useCategories';
-import { useIgnoredSuggestions, inferCategoryName } from '@/hooks/useRuleSuggestions';
+import {
+  useIgnoredSuggestions,
+  useAiInferenceVersion,
+} from '@/hooks/useRuleSuggestions';
+import {
+  getCachedInferredCategory,
+  inferCategoryAI,
+} from '@/lib/aiCategoryInference';
 
 export interface UncategorizedMerchant {
   id: string;             // ignore-key
@@ -20,12 +27,17 @@ export function useUncategorizedMerchants(minCount = 2) {
   const { data: transactions } = useTransactions();
   const { data: categories } = useCategories();
   const { ids: ignoredIds } = useIgnoredSuggestions();
+  const aiVersion = useAiInferenceVersion();
 
-  return useMemo<UncategorizedMerchant[]>(() => {
-    if (!transactions) return [];
-    const ignored = new Set(ignoredIds);
+  const categoryNames = useMemo(
+    () => (categories || []).map((c) => c.name),
+    [categories],
+  );
+
+  // Group uncategorized expenses by merchant.
+  const baseGroups = useMemo(() => {
     const groups = new Map<string, UncategorizedMerchant>();
-
+    if (!transactions) return groups;
     for (const t of transactions as any[]) {
       if (t.type !== 'expense') continue;
       if (t.category_id) continue;
@@ -49,23 +61,43 @@ export function useUncategorizedMerchants(minCount = 2) {
       g.count += 1;
       g.avgAmount += Math.abs(Number(t.amount) || 0);
     }
+    return groups;
+  }, [transactions]);
 
+  // Kick off AI inference for merchants past the threshold.
+  useEffect(() => {
+    if (categoryNames.length === 0) return;
+    for (const g of baseGroups.values()) {
+      if (g.count < minCount) continue;
+      if (getCachedInferredCategory(g.name) !== undefined) continue;
+      void inferCategoryAI(g.name, categoryNames);
+    }
+  }, [baseGroups, categoryNames, minCount]);
+
+  return useMemo<UncategorizedMerchant[]>(() => {
+    const ignored = new Set(ignoredIds);
     const findCategory = (name: string) =>
-      categories?.find(c => c.name.toLowerCase() === name.toLowerCase());
+      categories?.find((c) => c.name.toLowerCase() === name.toLowerCase());
 
     const out: UncategorizedMerchant[] = [];
-    for (const g of groups.values()) {
+    for (const g of baseGroups.values()) {
       if (g.count < minCount) continue;
       if (ignored.has(g.id)) continue;
-      g.avgAmount = g.avgAmount / g.count;
-      const inferredName = inferCategoryName(g.name);
+      const m: UncategorizedMerchant = {
+        ...g,
+        avgAmount: g.avgAmount / g.count,
+      };
+      const cached = getCachedInferredCategory(m.name);
+      const inferredName = cached === undefined ? null : cached;
       if (inferredName) {
         const cat = findCategory(inferredName);
-        g.inferredCategoryName = inferredName;
-        g.inferredCategoryId = cat?.id;
+        m.inferredCategoryName = inferredName;
+        m.inferredCategoryId = cat?.id;
       }
-      out.push(g);
+      out.push(m);
     }
     return out.sort((a, b) => b.count - a.count);
-  }, [transactions, categories, ignoredIds]);
+    // aiVersion forces recompute when AI cache updates.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseGroups, categories, ignoredIds, minCount, aiVersion]);
 }
