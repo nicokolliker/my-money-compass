@@ -12,7 +12,7 @@ import { useLatestFxRate } from '@/hooks/useFxRates';
 import { parseSplitwise } from '@/lib/importers/splitwiseParser';
 import { FileSlot } from './ViejoSettlementWizard';
 
-export function SplitwiseSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
+export function SplitwiseSettlementWizard({ open, onOpenChange, settlementMonth }: { open: boolean; onOpenChange: (v: boolean) => void; settlementMonth: string }) {
   const { data: accounts } = useAccountBalances();
   const arsToUsd = useLatestFxRate('ARS', 'USD');
   const qc = useQueryClient();
