@@ -323,12 +323,6 @@ Deno.serve(async (req) => {
       let minDate: string | null = null;
       let maxDate: string | null = null;
 
-      let imported = 0;
-      let skipped = 0;
-      let sumImported = 0;
-      let minDate: string | null = null;
-      let maxDate: string | null = null;
-
       // Fetch user's rules once for auto-categorization
       const { data: rulesData } = await admin
         .from("rules")
@@ -361,9 +355,6 @@ Deno.serve(async (req) => {
           type = "transfer";
         }
         const category_id = matchRule(description);
-        if ((tx.details?.type || "").toUpperCase() === "TRANSFER") {
-          type = "transfer";
-        }
 
         const amountUsd = amount * fxRate;
 
@@ -381,10 +372,12 @@ Deno.serve(async (req) => {
               amount_usd: amountUsd,
               type,
               external_id,
+              category_id,
             },
             { onConflict: "external_id", ignoreDuplicates: true },
           )
           .select("id");
+
 
         if (insErr) {
           diagnostics.push(`Upsert error ${external_id}: ${insErr.message}`);
