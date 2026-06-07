@@ -25,12 +25,17 @@ export default function WiseTab() {
   const [selectedProfile, setSelectedProfile] = useState<number | null>(null);
   const [balances, setBalances] = useState<WiseBalance[]>([]);
   const [connected, setConnected] = useState(false);
+  const [apiToken, setApiToken] = useState('');
   const [syncing, setSyncing] = useState<string | null>(null);
   const [syncResults, setSyncResults] = useState<Record<string, WiseSyncResult>>({});
 
   const handleConnect = async () => {
+    if (!apiToken.trim()) {
+      toast.error('Pegá tu Wise API token primero');
+      return;
+    }
     try {
-      const res = await getProfiles.mutateAsync();
+      const res = await getProfiles.mutateAsync(apiToken.trim());
       setProfiles(res.profiles || []);
       if (res.profiles?.length > 0) {
         setSelectedProfile(res.profiles[0].id);
@@ -38,6 +43,8 @@ export default function WiseTab() {
         const bRes = await getBalances.mutateAsync(res.profiles[0].id);
         setBalances(bRes.balances || []);
         toast.success('Connected to Wise');
+      } else {
+        toast.error('No se encontraron perfiles en Wise');
       }
     } catch (e: any) {
       toast.error(e.message);
