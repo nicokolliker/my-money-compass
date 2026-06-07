@@ -98,7 +98,7 @@ export function SplitwiseSettlementWizard({ open, onOpenChange, settlementMonth 
   const monthActivity = useMemo(() => {
     if (!result) return [];
     return result.rows.filter(
-      (r) => r.date.startsWith(monthInfo.ym) && Math.abs(r.userAmount) >= 0.01,
+      (r) => r.date.startsWith(monthInfo.ym) && r.userAmount !== 0,
     );
   }, [result, monthInfo.ym]);
 
