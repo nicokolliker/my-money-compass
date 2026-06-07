@@ -52,7 +52,10 @@ export function inferCategoryName(name: string): string | null {
  */
 export function useAiInferenceVersion() {
   const [v, setV] = useState(0);
-  useEffect(() => subscribeInferredCategory(() => setV((x) => x + 1)), []);
+  useEffect(() => {
+    const unsub = subscribeInferredCategory(() => setV((x) => x + 1));
+    return () => { unsub; };
+  }, []);
   return v;
 }
 
