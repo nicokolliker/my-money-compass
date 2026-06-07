@@ -287,7 +287,7 @@ export default function Accounts() {
                         {isArqAccount(a.name) && (
                           <button
                             onClick={() => setArqSheetAccount(a)}
-                            className="p-1.5 rounded-lg hover:bg-accent/50 transition-colors shrink-0"
+                            className="p-1.5 rounded-lg hover:bg-muted/60 transition-colors shrink-0"
                             title="Ver conciliaciones"
                           >
                             <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
@@ -296,7 +296,7 @@ export default function Accounts() {
                         {isTrackedDestAccount(a.name) && (
                           <button
                             onClick={() => setDestSheetAccount(a)}
-                            className="p-1.5 rounded-lg hover:bg-accent/50 transition-colors shrink-0"
+                            className="p-1.5 rounded-lg hover:bg-muted/60 transition-colors shrink-0"
                             title="Ver conciliaciones"
                           >
                             <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
@@ -306,7 +306,7 @@ export default function Accounts() {
                           const isSpecial = isArqAccount(a.name) || isTrackedDestAccount(a.name);
                           const onRowClick = isSpecial ? () => openEdit(a) : () => setDetailAccount(a);
                           return (
-                        <button onClick={onRowClick} className="flex items-center gap-3 flex-1 min-w-0 py-3 text-left hover:bg-accent/50 active:bg-accent rounded-lg px-2 -mx-2 transition-colors">
+                        <button onClick={onRowClick} className="flex items-center gap-3 flex-1 min-w-0 py-3 text-left hover:bg-muted/60 active:bg-accent rounded-lg px-2 -mx-2 transition-colors">
                           <AccountLogo name={a.name} institution={(a as any).institution} />
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5">
@@ -579,7 +579,7 @@ export default function Accounts() {
             </div>
             <button
               onClick={() => { setShowAddChoice(false); setEditId(null); setForm({ name: '', type: 'bank', institution: '', currency: 'USD', opening_balance: '0', notes: '', group_id: '', exclude_from_net_worth: false, my_card_suffix: '', is_own_card: false }); setShowForm(true); }}
-              className="w-full flex items-center gap-4 p-4 rounded-xl border hover:border-primary/40 hover:bg-accent/50 transition-colors text-left"
+              className="w-full flex items-center gap-4 p-4 rounded-xl border hover:border-primary/40 hover:bg-muted/60 transition-colors text-left"
             >
               <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0">
                 <PenLine className="h-5 w-5 text-muted-foreground" />
@@ -601,7 +601,7 @@ export default function Accounts() {
           <div className="space-y-3 pt-2">
             <button
               onClick={() => { setShowPostCreate(false); navigate('/settings', { state: { tab: 'import' } }); }}
-              className="w-full flex items-center gap-4 p-4 rounded-xl border hover:border-primary/40 hover:bg-accent/50 transition-colors text-left"
+              className="w-full flex items-center gap-4 p-4 rounded-xl border hover:border-primary/40 hover:bg-muted/60 transition-colors text-left"
             >
               <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                 <FileUp className="h-5 w-5 text-primary" />
@@ -613,7 +613,7 @@ export default function Accounts() {
             </button>
             <button
               onClick={() => setShowPostCreate(false)}
-              className="w-full flex items-center gap-4 p-4 rounded-xl border hover:border-primary/40 hover:bg-accent/50 transition-colors text-left"
+              className="w-full flex items-center gap-4 p-4 rounded-xl border hover:border-primary/40 hover:bg-muted/60 transition-colors text-left"
             >
               <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0">
                 <PenLine className="h-5 w-5 text-muted-foreground" />

@@ -53,7 +53,7 @@ function MerchantCombobox({ merchants, value, onChange }: { merchants: any[]; va
         <div className="max-h-[240px] overflow-y-auto p-1">
           <button
             type="button"
-            className="w-full text-left px-2 py-1.5 text-sm rounded hover:bg-accent"
+            className="w-full text-left px-2 py-1.5 text-sm rounded hover:bg-muted/60"
             onClick={() => { onChange('none'); setOpen(false); setSearch(''); }}
           >
             No merchant
@@ -62,7 +62,7 @@ function MerchantCombobox({ merchants, value, onChange }: { merchants: any[]; va
             <button
               type="button"
               key={m.id}
-              className="w-full flex items-center justify-between px-2 py-1.5 text-sm rounded hover:bg-accent"
+              className="w-full flex items-center justify-between px-2 py-1.5 text-sm rounded hover:bg-muted/60"
               onClick={() => { onChange(m.id); setOpen(false); setSearch(''); }}
             >
               <span>{m.display_name || m.name}</span>

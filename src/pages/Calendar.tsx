@@ -298,7 +298,7 @@ export default function CalendarPage({ embedded = false }: { embedded?: boolean 
                                 {!item.isPaid && (
                                   <div className="flex items-center gap-1 shrink-0">
                                     <Button
-                                      size="sm" variant="ghost" className="h-7 w-7 p-0 text-primary hover:text-primary hover:bg-primary/10"
+                                      size="sm" variant="ghost" className="h-7 w-7 p-0 text-primary hover:text-primary hover:bg-muted/60"
                                       onClick={() => setMatchInstance(item as any)}
                                       title="Registrar pago"
                                     >

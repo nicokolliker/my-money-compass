@@ -129,7 +129,7 @@ export default function ManualMatchDialog({ instance, open, onOpenChange }: Prop
                 key={t.id}
                 onClick={() => handleLink(t.id)}
                 disabled={link.isPending}
-                className="w-full flex items-center gap-3 p-3 rounded-xl border hover:border-primary/40 hover:bg-accent/50 transition-colors text-left disabled:opacity-50"
+                className="w-full flex items-center gap-3 p-3 rounded-xl border hover:border-primary/40 hover:bg-muted/60 transition-colors text-left disabled:opacity-50"
               >
                 <div className="text-center shrink-0 w-12">
                   <p className="text-[10px] text-muted-foreground uppercase">{format(new Date(t.date + 'T12:00:00'), 'MMM')}</p>
