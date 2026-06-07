@@ -272,9 +272,27 @@ Deno.serve(async (req) => {
         }
         windowEnd = windowStart;
       }
+
+      if (!statementOk) {
+        diagnostics.push("Wise bloqueó balance-statements; intentando fallback con Activities API.");
+        try {
+          txs = await fetchActivitiesFallback(
+            profileId,
+            token,
+            currency,
+            new Date(earliest).toISOString(),
+            new Date(now).toISOString(),
+          );
+          statementOk = txs.length > 0;
+          diagnostics.push(`Activities API devolvió ${txs.length} movimientos para ${currency}.`);
+        } catch (e: any) {
+          diagnostics.push(`Activities API falló: ${e.message}`);
+        }
+      }
+
       if (!statementOk) {
         return json({
-          error: `Wise rechazó el statement. ${diagnostics.join(" | ")}`,
+          error: `Wise no permitió leer transacciones. ${diagnostics.join(" | ")}`,
           diagnostics,
           status: "failed",
           imported: 0,
