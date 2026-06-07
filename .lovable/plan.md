@@ -1,120 +1,66 @@
-# Debts page redesign
+# Sync installments → recurring expenses
 
 ## Goal
-Restructure `/debts` around the user's actual monthly ritual: two settlements (Viejo + Splitwise) shown as twin cards, with all confirm actions producing real account-affecting transactions.
+After the Viejo wizard finishes, every installment row with `remaining_installments > 0` becomes (or updates) a row in `recurring_expenses` marked as an installment. Items that hit `remaining = 0` are deactivated. Manually-added recurrings need no extra wiring — they already feed budget tracking via their category.
 
-## New page layout (`src/pages/Debts.tsx`)
+## Identification scheme
+- `subtype = 'installment'` marks the row as installment-managed.
+- `notes` stores a stable key: `installment:<source>:<stripped-description>` where the description has any `Cuota X/Y` token removed and is trimmed/collapsed.
+- Matching is done by `(user_id, subtype='installment', notes=<key>)`. This survives the monthly `Cuota 03/06 → 04/06` change.
 
+## Sync logic (runs at end of Viejo wizard `handleConfirm`, after `installment_debts` upsert)
+
+For each of the three sources (`mama`, `papa`, `sant`):
+
+```text
+1. Load existing recurring_expenses where user_id=me AND subtype='installment'
+   AND notes LIKE 'installment:<source>:%'   → existingBySource map by notes key.
+
+2. For each installment row in this source's selection:
+   - parse Cuota X/Y → current, total, remaining = total - current
+   - key  = `installment:${source}:${stripCuota(description)}`
+   - name = stripCuota(description)             (clean display name)
+   - amount = amount_ars, currency = 'ARS'
+   - end_date = addMonths(today, remaining)     (date-fns)
+   - category_id =
+        inferCategoryName(description) → categories.find(name) → id
+        ?? categories.find(name ILIKE 'casa' OR 'hogar').id
+        ?? null
+   - type = 'casa'
+   - frequency = 'monthly'
+   - is_active = remaining > 0
+
+   If remaining === 0:
+     - if existing row found → UPDATE is_active=false (do not delete, to preserve history/matches)
+     - else skip
+   Else:
+     - if existing row found → UPDATE (name, amount, end_date, category_id, is_active=true)
+     - else INSERT new row with the fields above + notes=key + subtype='installment'
+
+3. After processing this source's current rows, any leftover row in
+   existingBySource that was NOT touched this run → UPDATE is_active=false
+   (the installment was fully paid off or removed in a prior cycle).
 ```
-Liquidaciones — <Month YYYY>
 
-┌──────────────────────┐  ┌──────────────────────┐
-│ Al Viejo             │  │ Splitwise            │
-│ Last: $X · Month     │  │ Balance: -$X ARS     │
-│ [✓ Liquidado | Pend] │  │ Último import: date  │
-│                      │  │                      │
-│ [💚 Vuelto pendiente │  │ [Registrar pago →]   │
-│  +$X.XXX ARS         │  │   (if owes)          │
-│  Marcar recibido]    │  │ or "Sin deuda"       │
-│                      │  │                      │
-│ [Liquidar Month →]   │  │ [Cargar CSV]         │
-└──────────────────────┘  └──────────────────────┘
+All writes go through `supabase.from('recurring_expenses')` directly inside `handleConfirm` (same pattern as the existing transaction inserts). At the end, invalidate `['recurring-expenses']` alongside `['installment-debts']`.
 
-Estado actual
-  <CreditCardDebtCard />
+## Manual recurring → budget
+Confirmed in clarifying questions: no schema or auto-budget code. Existing budgets already roll up spend from transactions in the category, so a manually-added recurring with a `category_id` will naturally appear in the matching budget row when its transactions land. No change needed.
 
-Historial
-  <UnifiedCycleHistory />
-```
-
-Removed: top-level `<PendingCreditsBanner />`, the unused `ViejoDebtCard` / `SplitwiseDebtCard` / `SimpleDebtCard` / `TransferDialog` blocks (dead code from prior refactor).
-
-## Card 1 — `ViejoActionCard` (extended)
-
-- Keep current header (last settlement USD + month, "Liquidar [mes] →" button opening `ViejoSettlementWizard`).
-- Add inline status badge:
-  - `✓ Liquidado` when a settlement transaction exists for the current `yyyy-MM` (reuse the `liquidacion-check` query already in `ViejoDebtCard`).
-  - Otherwise `Pendiente`.
-- Inline pending vuelto block (replaces `PendingCreditsBanner`):
-  - Source: `usePendingCredits()` filtered to `source = 'viejo_settlement'`, `status = 'pending'`.
-  - Renders: `💚 Vuelto pendiente: +$X.XXX ARS · <month>` + `Marcar como recibido` button.
-  - Click → confirm dialog → `markVueltoReceived()` (see Behavior section).
-
-## Card 2 — `SplitwiseActionCard` (rebuilt)
-
-- Header: Splitwise logo + name + `Último import: <date>` (from `useImportLog`).
-- Balance display (large, centered):
-  - `balance < -0.5` → red `-$X.XX USD` with sublabel "Debés".
-  - `balance > 0.5` → green `+$X.XX USD` with "Te deben".
-  - else → muted "Sin deuda este mes ✓".
-- Primary button (only when `balance < -0.5`): `Registrar pago →` opens new `SplitwisePaymentDialog`.
-- Secondary button always visible: `Cargar CSV de Splitwise →` opens existing `SplitwiseSettlementWizard`.
-
-### `SplitwisePaymentDialog` (new, inline in Debts.tsx or `src/components/debts/SplitwisePaymentDialog.tsx`)
-Fields:
-- `Monto ARS` — pre-filled with `Math.round(Math.abs(balance) * tcBlue)` (USD→ARS using latest blue rate) but editable.
-- `Memo` — text input, optional (default: `Pago Splitwise — <Month>`).
-- Confirm → creates an MP-debit transaction (see Behavior).
-
-## Behavior — real transactions
-
-All three actions use `supabase.from('transactions').insert(...)` directly (same pattern as `ViejoSettlementWizard`).
-
-Account resolution helper (memoized via `useAccountBalances`):
-- Cash USD → first account where `currency='USD'` AND `name ILIKE '%cash%'`.
-- MercadoPago ARS → first account where `currency='ARS'` AND (`name ILIKE '%mercadopago%'` OR `name ILIKE '%mercado pago%'` OR `name ILIKE '%mp%'`).
-- Splitwise USD → already resolved as `splitwiseAccount`.
-
-### 1. Viejo wizard completion (Cash USD debit)
-Already implemented in `ViejoSettlementWizard.tsx` lines 424-435 — it inserts a `-usdAPagar` expense on the Cash USD account. **No change required**; we'll just note this in the plan and leave it.
-
-### 2. Marking vuelto as received (MP ARS credit)
-Extend `useResolvePendingCredit` (or wrap it in Debts page) so that on confirm we ALSO:
-- Insert `transactions` row:
-  - `account_id` = MP ARS account
-  - `date` = today
-  - `description` = `Vuelto liquidación <Month YYYY>`
-  - `amount` = `+pc.amount_ars`, `currency='ARS'`
-  - `fx_rate` = latest ARS→USD blue rate
-  - `amount_usd` = `+pc.amount_ars * fxArsUsd`
-  - `type` = `'income'`
-  - `notes` = JSON `{ vuelto_for: pc.id, settlement_month: pc.settlement_month }`
-- Then call the existing resolve mutation, passing the new `transactionId` so `pending_credits.matched_transaction_id` gets set.
-
-### 3. Splitwise payment confirm (MP ARS debit)
-On confirm of `SplitwisePaymentDialog`:
-- Insert `transactions` row:
-  - `account_id` = MP ARS account
-  - `date` = today
-  - `description` = memo or `Pago Splitwise — <Month>`
-  - `amount` = `-amountARS`, `currency='ARS'`
-  - `fx_rate` = latest ARS→USD blue rate
-  - `amount_usd` = `-amountARS * fxArsUsd`
-  - `type` = `'expense'`
-  - `notes` = JSON `{ splitwise_payment: true, settlement_month: '<yyyy-MM>' }`
-- Also insert mirroring credit on Splitwise account so the USD owed balance moves toward 0:
-  - `account_id` = Splitwise account
-  - `amount` = `+amountARS * fxArsUsd` (USD), `currency='USD'`
-  - `type` = `'adjustment'`
-  - `description` = `Pago Splitwise (MP)`
-  - linked via shared `notes` group id.
-- Invalidate `['accounts']`, `['transactions']`, `['splitwise-monthly']`.
-- Toast `Pago registrado`.
-
-## Edge cases & guards
-- If MP ARS or Cash USD account can't be resolved → toast error `No se encontró la cuenta MP/Cash USD`, abort.
-- If `tcBlue` (blue rate) unavailable → fall back to `1` for USD column but still record ARS amount; warn in toast.
-- All inserts wrapped in try/catch with sonner error toast.
-- After success, invalidate React Query keys: `['accounts']`, `['transactions']`, `['pending-credits']`, `['splitwise-monthly']`, `['last-liquidacion-any']`.
+## Technical details
+- New helper (top of `ViejoSettlementWizard.tsx` or `src/lib/installmentRecurring.ts`):
+  - `stripCuota(desc: string): string` — removes `\s*cuota\s*\d+\s*\/\s*\d+\s*` (case-insensitive), collapses spaces, trims.
+  - `buildInstallmentKey(source, desc)` returning `installment:${source}:${stripCuota(desc).toLowerCase()}`.
+- `end_date`: `format(addMonths(new Date(), remaining), 'yyyy-MM-dd')`.
+- Fallback "Casa/Hogar" category: case-insensitive lookup against the already-loaded `categories` array; if missing, leave `category_id` null (do not auto-create).
+- `next_due_date`: leave existing value if updating; on insert set to first of next month so the recurring tracker picks it up.
+- Cast to `as any` only where necessary; `subtype` and `notes` are already typed on the table.
 
 ## Files touched
-
-- `src/pages/Debts.tsx` — rewrite page body; delete dead `ViejoDebtCard`/`SplitwiseDebtCard`/`SimpleDebtCard`/`TransferDialog` blocks; new `ViejoActionCard` + `SplitwiseActionCard` with new behaviors; mount `SplitwisePaymentDialog`.
-- `src/components/debts/SplitwisePaymentDialog.tsx` — **new**.
-- `src/hooks/usePendingCredits.ts` — extend `useResolvePendingCredit` to accept an optional `creditTransaction` payload and create the MP credit tx in the same mutation (or add a sibling hook `useReceiveVuelto`).
-- No changes to `ViejoSettlementWizard.tsx` (Cash USD debit already in place).
-- No DB schema changes.
+- `src/components/debts/ViejoSettlementWizard.tsx` — extend `handleConfirm` with the sync block right after the installment_debts insert loop; add `qc.invalidateQueries({ queryKey: ['recurring-expenses'] })`.
+- (Optional) `src/lib/installmentRecurring.ts` — extract `stripCuota` + `buildInstallmentKey` + the sync function so the wizard file stays readable.
 
 ## Out of scope
-- Visual redesign of `CreditCardDebtCard` and `UnifiedCycleHistory` (kept as-is per request).
-- Touching the wizard internals beyond what's already implemented.
+- Migrations (no schema change).
+- Auto-creating budget rows.
+- Changing the manual "Add recurring expense" form (no new behavior needed there).
