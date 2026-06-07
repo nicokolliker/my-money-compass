@@ -126,52 +126,85 @@ export function useRuleSuggestions() {
   const { data: categories } = useCategories();
   const { data: recurring } = useRecurringExpenses();
   const { ids: ignoredIds } = useIgnoredSuggestions();
+  const aiVersion = useAiInferenceVersion();
+
+  // Build a stable list of category names for the AI prompt.
+  const categoryNames = useMemo(
+    () => (categories || []).map((c) => c.name),
+    [categories],
+  );
+
+  // Group expenses by merchant.
+  type Group = { key: string; name: string; txs: any[]; months: Set<string>; amounts: number[] };
+  const groups = useMemo(() => {
+    const out = new Map<string, Group>();
+    if (!transactions) return out;
+    for (const t of transactions as any[]) {
+      if (t.type !== 'expense') continue;
+      const name = (t.merchant || t.description || '').trim();
+      if (!name) continue;
+      const key = name.toUpperCase();
+      let g = out.get(key);
+      if (!g) { g = { key, name, txs: [], months: new Set(), amounts: [] }; out.set(key, g); }
+      g.txs.push(t);
+      g.months.add(t.date.slice(0, 7));
+      g.amounts.push(Math.abs(Number(t.amount_usd)));
+    }
+    return out;
+  }, [transactions]);
+
+  // Fire AI inference for merchants with 2+ uncategorized txs whose result
+  // isn't cached yet. Results populate the module cache and trigger re-render
+  // via `useAiInferenceVersion`. Suggestions remain suggestions — nothing is
+  // applied automatically.
+  useEffect(() => {
+    if (categoryNames.length === 0) return;
+    for (const g of groups.values()) {
+      const uncategorized = g.txs.filter((t) => !t.category_id).length;
+      if (uncategorized < 2) continue;
+      if (getCachedInferredCategory(g.name) !== undefined) continue;
+      void inferCategoryAI(g.name, categoryNames);
+    }
+  }, [groups, categoryNames]);
 
   return useMemo(() => {
     const ignored = new Set(ignoredIds);
     const suggestions: RuleSuggestion[] = [];
     if (!transactions) return suggestions;
 
-    const expenses = transactions.filter((t: any) => t.type === 'expense');
+    const findCategory = (name: string) =>
+      categories?.find((c) => c.name.toLowerCase() === name.toLowerCase());
 
-    // Group by merchant key
-    type Group = { key: string; name: string; txs: any[]; months: Set<string>; amounts: number[]; hasCategory: boolean };
-    const groups = new Map<string, Group>();
-    for (const t of expenses) {
-      const name = (t.merchant || t.description || '').trim();
-      if (!name) continue;
-      const key = name.toUpperCase();
-      let g = groups.get(key);
-      if (!g) { g = { key, name, txs: [], months: new Set(), amounts: [], hasCategory: false }; groups.set(key, g); }
-      g.txs.push(t);
-      g.months.add(t.date.slice(0, 7));
-      g.amounts.push(Math.abs(Number(t.amount_usd)));
-      if (t.category_id) g.hasCategory = true;
-    }
+    const inferredFor = (name: string): string | null => {
+      const cached = getCachedInferredCategory(name);
+      return cached === undefined ? null : cached;
+    };
 
-    const findCategory = (name: string) => categories?.find(c => c.name.toLowerCase() === name.toLowerCase());
-
-    // Tipo 1 — sin categoría, 3+ veces
+    // Tipo 1 — sin categoría, 2+ veces. Surface ALL merchants regardless of
+    // whether a category can be inferred. The inferred category (if any)
+    // travels along as a SUGGESTION only.
     for (const g of groups.values()) {
-      const uncategorized = g.txs.filter(t => !t.category_id);
-      if (uncategorized.length >= 3) {
-        const inferred = inferCategoryName(g.name);
-        if (inferred) {
-          const cat = findCategory(inferred);
-          const id = `cat-${g.key}`;
-          if (!ignored.has(id)) {
-            suggestions.push({
-              id, type: 'category', merchant: g.name, count: uncategorized.length,
-              suggestedCategoryName: inferred, suggestedCategoryId: cat?.id,
-              message: `${g.name} aparece ${uncategorized.length} veces sin categoría → sugerimos ${inferred}`,
-            });
-          }
-        }
-      }
+      const uncategorized = g.txs.filter((t) => !t.category_id);
+      if (uncategorized.length < 2) continue;
+      const id = `cat-${g.key}`;
+      if (ignored.has(id)) continue;
+      const inferred = inferredFor(g.name);
+      const cat = inferred ? findCategory(inferred) : undefined;
+      suggestions.push({
+        id,
+        type: 'category',
+        merchant: g.name,
+        count: uncategorized.length,
+        suggestedCategoryName: inferred || undefined,
+        suggestedCategoryId: cat?.id,
+        message: inferred
+          ? `${g.name} aparece ${uncategorized.length} veces sin categoría → sugerimos ${inferred}`
+          : `${g.name} aparece ${uncategorized.length} veces sin categoría`,
+      });
     }
 
     // Tipo 2 — recurrente: 2+ meses con monto similar
-    const recurringNames = new Set((recurring || []).map(r => r.name.toLowerCase()));
+    const recurringNames = new Set((recurring || []).map((r) => r.name.toLowerCase()));
     for (const g of groups.values()) {
       if (g.months.size < 2) continue;
       if (recurringNames.has(g.name.toLowerCase())) continue;
@@ -191,17 +224,18 @@ export function useRuleSuggestions() {
       }
     }
 
-    // Tipo 3 — keyword frecuente sin regla
+    // Tipo 3 — keyword frecuente sin regla (threshold 2)
     for (const g of groups.values()) {
-      if (g.txs.length < 5) continue;
+      if (g.txs.length < 2) continue;
       const hasRule = (rules || []).some((r: any) => g.key.includes(r.keyword.toUpperCase()));
       if (hasRule) continue;
       const id = `rule-${g.key}`;
       if (ignored.has(id)) continue;
-      // Si ya hay una sugerencia de categoría para este mismo merchant, no agregar la de regla
-      const alreadyHasCategorySuggestion = suggestions.some(s => s.type === 'category' && s.merchant === g.name);
+      const alreadyHasCategorySuggestion = suggestions.some(
+        (s) => s.type === 'category' && s.merchant === g.name,
+      );
       if (alreadyHasCategorySuggestion) continue;
-      const inferred = inferCategoryName(g.name);
+      const inferred = inferredFor(g.name);
       const cat = inferred ? findCategory(inferred) : undefined;
       suggestions.push({
         id, type: 'rule', merchant: g.name, count: g.txs.length,
@@ -215,11 +249,14 @@ export function useRuleSuggestions() {
     const order: SuggestionType[] = ['category', 'recurring', 'rule'];
     return suggestions
       .sort((a, b) => order.indexOf(a.type) - order.indexOf(b.type))
-      .filter(s => {
+      .filter((s) => {
         const k = `${s.merchant}-${s.type}`;
         if (seen.has(k)) return false;
         seen.add(k);
         return true;
       });
-  }, [transactions, rules, categories, recurring]);
+    // aiVersion forces re-eval when AI inference cache updates.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transactions, rules, categories, recurring, ignoredIds, groups, aiVersion]);
 }
+
