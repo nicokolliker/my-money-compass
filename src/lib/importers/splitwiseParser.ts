@@ -100,10 +100,10 @@ export function parseSplitwise(
     const description = (descIdx >= 0 ? cols[descIdx] : '').trim() || 'Splitwise';
     const currencyRaw = ((curIdx >= 0 ? cols[curIdx] : 'USD') || 'USD').trim().toUpperCase();
 
-    // Capture the trailing "Saldo total" summary row Splitwise appends (per currency) and skip it
+    // Capture the trailing "Saldo total" summary row Splitwise appends — only ARS balance
     if (TOTAL_BALANCE_RE.test(description)) {
       const v = parseFloat(((cols[userIdx] || '').trim()).replace(/,/g, ''));
-      if (isFinite(v)) officialByCurrency[currencyRaw] = v;
+      if (isFinite(v) && currencyRaw === 'ARS') officialByCurrency['ARS'] = v;
       continue;
     }
 
