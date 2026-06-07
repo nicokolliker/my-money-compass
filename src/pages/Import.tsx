@@ -524,9 +524,12 @@ export default function ImportPage() {
       if (!user) throw new Error('Not authenticated');
       const fxRate = arsToUsd || 0;
       const rules = await fetchUserRules();
+      const digitalMap = await fetchDigitalSubcatMap();
       const payload = toImport.map((r) => {
         const isIncome = r.type === 'income';
         const sign = isIncome ? 1 : -1;
+        const category_id = matchRuleCategory(rules, r.description, r.description);
+        const subcategory_id = resolveDigitalSubcategoryId(category_id, r.description, digitalMap);
         return {
           user_id: user.id,
           account_id: mpAccount.id,
@@ -540,7 +543,8 @@ export default function ImportPage() {
           type: (isIncome ? 'income' : 'expense') as any,
           external_id: r.external_id,
           raw_imported_description: r.description,
-          category_id: matchRuleCategory(rules, r.description, r.description),
+          category_id,
+          subcategory_id,
         };
       });
       const { data: insertedRows, error } = await supabase.from('transactions').insert(payload).select('id, date, amount, type');
