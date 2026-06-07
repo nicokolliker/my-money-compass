@@ -24,6 +24,7 @@ import { MerchantLogo } from '@/components/MerchantLogo';
 import { formatUSD } from '@/lib/constants';
 import { useImportLog } from '@/hooks/useImportLog';
 import { CreditCardDebtCard } from '@/components/debts/CreditCardDebtCard';
+import { InstallmentDebtsCard } from '@/components/debts/InstallmentDebtsCard';
 import { UnifiedCycleHistory } from '@/components/debts/UnifiedCycleHistory';
 import { ViejoSettlementWizard } from '@/components/debts/ViejoSettlementWizard';
 import { SplitwiseSettlementWizard } from '@/components/debts/SplitwiseWizard';
