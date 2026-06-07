@@ -21,6 +21,7 @@ import { Plus, Trash2, Zap, RefreshCw, DollarSign, ChevronDown, Lightbulb, Repea
 import { toast } from 'sonner';
 import CategoriesTab from '@/components/settings/CategoriesTab';
 import MerchantsTab from '@/components/settings/MerchantsTab';
+import { ResetDataCard } from '@/components/settings/ResetDataCard';
 
 type RulesTab = 'rules' | 'categories' | 'merchants' | 'fx';
 
