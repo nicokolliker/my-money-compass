@@ -360,7 +360,21 @@ export default function Transactions() {
   };
 
   const handleCategoryChange = async (txId: string, catId: string | null) => {
-    try { await updateTx.mutateAsync({ id: txId, category_id: catId }); toast.success('Category updated'); }
+    try {
+      const updates: any = { id: txId, category_id: catId };
+      // If switching to Digital, auto-assign a subtype from the tx name signal.
+      const digitalCat = categories?.find(c => c.name === 'Digital');
+      if (catId && digitalCat && catId === digitalCat.id) {
+        const tx: any = transactions?.find((t: any) => t.id === txId);
+        const nameSignal = tx?.merchant || tx?.description || '';
+        const { getDigitalSubtype } = await import('@/lib/digitalSubtypes');
+        updates.subtype = getDigitalSubtype(nameSignal);
+      } else if (catId === null) {
+        updates.subtype = null;
+      }
+      await updateTx.mutateAsync(updates);
+      toast.success('Category updated');
+    }
     catch (e: any) { toast.error(e.message); }
   };
 

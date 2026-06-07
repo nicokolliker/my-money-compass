@@ -8,12 +8,14 @@ import { useCategories } from '@/hooks/useCategories';
 import { useCreateRule } from '@/hooks/useRules';
 import { useIgnoredSuggestions } from '@/hooks/useRuleSuggestions';
 import { useUncategorizedMerchants, type UncategorizedMerchant } from '@/hooks/useUncategorizedMerchants';
+import { DIGITAL_SUBTYPES, getDigitalSubtype } from '@/lib/digitalSubtypes';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 interface RowState {
   categoryId: string;          // '' = unassigned
+  subtype: string;             // only used when category is Digital
   createRule: boolean;
 }
 
@@ -28,6 +30,8 @@ export function UncategorizedMerchantsBanner() {
   const [rows, setRows] = useState<Record<string, RowState>>({});
   const [saving, setSaving] = useState(false);
 
+  const digitalCategoryId = categories?.find(c => c.name === 'Digital')?.id;
+
   // Initialize row state from merchants when opening / list changes
   useEffect(() => {
     if (!open) return;
@@ -35,12 +39,17 @@ export function UncategorizedMerchantsBanner() {
       const next = { ...prev };
       for (const m of merchants) {
         if (!next[m.key]) {
-          next[m.key] = { categoryId: m.inferredCategoryId ?? '', createRule: false };
+          const catId = m.inferredCategoryId ?? '';
+          next[m.key] = {
+            categoryId: catId,
+            subtype: catId && catId === digitalCategoryId ? getDigitalSubtype(m.name) : '',
+            createRule: false,
+          };
         }
       }
       return next;
     });
-  }, [open, merchants]);
+  }, [open, merchants, digitalCategoryId]);
 
   if (merchants.length === 0) return null;
 
@@ -63,9 +72,14 @@ export function UncategorizedMerchantsBanner() {
       let createdRules = 0;
       for (const m of toApply) {
         const state = rows[m.key];
+        const isDigital = !!digitalCategoryId && state.categoryId === digitalCategoryId;
+        const update: { category_id: string; subtype?: string | null } = {
+          category_id: state.categoryId,
+          subtype: isDigital ? (state.subtype || getDigitalSubtype(m.name)) : null,
+        };
         const { error } = await supabase
           .from('transactions')
-          .update({ category_id: state.categoryId })
+          .update(update)
           .in('id', m.txIds);
         if (error) throw error;
         updatedTxs += m.txIds.length;
@@ -130,7 +144,8 @@ export function UncategorizedMerchantsBanner() {
 
           <div className="flex-1 overflow-y-auto -mx-6 px-6 space-y-2">
             {merchants.map(m => {
-              const state = rows[m.key] ?? { categoryId: m.inferredCategoryId ?? '', createRule: false };
+              const state: RowState = rows[m.key] ?? { categoryId: m.inferredCategoryId ?? '', subtype: '', createRule: false };
+              const isDigital = !!digitalCategoryId && state.categoryId === digitalCategoryId;
               return (
                 <div
                   key={m.key}
@@ -160,12 +175,17 @@ export function UncategorizedMerchantsBanner() {
                   <div className="flex items-center gap-2 flex-wrap">
                     <Select
                       value={state.categoryId || 'none'}
-                      onValueChange={(v) =>
+                      onValueChange={(v) => {
+                        const nextCat = v === 'none' ? '' : v;
+                        const nextSubtype =
+                          nextCat && nextCat === digitalCategoryId
+                            ? (state.subtype || getDigitalSubtype(m.name))
+                            : '';
                         setRows(prev => ({
                           ...prev,
-                          [m.key]: { ...state, categoryId: v === 'none' ? '' : v },
-                        }))
-                      }
+                          [m.key]: { ...state, categoryId: nextCat, subtype: nextSubtype },
+                        }));
+                      }}
                     >
                       <SelectTrigger className="h-9 flex-1 min-w-[180px] rounded-lg">
                         <SelectValue placeholder="Seleccionar categoría" />
@@ -196,6 +216,27 @@ export function UncategorizedMerchantsBanner() {
                       Crear regla automática
                     </label>
                   </div>
+
+                  {isDigital && (
+                    <Select
+                      value={state.subtype || 'otros'}
+                      onValueChange={(v) =>
+                        setRows(prev => ({
+                          ...prev,
+                          [m.key]: { ...state, subtype: v },
+                        }))
+                      }
+                    >
+                      <SelectTrigger className="h-9 rounded-lg">
+                        <SelectValue placeholder="Subtipo digital" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(DIGITAL_SUBTYPES).map(([key, { label, icon }]) => (
+                          <SelectItem key={key} value={key}>{icon} {label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
               );
             })}

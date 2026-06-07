@@ -1084,6 +1084,7 @@ export type Database = {
           payment_method_id: string | null
           raw_imported_description: string | null
           subcategory_id: string | null
+          subtype: string | null
           type: Database["public"]["Enums"]["transaction_type"]
           updated_at: string
           user_id: string | null
@@ -1108,6 +1109,7 @@ export type Database = {
           payment_method_id?: string | null
           raw_imported_description?: string | null
           subcategory_id?: string | null
+          subtype?: string | null
           type?: Database["public"]["Enums"]["transaction_type"]
           updated_at?: string
           user_id?: string | null
@@ -1132,6 +1134,7 @@ export type Database = {
           payment_method_id?: string | null
           raw_imported_description?: string | null
           subcategory_id?: string | null
+          subtype?: string | null
           type?: Database["public"]["Enums"]["transaction_type"]
           updated_at?: string
           user_id?: string | null
