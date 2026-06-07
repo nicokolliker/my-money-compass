@@ -238,6 +238,50 @@ function RulesPanel() {
   );
 }
 
+function ReapplyRulesButton() {
+  const qc = useQueryClient();
+  const [loading, setLoading] = useState(false);
+  const handleClick = async () => {
+    setLoading(true);
+    try {
+      const { fetchUserRules, matchRuleCategory } = await import('@/lib/applyRules');
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+      const rules = await fetchUserRules();
+      if (rules.length === 0) { toast.info('No hay reglas para aplicar'); return; }
+      const { data: txs, error } = await supabase
+        .from('transactions')
+        .select('id, description, merchant')
+        .eq('user_id', user.id)
+        .is('category_id', null);
+      if (error) throw error;
+      const updates: Record<string, string[]> = {};
+      for (const t of (txs || []) as any[]) {
+        const catId = matchRuleCategory(rules, t.description, t.merchant);
+        if (catId) (updates[catId] ||= []).push(t.id);
+      }
+      let total = 0;
+      for (const [catId, ids] of Object.entries(updates)) {
+        const { error: upErr } = await supabase.from('transactions').update({ category_id: catId }).in('id', ids);
+        if (upErr) throw upErr;
+        total += ids.length;
+      }
+      qc.invalidateQueries({ queryKey: ['transactions'] });
+      toast.success(total > 0 ? `${total} transacciones categorizadas` : 'No hubo coincidencias');
+    } catch (e: any) {
+      toast.error(e.message || 'Error al re-aplicar reglas');
+    } finally {
+      setLoading(false);
+    }
+  };
+  return (
+    <Button size="sm" variant="outline" onClick={handleClick} disabled={loading}>
+      <RefreshCw className={`h-4 w-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
+      {loading ? 'Aplicando...' : 'Re-aplicar reglas'}
+    </Button>
+  );
+}
+
 function FxRatesPanel() {
   const { data: rates } = useFxRates();
   const createRate = useCreateFxRate();
