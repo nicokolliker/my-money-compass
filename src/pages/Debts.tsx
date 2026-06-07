@@ -217,7 +217,7 @@ export default function DebtsPage() {
         <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           Estado actual
         </h2>
-        <CreditCardDebtCard />
+        <InstallmentDebtsCard />
       </section>
 
       {/* SECTION 3 — Historial */}
