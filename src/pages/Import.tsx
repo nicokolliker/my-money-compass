@@ -14,6 +14,11 @@ import { useInvalidateArqReconciliations } from '@/hooks/useArqReconciliation';
 import { parseMercadoPago } from '@/lib/importers/mercadoPagoParser';
 import { parseGalicia } from '@/lib/importers/galiciaParser';
 import { useRefreshRecurringTracking } from '@/hooks/useRecurringInstances';
+import {
+  RecurringSuggestionsDialog,
+  useRecurringSuggestions,
+} from '@/components/recurring/RecurringSuggestionsDialog';
+
 
 /** Close pending account_reconciliations for a destination account covering the imported month. */
 async function closeAccountReconciliations(opts: {
@@ -228,6 +233,30 @@ export default function ImportPage() {
   const refreshRecurring = useRefreshRecurringTracking();
   const silentRefreshRecurring = () => { refreshRecurring.mutateAsync().catch(() => {}); };
 
+  // ----- Recurring suggestions notifier -----
+  const recurringSuggestions = useRecurringSuggestions();
+  const suggestionsRef = useRef(recurringSuggestions);
+  useEffect(() => { suggestionsRef.current = recurringSuggestions; }, [recurringSuggestions]);
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
+  const notifyRecurringSuggestions = () => {
+    // Wait for transaction invalidation + refetch to flow through useRuleSuggestions
+    setTimeout(() => {
+      const list = suggestionsRef.current;
+      if (list.length === 0) return;
+      toast(
+        `Detectamos ${list.length} posible(s) gasto(s) recurrente(s)`,
+        {
+          action: {
+            label: 'Ver sugerencias',
+            onClick: () => setSuggestionsOpen(true),
+          },
+          duration: 8000,
+        },
+      );
+    }, 1500);
+  };
+
+
   async function handleProcess() {
     if (!arsFile) {
       toast.error('Subí el estado ARS');
@@ -411,6 +440,8 @@ export default function ImportPage() {
       setResultMsg(`${toImport.length} transacciones importadas, ${dupCount} duplicados ignorados`);
       toast.success('Importación completa');
       silentRefreshRecurring();
+      notifyRecurringSuggestions();
+
       setRows([]);
       setArqMonth('');
       setArsFile(null);
@@ -532,6 +563,8 @@ export default function ImportPage() {
       setMpResultMsg(`${toImport.length} transacciones importadas, ${dups} duplicados ignorados`);
       toast.success('Importación completa');
       silentRefreshRecurring();
+      notifyRecurringSuggestions();
+
       setMpRows([]);
       setMpMonth('');
       setMpFile(null);
@@ -651,6 +684,8 @@ export default function ImportPage() {
       setGaliciaResultMsg(`${toImport.length} transacciones importadas, ${dups} duplicados ignorados`);
       toast.success('Importación completa');
       silentRefreshRecurring();
+      notifyRecurringSuggestions();
+
       setGaliciaRows([]);
       setGaliciaMonth('');
       setGaliciaFile(null);
@@ -1117,9 +1152,13 @@ export default function ImportPage() {
       </div>
 
 
-
+      <RecurringSuggestionsDialog
+        open={suggestionsOpen}
+        onOpenChange={setSuggestionsOpen}
+      />
     </div>
   );
+
 }
 
 const SOURCES: { key: 'arq' | 'mercadopago' | 'galicia' | 'wise'; label: string }[] = [

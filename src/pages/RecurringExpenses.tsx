@@ -24,6 +24,8 @@ import { DemoDataBanner } from '@/components/DemoDataBanner';
 import { MerchantLogo } from '@/components/MerchantLogo';
 import { useDemoData } from '@/hooks/useDemoData';
 import CalendarPage from './Calendar';
+import { RecurringSuggestionsBadge } from '@/components/recurring/RecurringSuggestionsDialog';
+
 
 // Status badge tones (Library list)
 const STATUS_STYLES: Record<DerivedInstanceState | 'none', { label: string; bg: string; color: string }> = {
@@ -292,14 +294,17 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
   return (
     <div className={embedded ? 'space-y-4' : 'space-y-5'}>
       {!embedded && hasDemoData && <DemoDataBanner onCleared={onDemoCleared} />}
-      <div className={embedded ? 'flex items-center justify-end' : 'flex items-center justify-between'}>
+      <div className={embedded ? 'flex items-center justify-end gap-2' : 'flex items-center justify-between gap-2'}>
         {!embedded && <h1 className="text-2xl font-bold text-foreground">Recurring</h1>}
-        <Dialog open={showAdd} onOpenChange={o => { setShowAdd(o); if (!o) { setEditingId(null); setForm(emptyForm); } }}>
-          <DialogTrigger asChild>
-            <Button size="sm" onClick={() => { if (!form.type && tree[0]) setForm(f => ({ ...f, type: tree[0].id })); }}>
-              <Plus className="h-4 w-4 mr-1" /> Agregar recurrente
-            </Button>
-          </DialogTrigger>
+        <div className="flex items-center gap-2">
+          <RecurringSuggestionsBadge />
+          <Dialog open={showAdd} onOpenChange={o => { setShowAdd(o); if (!o) { setEditingId(null); setForm(emptyForm); } }}>
+            <DialogTrigger asChild>
+              <Button size="sm" onClick={() => { if (!form.type && tree[0]) setForm(f => ({ ...f, type: tree[0].id })); }}>
+                <Plus className="h-4 w-4 mr-1" /> Agregar recurrente
+              </Button>
+            </DialogTrigger>
+
           <DialogContent className="max-h-[85vh] overflow-y-auto">
             <DialogHeader><DialogTitle>{editingId ? 'Edit' : 'Add'} Recurring Expense</DialogTitle></DialogHeader>
             <div className="space-y-3 pt-2">
@@ -372,7 +377,9 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
             </div>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
+
 
       <Tabs value={topTab} onValueChange={(v) => setTopTab(v as any)}>
         <TabsList className="w-full">
