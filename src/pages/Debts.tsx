@@ -45,7 +45,7 @@ function MonthSelector({ value, onChange }: { value: string; onChange: (v: strin
   const atMax = value >= today;
   const label = format(new Date(value + '-01T12:00:00'), 'MMMM yyyy', { locale: es });
   return (
-    <div className="flex items-center justify-center gap-2">
+    <div className="flex items-center justify-start gap-2">
       <Button
         variant="ghost"
         size="icon"
@@ -361,8 +361,13 @@ function ViejoCard({
             </div>
           </div>
           <Badge
-            variant={yaLiquidado ? 'secondary' : 'outline'}
-            className="text-[10px] shrink-0"
+            variant="outline"
+            className={cn(
+              'text-[10px] shrink-0',
+              yaLiquidado
+                ? 'bg-green-100 text-green-700 border-green-200 hover:bg-green-100'
+                : 'bg-amber-100 text-amber-700 border-amber-200 hover:bg-amber-100'
+            )}
           >
             {yaLiquidado ? '✓ Liquidado' : 'Pendiente'}
           </Badge>
@@ -433,14 +438,27 @@ function SplitwiseCard({
   return (
     <Card className="rounded-2xl overflow-hidden">
       <CardContent className="p-5 space-y-4">
-        <div className="flex items-center gap-3">
-          <MerchantLogo name="Splitwise" domain="splitwise.com" size={40} />
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-foreground">Splitwise</p>
-            <p className="text-xs text-muted-foreground truncate">
-              {lastDate ? <>Último import: {lastDate}</> : 'Sin actividad aún'}
-            </p>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <MerchantLogo name="Splitwise" domain="splitwise.com" size={40} />
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-foreground">Splitwise</p>
+              <p className="text-xs text-muted-foreground truncate">
+                {lastDate ? <>Último import: {lastDate}</> : 'Sin actividad aún'}
+              </p>
+            </div>
           </div>
+          <Badge
+            variant="outline"
+            className={cn(
+              'text-[10px] shrink-0',
+              !owes
+                ? 'bg-green-100 text-green-700 border-green-200 hover:bg-green-100'
+                : 'bg-amber-100 text-amber-700 border-amber-200 hover:bg-amber-100'
+            )}
+          >
+            {!owes ? '✓ Liquidado' : 'Pendiente'}
+          </Badge>
         </div>
 
         <div className="text-center py-2">
