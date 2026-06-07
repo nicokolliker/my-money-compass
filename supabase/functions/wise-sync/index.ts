@@ -34,6 +34,85 @@ async function wiseFetch(path: string, token: string, action: string) {
   return res.json();
 }
 
+function cleanWiseText(value: unknown) {
+  return String(value ?? "")
+    .replace(/<[^>]+>/g, "")
+    .replace(/\*\*/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function parseMoney(raw: string) {
+  const compact = raw.replace(/[\s']/g, "");
+  const lastComma = compact.lastIndexOf(",");
+  const lastDot = compact.lastIndexOf(".");
+  const decimal = lastComma > lastDot ? "," : ".";
+  const normalized = compact
+    .replace(new RegExp(`\\${decimal === "," ? "." : ","}`, "g"), "")
+    .replace(decimal, ".");
+  return Number(normalized);
+}
+
+function amountFromActivity(activity: any, currency: string) {
+  const currencyRe = currency.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const fields = [activity.primaryAmount, activity.secondaryAmount].map(cleanWiseText);
+  for (const field of fields) {
+    const after = field.match(new RegExp(`([+-]?\\d[\\d.,\\s']*)\\s*${currencyRe}\\b`, "i"));
+    const before = field.match(new RegExp(`\\b${currencyRe}\\s*([+-]?\\d[\\d.,\\s']*)`, "i"));
+    const match = after || before;
+    if (!match) continue;
+    const parsed = parseMoney(match[1]);
+    if (!Number.isFinite(parsed)) continue;
+
+    const text = `${activity.type || ""} ${activity.title || ""} ${activity.description || ""}`.toLowerCase();
+    if (parsed < 0) return parsed;
+    if (/refund|cashback|interest|received|deposit|top\s*up|added|incoming|reversal|reembolso|recib/.test(text)) return parsed;
+    if (/card_payment|cash_withdrawal|direct_debit|fee|sent|send|paid|spent|withdraw|deduct|charge|payment|outgoing|enviado|pagad/.test(text)) return -Math.abs(parsed);
+    return parsed;
+  }
+  return null;
+}
+
+async function fetchActivitiesFallback(
+  profileId: string | number,
+  token: string,
+  currency: string,
+  since: string,
+  until: string,
+) {
+  const txs: any[] = [];
+  let cursor: string | null = null;
+  for (let page = 0; page < 20; page += 1) {
+    const params = new URLSearchParams({ since, until, size: "100", status: "COMPLETED" });
+    if (cursor) params.set("nextCursor", cursor);
+    const payload = await wiseFetch(
+      `/v1/profiles/${profileId}/activities?${params.toString()}`,
+      token,
+      `activities ${since.slice(0, 10)}→${until.slice(0, 10)}`,
+    );
+
+    for (const activity of payload?.activities ?? []) {
+      const amount = amountFromActivity(activity, currency);
+      const date = activity.createdOn || activity.updatedOn;
+      if (amount === null || !date) continue;
+      const description = cleanWiseText(
+        [activity.title, activity.description].filter(Boolean).join(" — "),
+      ) || "Wise";
+      txs.push({
+        id: `activity-${activity.id || activity.resource?.id || `${date}-${amount}`}`,
+        referenceNumber: `activity-${activity.id || activity.resource?.id || `${date}-${amount}`}`,
+        date,
+        amount: { value: amount },
+        details: { description, type: activity.type || activity.resource?.type || "ACTIVITY" },
+      });
+    }
+
+    cursor = payload?.cursor ?? null;
+    if (!cursor) break;
+  }
+  return txs;
+}
+
 async function getAuthenticatedUserId(
   supabaseUrl: string,
   anonKey: string,
