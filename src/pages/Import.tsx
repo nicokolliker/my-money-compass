@@ -440,6 +440,8 @@ export default function ImportPage() {
       setResultMsg(`${toImport.length} transacciones importadas, ${dupCount} duplicados ignorados`);
       toast.success('Importación completa');
       silentRefreshRecurring();
+      notifyRecurringSuggestions();
+
       setRows([]);
       setArqMonth('');
       setArsFile(null);
@@ -561,6 +563,8 @@ export default function ImportPage() {
       setMpResultMsg(`${toImport.length} transacciones importadas, ${dups} duplicados ignorados`);
       toast.success('Importación completa');
       silentRefreshRecurring();
+      notifyRecurringSuggestions();
+
       setMpRows([]);
       setMpMonth('');
       setMpFile(null);
@@ -680,6 +684,8 @@ export default function ImportPage() {
       setGaliciaResultMsg(`${toImport.length} transacciones importadas, ${dups} duplicados ignorados`);
       toast.success('Importación completa');
       silentRefreshRecurring();
+      notifyRecurringSuggestions();
+
       setGaliciaRows([]);
       setGaliciaMonth('');
       setGaliciaFile(null);
