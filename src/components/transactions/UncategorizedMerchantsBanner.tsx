@@ -8,12 +8,14 @@ import { useCategories } from '@/hooks/useCategories';
 import { useCreateRule } from '@/hooks/useRules';
 import { useIgnoredSuggestions } from '@/hooks/useRuleSuggestions';
 import { useUncategorizedMerchants, type UncategorizedMerchant } from '@/hooks/useUncategorizedMerchants';
+import { DIGITAL_SUBTYPES, getDigitalSubtype } from '@/lib/digitalSubtypes';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 interface RowState {
   categoryId: string;          // '' = unassigned
+  subtype: string;             // only used when category is Digital
   createRule: boolean;
 }
 
@@ -28,6 +30,8 @@ export function UncategorizedMerchantsBanner() {
   const [rows, setRows] = useState<Record<string, RowState>>({});
   const [saving, setSaving] = useState(false);
 
+  const digitalCategoryId = categories?.find(c => c.name === 'Digital')?.id;
+
   // Initialize row state from merchants when opening / list changes
   useEffect(() => {
     if (!open) return;
@@ -35,12 +39,17 @@ export function UncategorizedMerchantsBanner() {
       const next = { ...prev };
       for (const m of merchants) {
         if (!next[m.key]) {
-          next[m.key] = { categoryId: m.inferredCategoryId ?? '', createRule: false };
+          const catId = m.inferredCategoryId ?? '';
+          next[m.key] = {
+            categoryId: catId,
+            subtype: catId && catId === digitalCategoryId ? getDigitalSubtype(m.name) : '',
+            createRule: false,
+          };
         }
       }
       return next;
     });
-  }, [open, merchants]);
+  }, [open, merchants, digitalCategoryId]);
 
   if (merchants.length === 0) return null;
 
