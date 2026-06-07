@@ -10,7 +10,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { Download, Check } from 'lucide-react';
+import { Download, Check, ChevronLeft, ChevronRight } from 'lucide-react';
 import { downloadSettlementPdf } from '@/lib/settlementPdf';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -31,6 +31,44 @@ import { SettlementDetail, ITEM_META, CARD_KEYS } from '@/components/debts/Cycle
 import { SplitwisePaymentDialog } from '@/components/debts/SplitwisePaymentDialog';
 import { usePendingCredits, useResolvePendingCredit, type PendingCredit } from '@/hooks/usePendingCredits';
 
+const currentYM = () => format(new Date(), 'yyyy-MM');
+
+function shiftMonth(ym: string, delta: number): string {
+  const [y, m] = ym.split('-').map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  return format(d, 'yyyy-MM');
+}
+
+function MonthSelector({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const today = currentYM();
+  const atMax = value >= today;
+  const label = format(new Date(value + '-01T12:00:00'), 'MMMM yyyy', { locale: es });
+  return (
+    <div className="flex items-center justify-center gap-2">
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-8 w-8"
+        onClick={() => onChange(shiftMonth(value, -1))}
+        aria-label="Mes anterior"
+      >
+        <ChevronLeft className="h-4 w-4" />
+      </Button>
+      <span className="text-sm font-medium capitalize min-w-[140px] text-center">{label}</span>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-8 w-8"
+        disabled={atMax}
+        onClick={() => !atMax && onChange(shiftMonth(value, 1))}
+        aria-label="Mes siguiente"
+      >
+        <ChevronRight className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+}
+
 export default function DebtsPage() {
   const qc = useQueryClient();
   const { data: importLog } = useImportLog();
@@ -39,14 +77,12 @@ export default function DebtsPage() {
   const resolveCredit = useResolvePendingCredit();
   const arsToUsd = useLatestFxRate('ARS', 'USD');
 
+  const [settlementMonth, setSettlementMonth] = useState<string>(() => currentYM());
   const [openViejo, setOpenViejo] = useState(false);
   const [openSw, setOpenSw] = useState(false);
   const [openSwPay, setOpenSwPay] = useState(false);
   const [confirmingVuelto, setConfirmingVuelto] = useState<PendingCredit | null>(null);
   const [detail, setDetail] = useState<{ parsed: any; monthLabel: string; tx: any } | null>(null);
-
-  const monthLabel = format(new Date(), 'MMMM yyyy', { locale: es });
-  const currentMonth = format(new Date(), 'yyyy-MM');
 
   const splitwiseAccount = useMemo(
     () => accounts?.find((a: any) => /splitwise/i.test(a.name)) || null,
@@ -78,9 +114,9 @@ export default function DebtsPage() {
       const today = new Date().toISOString().slice(0, 10);
       const amountArs = Number(confirmingVuelto.amount_ars) || 0;
       const amountUsd = amountArs * arsToUsd;
-      const settlementMonth = confirmingVuelto.settlement_month || currentMonth;
+      const sMonth = confirmingVuelto.settlement_month || currentYM();
       const monthLbl = format(
-        new Date(settlementMonth + '-01T12:00:00'),
+        new Date(sMonth + '-01T12:00:00'),
         'MMMM yyyy',
         { locale: es },
       );
@@ -99,7 +135,7 @@ export default function DebtsPage() {
           type: 'income' as const,
           notes: JSON.stringify({
             vuelto_for: confirmingVuelto.id,
-            settlement_month: settlementMonth,
+            settlement_month: sMonth,
           }),
         })
         .select('id')
@@ -149,18 +185,20 @@ export default function DebtsPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight capitalize">
-          Liquidaciones — {monthLabel}
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Tus dos rituales mensuales en un solo lugar
-        </p>
+      <div className="space-y-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Liquidaciones</h1>
+          <p className="text-sm text-muted-foreground">
+            Tus dos rituales mensuales en un solo lugar
+          </p>
+        </div>
+        <MonthSelector value={settlementMonth} onChange={setSettlementMonth} />
       </div>
 
       {/* SECTION 1 — Twin settlement cards */}
       <section className="grid gap-4 md:grid-cols-2">
         <ViejoCard
+          settlementMonth={settlementMonth}
           onOpenWizard={() => setOpenViejo(true)}
           vueltos={viejoVueltos}
           onMarkVuelto={(pc) => setConfirmingVuelto(pc)}
@@ -189,8 +227,17 @@ export default function DebtsPage() {
         <UnifiedCycleHistory onRowClick={(r) => setDetail(r)} />
       </section>
 
-      <ViejoSettlementWizard open={openViejo} onOpenChange={setOpenViejo} onSantTotalDetected={() => {}} />
-      <SplitwiseSettlementWizard open={openSw} onOpenChange={setOpenSw} />
+      <ViejoSettlementWizard
+        open={openViejo}
+        onOpenChange={setOpenViejo}
+        settlementMonth={settlementMonth}
+        onSantTotalDetected={() => {}}
+      />
+      <SplitwiseSettlementWizard
+        open={openSw}
+        onOpenChange={setOpenSw}
+        settlementMonth={settlementMonth}
+      />
       <SplitwisePaymentDialog
         open={openSwPay}
         onOpenChange={setOpenSwPay}
@@ -245,26 +292,28 @@ export default function DebtsPage() {
 // ============================================================================
 
 function ViejoCard({
+  settlementMonth,
   onOpenWizard,
   vueltos,
   onMarkVuelto,
 }: {
+  settlementMonth: string;
   onOpenWizard: () => void;
   vueltos: PendingCredit[];
   onMarkVuelto: (pc: PendingCredit) => void;
 }) {
-  const currentMonth = format(new Date(), 'yyyy-MM');
-  const monthLabel = format(new Date(), 'MMMM', { locale: es });
+  const monthLabel = format(new Date(settlementMonth + '-01T12:00:00'), 'MMMM', { locale: es });
 
   const { data: liquidacionEsteMes } = useQuery({
-    queryKey: ['liquidacion-check', currentMonth],
+    queryKey: ['liquidacion-check', settlementMonth],
     queryFn: async () => {
       const { data } = await supabase
         .from('transactions')
         .select('id, date, amount_usd')
         .ilike('description', '%Liquidación%')
         .ilike('description', '%viejo%')
-        .gte('date', currentMonth + '-01')
+        .gte('date', settlementMonth + '-01')
+        .lte('date', settlementMonth + '-31')
         .not('notes', 'is', null)
         .maybeSingle();
       return data;

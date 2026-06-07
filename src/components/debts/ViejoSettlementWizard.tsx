@@ -49,7 +49,7 @@ interface SettlementItem {
   categoryName: string;
 }
 
-export function ViejoSettlementWizard({ open, onOpenChange, onSantTotalDetected }: { open: boolean; onOpenChange: (v: boolean) => void; onSantTotalDetected?: (n: number) => void }) {
+export function ViejoSettlementWizard({ open, onOpenChange, settlementMonth, onSantTotalDetected }: { open: boolean; onOpenChange: (v: boolean) => void; settlementMonth: string; onSantTotalDetected?: (n: number) => void }) {
   const { data: accounts } = useAccountBalances();
   const { data: categories } = useCategories();
   const { data: blueRate } = useBlueDollarRate();
@@ -59,13 +59,6 @@ export function ViejoSettlementWizard({ open, onOpenChange, onSantTotalDetected 
   const defaultBlueRate = blueRate?.blue_avg ? Math.round(blueRate.blue_avg) : (arsToUsd > 0 ? Math.round(1 / arsToUsd) : 1390);
 
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
-  const [settlementMonth, setSettlementMonth] = useState<string>(() => {
-    const today = new Date();
-    const day = today.getDate();
-    const d = new Date(today.getFullYear(), today.getMonth(), 1);
-    if (day < 20) d.setMonth(d.getMonth() - 1);
-    return format(d, 'yyyy-MM');
-  });
   const [iebraFile, setIebraFile] = useState<File | null>(null);
   const [kollikerFile, setKollikerFile] = useState<File | null>(null);
   const [santFile, setSantFile] = useState<File | null>(null);
@@ -89,27 +82,9 @@ export function ViejoSettlementWizard({ open, onOpenChange, onSantTotalDetected 
   const [expandedDetails, setExpandedDetails] = useState<Record<string, boolean>>({});
   const [cardSubtotals, setCardSubtotals] = useState<Record<string, number>>({});
 
-  const monthOptions = useMemo(() => {
-    const arr: { ym: string; label: string }[] = [];
-    const today = new Date();
-    // Cap at current month (no future months); show last 12 months newest first.
-    const start = new Date(today.getFullYear(), today.getMonth(), 1);
-    for (let i = 0; i < 12; i++) {
-      const d = new Date(start.getFullYear(), start.getMonth() - i, 1);
-      arr.push({ ym: format(d, 'yyyy-MM'), label: format(d, 'MMMM yyyy', { locale: es }) });
-    }
-    return arr;
-  }, []);
-
   useEffect(() => {
     if (!open) {
       setStep(1);
-      setSettlementMonth((() => {
-        const today = new Date();
-        const d = new Date(today.getFullYear(), today.getMonth(), 1);
-        if (today.getDate() < 20) d.setMonth(d.getMonth() - 1);
-        return format(d, 'yyyy-MM');
-      })());
       setIebraFile(null); setKollikerFile(null); setSantFile(null);
       setBcTotalARS(0); setSantTotalARS(0); setVisaCiudadMamaARS(0); setVisaCiudadPapaARS(0);
       setExtraItems([]);
@@ -549,19 +524,8 @@ export function ViejoSettlementWizard({ open, onOpenChange, onSantTotalDetected 
         {step === 1 && (
           <>
             <div className="space-y-4 min-w-0 overflow-hidden">
-              <div className="space-y-1.5">
-                <Label className="text-xs">Mes a liquidar</Label>
-                <Select value={settlementMonth} onValueChange={setSettlementMonth}>
-                  <SelectTrigger className="w-full capitalize"><SelectValue /></SelectTrigger>
-                  <SelectContent className="max-h-72">
-                    {monthOptions.map((m) => (
-                      <SelectItem key={m.ym} value={m.ym} className="capitalize">{m.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
               <p className="text-xs text-muted-foreground">
-                Subí los PDFs disponibles. Los faltantes podés cargarlos manualmente en el siguiente paso.
+                Liquidando <span className="font-semibold capitalize text-foreground">{format(new Date(settlementMonth + '-01T12:00:00'), 'MMMM yyyy', { locale: es })}</span>. Subí los PDFs disponibles. Los faltantes podés cargarlos manualmente en el siguiente paso.
               </p>
               <FileSlot label="BC mamá (resumen)" file={iebraFile} onChange={setIebraFile} />
               <FileSlot label="BC papá (resumen)" file={kollikerFile} onChange={setKollikerFile} />

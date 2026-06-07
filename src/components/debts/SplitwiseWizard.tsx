@@ -12,7 +12,7 @@ import { useLatestFxRate } from '@/hooks/useFxRates';
 import { parseSplitwise } from '@/lib/importers/splitwiseParser';
 import { FileSlot } from './ViejoSettlementWizard';
 
-export function SplitwiseSettlementWizard({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
+export function SplitwiseSettlementWizard({ open, onOpenChange, settlementMonth }: { open: boolean; onOpenChange: (v: boolean) => void; settlementMonth: string }) {
   const { data: accounts } = useAccountBalances();
   const arsToUsd = useLatestFxRate('ARS', 'USD');
   const qc = useQueryClient();
@@ -79,33 +79,28 @@ export function SplitwiseSettlementWizard({ open, onOpenChange }: { open: boolea
     }
   }
 
-  // Most recent calendar month that has non-zero user activity in the parsed rows
-  const lastMonthInfo = useMemo(() => {
-    const fallback = () => {
-      const d = new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1);
-      const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      const label = format(d, 'LLLL yyyy', { locale: es });
-      return { ym, label: label.charAt(0).toUpperCase() + label.slice(1) };
-    };
-    if (!result || result.rows.length === 0) return fallback();
-    const months = new Set<string>();
-    for (const r of result.rows) {
-      if (Math.abs(r.userAmount) >= 0.01) months.add(r.date.slice(0, 7));
-    }
-    if (months.size === 0) return fallback();
-    const ym = Array.from(months).sort().pop()!;
-    const [y, m] = ym.split('-').map(Number);
+  // Selected month label
+  const monthInfo = useMemo(() => {
+    const [y, m] = settlementMonth.split('-').map(Number);
     const label = format(new Date(y, m - 1, 1), 'LLLL yyyy', { locale: es });
-    return { ym, label: label.charAt(0).toUpperCase() + label.slice(1) };
-  }, [result]);
+    return { ym: settlementMonth, label: label.charAt(0).toUpperCase() + label.slice(1) };
+  }, [settlementMonth]);
 
-  // Rows to reconcile = last active month + Nico owes (userAmount < 0)
+  // Rows to reconcile = selected month + Nico owes (userAmount < 0)
   const toImport = useMemo(() => {
     if (!result) return [];
     return result.rows.filter(
-      (r) => r.date.startsWith(lastMonthInfo.ym) && r.userAmount < 0,
+      (r) => r.date.startsWith(monthInfo.ym) && r.userAmount < 0,
     );
-  }, [result, lastMonthInfo.ym]);
+  }, [result, monthInfo.ym]);
+
+  // All non-zero user activity for the selected month (for display)
+  const monthActivity = useMemo(() => {
+    if (!result) return [];
+    return result.rows.filter(
+      (r) => r.date.startsWith(monthInfo.ym) && Math.abs(r.userAmount) >= 0.01,
+    );
+  }, [result, monthInfo.ym]);
 
   async function handleConfirm() {
     if (!result) return;
@@ -149,7 +144,7 @@ export function SplitwiseSettlementWizard({ open, onOpenChange }: { open: boolea
       await supabase.from('import_log').insert({
         user_id: user.id,
         source: 'splitwise',
-        month: lastMonthInfo.ym,
+        month: monthInfo.ym,
         transaction_count: rows.length,
       });
 
@@ -221,27 +216,29 @@ export function SplitwiseSettlementWizard({ open, onOpenChange }: { open: boolea
                 </div>
                 <div className="rounded-xl border p-3 space-y-2">
                   <div>
-                    <p className="text-sm font-semibold">Gastos a conciliar — {lastMonthInfo.label}</p>
+                    <p className="text-sm font-semibold">Actividad — {monthInfo.label}</p>
                     <p className="text-[11px] text-muted-foreground">
-                      Solo lo que otros pagaron por vos
+                      Movimientos de Nico en el mes seleccionado
                     </p>
                   </div>
-                  {toImport.length === 0 ? (
+                  {monthActivity.length === 0 ? (
                     <p className="text-xs text-muted-foreground py-2">
-                      No hay gastos pagados por otros en {lastMonthInfo.label}.
+                      Sin actividad en {monthInfo.label}.
                     </p>
                   ) : (
                     <div className="max-h-48 overflow-y-auto divide-y -mx-1">
-                      {toImport.map((r, i) => {
+                      {monthActivity.map((r, i) => {
                         const abs = Math.abs(r.userAmount);
+                        const isOwed = r.userAmount < 0;
                         return (
                           <div key={i} className="flex justify-between px-1 py-1.5 text-xs gap-2">
                             <div className="min-w-0 flex-1">
                               <p className="truncate font-medium">{r.description}</p>
                               <p className="text-muted-foreground font-mono">{r.date}</p>
                             </div>
-                            <span className="font-mono text-destructive shrink-0">
-                              −{r.currency === 'ARS'
+                            <span className={cn('font-mono shrink-0', isOwed ? 'text-destructive' : 'text-success')}>
+                              {isOwed ? '−' : '+'}
+                              {r.currency === 'ARS'
                                 ? '$' + Math.round(abs).toLocaleString('es-AR')
                                 : '$' + abs.toFixed(2)}
                               {' '}{r.currency}
