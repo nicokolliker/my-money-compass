@@ -14,6 +14,11 @@ import { useInvalidateArqReconciliations } from '@/hooks/useArqReconciliation';
 import { parseMercadoPago } from '@/lib/importers/mercadoPagoParser';
 import { parseGalicia } from '@/lib/importers/galiciaParser';
 import { useRefreshRecurringTracking } from '@/hooks/useRecurringInstances';
+import {
+  RecurringSuggestionsDialog,
+  useRecurringSuggestions,
+} from '@/components/recurring/RecurringSuggestionsDialog';
+
 
 /** Close pending account_reconciliations for a destination account covering the imported month. */
 async function closeAccountReconciliations(opts: {
