@@ -419,6 +419,45 @@ export type Database = {
           },
         ]
       }
+      installment_debts: {
+        Row: {
+          amount_ars: number
+          created_at: string
+          current_installment: number
+          description: string
+          id: string
+          remaining_installments: number
+          settlement_month: string
+          source: string
+          total_installments: number
+          user_id: string
+        }
+        Insert: {
+          amount_ars: number
+          created_at?: string
+          current_installment: number
+          description: string
+          id?: string
+          remaining_installments: number
+          settlement_month: string
+          source: string
+          total_installments: number
+          user_id: string
+        }
+        Update: {
+          amount_ars?: number
+          created_at?: string
+          current_installment?: number
+          description?: string
+          id?: string
+          remaining_installments?: number
+          settlement_month?: string
+          source?: string
+          total_installments?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       invoices: {
         Row: {
           card_subtotals: Json | null
