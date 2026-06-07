@@ -39,6 +39,7 @@ export default function Dashboard() {
   const { data: blueDollar } = useBlueDollarRate();
   const { data: recurringItems } = useRecurringExpenses();
   const { data: instances } = useDerivedInstances();
+  const { data: monthInstances } = useDerivedInstances({ from: monthStart, to: monthEnd });
   const { netWorthUsd: netWorth, totalAssetsUsd: totalAssets, totalLiabilitiesUsd: totalLiabilities } = useNetWorth();
   const { hasDemoData, onCleared: onDemoCleared } = useDemoData();
   const alerts = useHomeAlerts();
@@ -46,6 +47,7 @@ export default function Dashboard() {
 
   const now = new Date();
   const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+  const monthEnd = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()).padStart(2, '0')}`;
   const prevMonthStart = now.getMonth() === 0
     ? `${now.getFullYear() - 1}-12-01`
     : `${now.getFullYear()}-${String(now.getMonth()).padStart(2, '0')}-01`;
@@ -85,6 +87,24 @@ export default function Dashboard() {
       .sort((a: any, b: any) => (a.expected_date > b.expected_date ? 1 : -1))
       .slice(0, 4);
   }, [instances]);
+
+  const fiveDaysFromNow = format(addDays(now, 5), 'yyyy-MM-dd');
+
+  const pendingRecurrentes = useMemo(() => {
+    if (!monthInstances) return [];
+    return monthInstances
+      .filter((i: any) =>
+        i.derived === 'missing' ||
+        (i.derived === 'upcoming' && i.expected_date <= fiveDaysFromNow)
+      )
+      .sort((a: any, b: any) => (a.expected_date > b.expected_date ? 1 : -1))
+      .slice(0, 5);
+  }, [monthInstances, fiveDaysFromNow]);
+
+  const allRecurrentesPaid = useMemo(() => {
+    if (!monthInstances || monthInstances.length === 0) return false;
+    return monthInstances.every((i: any) => isDerivedPaid(i.derived));
+  }, [monthInstances]);
 
   if (isLoading) return <div className="flex items-center justify-center h-64 text-muted-foreground">Loading...</div>;
 
