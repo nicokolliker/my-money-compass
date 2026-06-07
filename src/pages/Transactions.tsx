@@ -417,6 +417,7 @@ export default function Transactions() {
         categoryId: tx.category_id || '',
         accountId: tx.account_id || '',
         nextDueDate: tx.date || new Date().toISOString().slice(0, 10),
+        subtype: '',
       });
     }
     catch (e: any) { toast.error(e.message); }
