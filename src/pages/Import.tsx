@@ -769,6 +769,7 @@ export default function ImportPage() {
       if (!user) throw new Error('Not authenticated');
 
       const payload: any[] = [];
+      const rules = await fetchUserRules();
       for (const r of toImport) {
         const cur = (r._currency || 'USD').toUpperCase();
         const amt = r._amount ?? r.amountUSD;
@@ -789,6 +790,7 @@ export default function ImportPage() {
           type: (isIncome ? 'income' : 'expense') as any,
           external_id: r.external_id,
           raw_imported_description: r.description,
+          category_id: matchRuleCategory(rules, r.description, r.description),
         });
       }
       if (payload.length === 0) {
