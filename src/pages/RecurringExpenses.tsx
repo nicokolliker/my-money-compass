@@ -24,6 +24,8 @@ import { DemoDataBanner } from '@/components/DemoDataBanner';
 import { MerchantLogo } from '@/components/MerchantLogo';
 import { useDemoData } from '@/hooks/useDemoData';
 import CalendarPage from './Calendar';
+import { RecurringSuggestionsBadge } from '@/components/recurring/RecurringSuggestionsDialog';
+
 
 // Status badge tones (Library list)
 const STATUS_STYLES: Record<DerivedInstanceState | 'none', { label: string; bg: string; color: string }> = {
