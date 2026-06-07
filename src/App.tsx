@@ -37,7 +37,11 @@ function ProtectedRoutes() {
 
   if (!user) return <Navigate to="/auth" replace />;
 
-  return (
+  return <AuthedApp />;
+}
+
+function AuthedApp() {
+  useEnsureDigitalSubcategories();
     <AppLayout>
       <Routes>
         <Route path="/" element={<Dashboard />} />
