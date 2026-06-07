@@ -12,7 +12,8 @@ async function callWise(action: string, params: Record<string, unknown> = {}) {
 
 export function useWiseProfiles() {
   return useMutation({
-    mutationFn: () => callWise('get-profiles'),
+    mutationFn: (apiToken?: string) =>
+      callWise('get-profiles', apiToken ? { apiToken } : {}),
   });
 }
 
