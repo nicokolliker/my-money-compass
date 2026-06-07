@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { AlertCircle, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -29,7 +29,7 @@ export function UncategorizedMerchantsBanner() {
   const [saving, setSaving] = useState(false);
 
   // Initialize row state from merchants when opening / list changes
-  useMemo(() => {
+  useEffect(() => {
     if (!open) return;
     setRows(prev => {
       const next = { ...prev };
