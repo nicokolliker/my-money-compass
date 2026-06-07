@@ -72,7 +72,7 @@ export default function Analytics() {
   const { data: accounts } = useAccounts();
   const { data: categories } = useCategories();
   const { data: allSubcategories } = useSubcategories();
-  const { data: budgets } = useBudgets();
+  
   const { tree: categoryTree, totalRecurringMonthly } = useCategoryTree();
   const [period, setPeriod] = useState<Period>('this_month');
   const [accountFilter, setAccountFilter] = useState('all');
