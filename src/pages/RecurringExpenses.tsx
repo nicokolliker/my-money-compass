@@ -241,21 +241,12 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
     nextDue.setDate(parseInt(form.due_day) || 1);
     if (nextDue < new Date()) nextDue.setMonth(nextDue.getMonth() + 1);
 
-    // Resolve Digital subcategory_id from the selected subtype key
-    let subcategoryId: string | null = null;
-    if (cat.isDigital && form.subtype) {
-      const label = DIGITAL_SUBTYPES[form.subtype]?.label?.toLowerCase();
-      const match = (digitalSubcats || []).find((s: any) => (s.name || '').toLowerCase() === label);
-      subcategoryId = match?.id || null;
-    }
-
     const payload: any = {
       name: form.name,
       type: cat.name.toLowerCase().replace(/\s+/g, '_'),
       subtype: cat.isDigital ? (form.subtype || null) : null,
       category_id: cat.id,
       linked_category_id: cat.id,
-      subcategory_id: subcategoryId,
       account_id: form.account_id || null,
       amount: parseFloat(form.amount),
       currency: form.currency, frequency: form.frequency,
