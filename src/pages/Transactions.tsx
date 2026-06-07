@@ -204,6 +204,7 @@ export default function Transactions() {
   const { data: recurringMatchMap = {} } = useTransactionRecurringMap();
   const deleteTx = useDeleteTransaction();
   const updateTx = useUpdateTransaction();
+  const createRecurring = useCreateRecurringExpense();
   const { hasDemoData, onCleared: onDemoCleared } = useDemoData();
   const { data: importLog } = useImportLog();
   const arsToUsd = useLatestFxRate('ARS', 'USD');
