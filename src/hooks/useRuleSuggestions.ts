@@ -1,9 +1,14 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useRules } from '@/hooks/useRules';
 import { useCategories } from '@/hooks/useCategories';
 import { useRecurringExpenses } from '@/hooks/useRecurringExpenses';
 import { useUserSettings, useUpsertUserSettings } from '@/hooks/useUserSettings';
+import {
+  getCachedInferredCategory,
+  inferCategoryAI,
+  subscribeInferredCategory,
+} from '@/lib/aiCategoryInference';
 
 export type SuggestionType = 'category' | 'recurring' | 'rule';
 
@@ -21,6 +26,11 @@ export interface RuleSuggestion {
   currency?: string;
 }
 
+/**
+ * @deprecated Synchronous keyword fallback. Prefer `inferCategoryAI` from
+ * `@/lib/aiCategoryInference` for new code. Kept so legacy callers
+ * (e.g. ViejoSettlementWizard) continue to compile.
+ */
 export function inferCategoryName(name: string): string | null {
   const n = (name || '').toUpperCase();
   if (
@@ -34,6 +44,16 @@ export function inferCategoryName(name: string): string | null {
   if (n.includes('YPF') || n.includes('SHELL') || n.includes('AXION')) return 'Auto';
   if (n.includes('FARMACIA') || n.includes('DROGUERIA') || n.includes('FARMACITY')) return 'Salud';
   return null;
+}
+
+/**
+ * Subscribe to AI inference cache updates so dependent hooks re-render
+ * when new merchant classifications arrive.
+ */
+export function useAiInferenceVersion() {
+  const [v, setV] = useState(0);
+  useEffect(() => subscribeInferredCategory(() => setV((x) => x + 1)), []);
+  return v;
 }
 
 const IGNORED_KEY = 'ignored_suggestions';
