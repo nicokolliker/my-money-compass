@@ -501,7 +501,7 @@ function SplitwiseCard({
             className="w-full"
             onClick={onOpenCsv}
           >
-            Cargar CSV de Splitwise →
+            Liquidar <span className="capitalize">{monthLabel}</span> →
           </Button>
         </div>
       </CardContent>
