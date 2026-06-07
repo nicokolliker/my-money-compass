@@ -96,7 +96,7 @@ export default function CategoriesTab() {
           <button
             key={c.id}
             onClick={() => openEdit(c)}
-            className="flex items-center gap-3 w-full py-3 px-3 rounded-xl hover:bg-accent/60 active:bg-accent transition-colors text-left"
+            className="flex items-center gap-3 w-full py-3 px-3 rounded-xl hover:bg-muted/60 active:bg-accent transition-colors text-left"
           >
             <div
               className="w-9 h-9 rounded-full flex items-center justify-center text-lg"
@@ -156,7 +156,7 @@ export default function CategoriesTab() {
                     key={icon}
                     type="button"
                     onClick={() => setForm(f => ({ ...f, icon }))}
-                    className={`w-9 h-9 rounded-lg flex items-center justify-center text-lg hover:bg-accent transition-colors ${form.icon === icon ? 'ring-2 ring-primary bg-primary/10' : ''}`}
+                    className={`w-9 h-9 rounded-lg flex items-center justify-center text-lg hover:bg-muted/60 transition-colors ${form.icon === icon ? 'ring-2 ring-primary bg-primary/10' : ''}`}
                   >
                     {icon}
                   </button>

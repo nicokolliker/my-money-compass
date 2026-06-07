@@ -176,7 +176,7 @@ export default function RecurringTracking() {
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="h-7 px-2 text-[11px] text-primary hover:text-primary hover:bg-primary/10"
+                      className="h-7 px-2 text-[11px] text-primary hover:text-primary hover:bg-muted/60"
                       onClick={() => setLinkTarget(i)}
                       title="Registrar pago"
                     >

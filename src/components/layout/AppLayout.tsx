@@ -296,7 +296,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
             <div className="pt-2 mt-2 border-t border-border/40">
               <button
                 onClick={() => { setShowMore(false); signOut(); }}
-                className="flex items-center gap-3 w-full rounded-xl px-3 py-3 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground transition-all"
+                className="flex items-center gap-3 w-full rounded-xl px-3 py-3 text-sm font-medium text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-all"
               >
                 <LogOut className="h-4 w-4 shrink-0" />
                 Sign Out

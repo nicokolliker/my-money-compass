@@ -461,7 +461,7 @@ function InvoiceForm({ open, onClose, onSaved }: { open: boolean; onClose: () =>
           ) : (
             <label className="block">
               <span className="text-xs text-muted-foreground mb-1.5 block">Subir PDF de la factura</span>
-              <div className="border-2 border-dashed border-border rounded-lg p-4 text-center cursor-pointer hover:border-primary hover:bg-accent/30 transition-colors">
+              <div className="border-2 border-dashed border-border rounded-lg p-4 text-center cursor-pointer hover:border-primary hover:bg-muted/60 transition-colors">
                 {pdfLoading ? (
                   <p className="text-sm text-muted-foreground">Leyendo PDF...</p>
                 ) : (

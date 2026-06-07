@@ -463,7 +463,7 @@ export default function Transactions() {
                   const amount = Number(tx.amount);
 
                   return (
-                    <div key={tx.id} className={`flex items-center gap-3 py-3 px-3 rounded-xl hover:bg-accent/60 active:bg-accent transition-colors group ${tx.is_subscription ? 'border-l-2 border-l-primary/40' : ''}`}>
+                    <div key={tx.id} className={`flex items-center gap-3 py-3 px-3 rounded-xl hover:bg-muted/60 active:bg-accent transition-colors group ${tx.is_subscription ? 'border-l-2 border-l-primary/40' : ''}`}>
                       <div
                         className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer"
                         onClick={() => setEditTx(tx)}
@@ -497,11 +497,11 @@ export default function Transactions() {
                                 </PopoverTrigger>
                                 <PopoverContent className="w-48 p-1" align="start">
                                   <div className="space-y-0.5 max-h-48 overflow-auto">
-                                    <button className="w-full text-left px-2 py-1.5 text-xs rounded hover:bg-accent" onClick={() => handleCategoryChange(tx.id, null)}>
+                                    <button className="w-full text-left px-2 py-1.5 text-xs rounded hover:bg-muted/60" onClick={() => handleCategoryChange(tx.id, null)}>
                                       📌 Uncategorized
                                     </button>
                                     {categories?.map(c => (
-                                      <button key={c.id} className="w-full text-left px-2 py-1.5 text-xs rounded hover:bg-accent" onClick={() => handleCategoryChange(tx.id, c.id)}>
+                                      <button key={c.id} className="w-full text-left px-2 py-1.5 text-xs rounded hover:bg-muted/60" onClick={() => handleCategoryChange(tx.id, c.id)}>
                                         {c.icon || '📌'} {c.name}
                                       </button>
                                     ))}
