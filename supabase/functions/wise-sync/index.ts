@@ -15,6 +15,7 @@ async function wiseFetch(path: string, token: string, action: string) {
   try {
     res = await fetch(`${WISE_BASE}${path}`, {
       headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(12000),
     });
   } catch (e: any) {
     throw new Error(
@@ -82,7 +83,7 @@ async function fetchActivitiesFallback(
 ) {
   const txs: any[] = [];
   let cursor: string | null = null;
-  for (let page = 0; page < 6; page += 1) {
+  for (let page = 0; page < 2; page += 1) {
     const params = new URLSearchParams({ since, until, size: "50", status: "COMPLETED" });
     if (cursor) params.set("nextCursor", cursor);
     const payload = await wiseFetch(
@@ -276,7 +277,7 @@ Deno.serve(async (req) => {
       if (!statementOk) {
         diagnostics.push("Wise bloqueó balance-statements; intentando fallback con Activities API.");
         try {
-          const fallbackSince = new Date(now - 180 * 24 * 60 * 60 * 1000).toISOString();
+          const fallbackSince = new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString();
           txs = await fetchActivitiesFallback(
             profileId,
             token,
