@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { PrivacyModeProvider } from "@/hooks/usePrivacyMode";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { useEnsureDigitalSubcategories } from "@/hooks/useEnsureDigitalSubcategories";
 import Dashboard from "./pages/Dashboard";
 import Accounts from "./pages/Accounts";
 import DebtsPage from "./pages/Debts";
@@ -36,6 +37,11 @@ function ProtectedRoutes() {
 
   if (!user) return <Navigate to="/auth" replace />;
 
+  return <AuthedApp />;
+}
+
+function AuthedApp() {
+  useEnsureDigitalSubcategories();
   return (
     <AppLayout>
       <Routes>
