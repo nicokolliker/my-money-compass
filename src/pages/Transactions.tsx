@@ -174,6 +174,11 @@ export default function Transactions() {
   const [showDateFilter, setShowDateFilter] = useState(false);
   const [uncategorizedOnly, setUncategorizedOnly] = useState(false);
   const [editTx, setEditTx] = useState<any>(null);
+  const [recurringDialog, setRecurringDialog] = useState<null | {
+    txId: string; name: string; amount: string; currency: string;
+    frequency: string; categoryId: string; accountId: string; nextDueDate: string;
+  }>(null);
+  const [recurringSaving, setRecurringSaving] = useState(false);
 
   // Clear location state once consumed so refreshes don't re-apply it
   useEffect(() => {
