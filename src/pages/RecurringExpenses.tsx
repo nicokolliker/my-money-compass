@@ -326,9 +326,14 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
                   <Select value={form.subtype} onValueChange={v => setForm(f => ({ ...f, subtype: v }))}>
                     <SelectTrigger className="mt-1"><SelectValue placeholder="Seleccionar subcategoría" /></SelectTrigger>
                     <SelectContent>
-                      {digitalSubcats.map(s => (
-                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                      ))}
+                      {digitalSubcats.map(s => {
+                        const key = Object.entries(DIGITAL_SUBTYPES).find(
+                          ([, def]) => def.label.toLowerCase() === (s.name || '').toLowerCase(),
+                        )?.[0] || (s.name || '').toLowerCase();
+                        return (
+                          <SelectItem key={s.id} value={key}>{s.name}</SelectItem>
+                        );
+                      })}
                     </SelectContent>
                   </Select>
                 </div>
