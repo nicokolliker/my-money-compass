@@ -395,20 +395,20 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
 
           <div className="overflow-x-auto">
             <table className="text-xs border-collapse" style={{ minWidth: '960px', width: '100%' }}>
-              <thead>
-                <tr className="border-b border-border bg-muted/30">
-                  <th className="text-left px-4 py-2.5 sticky left-0 z-10 min-w-[160px] font-medium text-muted-foreground text-xs"
-                    style={{ background: 'hsl(var(--muted) / 0.3)', boxShadow: '2px 0 4px -2px rgba(0,0,0,0.06)' }}>
+              <thead className="sticky top-0 z-20">
+                <tr className="border-b border-border">
+                  <th className="text-left px-4 py-2.5 sticky left-0 z-30 min-w-[160px] font-medium text-muted-foreground text-xs"
+                    style={{ background: 'hsl(var(--muted))', boxShadow: '2px 0 4px -2px rgba(0,0,0,0.06)' }}>
                     Categoría
                   </th>
                   {MONTHS.map((m, i) => (
-                    <th key={m} className={cn('px-2 py-2.5 text-center font-medium text-muted-foreground text-xs min-w-[72px]',
+                    <th key={m} className={cn('px-2 py-2.5 text-center font-medium text-muted-foreground text-xs min-w-[72px] bg-muted',
                       isCurrent(i) && 'text-primary')}>
                       {m}
                       {isCurrent(i) && <div className="text-[8px] font-normal text-primary/70">actual</div>}
                     </th>
                   ))}
-                  <th className="px-4 py-2.5 text-right font-medium text-muted-foreground text-xs min-w-[80px]">Total</th>
+                  <th className="px-4 py-2.5 text-right font-medium text-muted-foreground text-xs min-w-[80px] bg-muted">Total</th>
                 </tr>
               </thead>
               <tbody>
