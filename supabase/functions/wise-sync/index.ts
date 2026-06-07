@@ -323,6 +323,27 @@ Deno.serve(async (req) => {
       let minDate: string | null = null;
       let maxDate: string | null = null;
 
+      let imported = 0;
+      let skipped = 0;
+      let sumImported = 0;
+      let minDate: string | null = null;
+      let maxDate: string | null = null;
+
+      // Fetch user's rules once for auto-categorization
+      const { data: rulesData } = await admin
+        .from("rules")
+        .select("keyword, match_field, category_id")
+        .eq("user_id", userId);
+      const rules: Array<{ keyword: string; match_field: string | null; category_id: string | null }> = (rulesData as any) || [];
+      const matchRule = (description: string) => {
+        const desc = (description || "").toLowerCase();
+        for (const r of rules) {
+          if (!r.keyword || !r.category_id) continue;
+          if (desc.includes(r.keyword.toLowerCase().trim())) return r.category_id;
+        }
+        return null;
+      };
+
       for (const tx of txs) {
         const ref =
           tx.referenceNumber || tx.id || `${tx.date}-${tx.amount?.value}`;
@@ -336,6 +357,10 @@ Deno.serve(async (req) => {
           "Wise";
         let type: "income" | "expense" | "transfer" =
           amount >= 0 ? "income" : "expense";
+        if ((tx.details?.type || "").toUpperCase() === "TRANSFER") {
+          type = "transfer";
+        }
+        const category_id = matchRule(description);
         if ((tx.details?.type || "").toUpperCase() === "TRANSFER") {
           type = "transfer";
         }
