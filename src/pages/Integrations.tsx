@@ -141,7 +141,21 @@ export default function IntegrationsPage() {
       qc.invalidateQueries({ queryKey: ['user-settings'] });
       qc.invalidateQueries({ queryKey: ['transactions'] });
       qc.invalidateQueries({ queryKey: ['accounts'] });
-      toast.success('Sincronización completada');
+      qc.invalidateQueries({ queryKey: ['merchants'] });
+
+      const userId = (await supabase.auth.getUser()).data.user?.id;
+      const r = userId ? data?.results?.[userId] : Object.values(data?.results || {})[0] as any;
+
+      if (!r || r.ok === false) {
+        toast.error(r?.error || 'Error al sincronizar');
+      } else {
+        const parts = [`${r.imported ?? 0} nuevas`];
+        if (r.skipped) parts.push(`${r.skipped} ya existían`);
+        toast.success(`Wise sincronizado: ${parts.join(' · ')}`);
+        if (r.diagnostics?.length) {
+          console.info('[sync-wise diagnostics]', r.diagnostics);
+        }
+      }
     } catch (e: any) {
       toast.error(e.message || 'Error al sincronizar');
     } finally {
