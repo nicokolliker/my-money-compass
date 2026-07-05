@@ -305,7 +305,14 @@ export function AppLayout({ children }: { children: ReactNode }) {
                 </button>
               );
             })}
-            <div className="pt-2 mt-2 border-t border-border/40">
+            <div className="pt-2 mt-2 border-t border-border/40 space-y-1">
+              <button
+                onClick={() => { toggleTheme(); }}
+                className="flex items-center gap-3 w-full rounded-xl px-3 py-3 text-sm font-medium text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-all"
+              >
+                {theme === 'dark' ? <Sun className="h-4 w-4 shrink-0" /> : <Moon className="h-4 w-4 shrink-0" />}
+                {theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
+              </button>
               <button
                 onClick={() => { setShowMore(false); signOut(); }}
                 className="flex items-center gap-3 w-full rounded-xl px-3 py-3 text-sm font-medium text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-all"
