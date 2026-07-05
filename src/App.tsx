@@ -21,6 +21,7 @@ import Settings from "./pages/Settings";
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
+import OAuthConsent from "./pages/OAuthConsent";
 
 const queryClient = new QueryClient();
 
@@ -79,7 +80,12 @@ function AuthedApp() {
 function AuthGuard() {
   const { user, loading } = useAuth();
   if (loading) return null;
-  if (user) return <Navigate to="/" replace />;
+  if (user) {
+    const params = new URLSearchParams(window.location.search);
+    const next = params.get("next");
+    const safe = next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
+    return <Navigate to={safe} replace />;
+  }
   return <Auth />;
 }
 
@@ -94,6 +100,7 @@ const App = () => (
             <Routes>
               <Route path="/auth" element={<AuthGuard />} />
               <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
               <Route path="/*" element={<ProtectedRoutes />} />
             </Routes>
           </PrivacyModeProvider>
