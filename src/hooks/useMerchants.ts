@@ -71,21 +71,68 @@ export function useMergeMerchants() {
   });
 }
 
-export function useMerchantTransactions(merchantId: string | null) {
+export function useMerchantTransactions(merchant: { id: string; name: string } | null) {
   const userId = useUserId();
   return useQuery({
-    queryKey: ['merchant-transactions', userId, merchantId],
-    enabled: !!userId && !!merchantId,
+    queryKey: ['merchant-transactions', userId, merchant?.id],
+    enabled: !!userId && !!merchant,
     queryFn: async () => {
-      if (!merchantId) return [];
-      const { data, error } = await supabase
-        .from('transactions')
-        .select('*, accounts!inner(name, currency), categories(name, icon, color)')
-        .eq('merchant_id', merchantId)
-        .order('date', { ascending: false })
-        .limit(50);
-      if (error) throw error;
-      return data;
+      if (!merchant) return [];
+      // Importers store the merchant NAME on transactions.merchant (text),
+      // not merchant_id — so match by exact name (case-insensitive) and
+      // include any legacy rows linked via merchant_id.
+      const [byName, byId] = await Promise.all([
+        supabase
+          .from('transactions')
+          .select('*, accounts!inner(name, currency), categories(name, icon, color)')
+          .ilike('merchant', merchant.name)
+          .order('date', { ascending: false })
+          .limit(100),
+        supabase
+          .from('transactions')
+          .select('*, accounts!inner(name, currency), categories(name, icon, color)')
+          .eq('merchant_id', merchant.id)
+          .order('date', { ascending: false })
+          .limit(100),
+      ]);
+      if (byName.error) throw byName.error;
+      const seen = new Set<string>();
+      const merged: any[] = [];
+      for (const t of [...(byName.data || []), ...(byId.data || [])]) {
+        if (seen.has(t.id)) continue;
+        seen.add(t.id);
+        merged.push(t);
+      }
+      merged.sort((a, b) => (a.date < b.date ? 1 : -1));
+      return merged;
+    },
+  });
+}
+
+/**
+ * Batch: set the merchant's default category on ALL of its transactions
+ * (matched by exact merchant name or legacy merchant_id link). Resolves the
+ * Digital subcategory from the merchant name when applicable.
+ */
+export function useApplyMerchantCategory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ merchant, categoryId }: { merchant: { id: string; name: string }; categoryId: string }) => {
+      const { fetchDigitalSubcatMap, resolveDigitalSubcategoryId } = await import('@/lib/applyRules');
+      const digitalMap = await fetchDigitalSubcatMap();
+      const subcategory_id = resolveDigitalSubcategoryId(categoryId, merchant.name, digitalMap);
+      const updates = { category_id: categoryId, subcategory_id };
+      const [r1, r2] = await Promise.all([
+        supabase.from('transactions').update(updates).ilike('merchant', merchant.name).select('id'),
+        supabase.from('transactions').update(updates).eq('merchant_id', merchant.id).select('id'),
+      ]);
+      if (r1.error) throw r1.error;
+      const ids = new Set([...(r1.data || []), ...(r2.data || [])].map((t: any) => t.id));
+      return ids.size;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['transactions'] });
+      qc.invalidateQueries({ queryKey: ['merchant-transactions'] });
     },
   });
 }

@@ -1,0 +1,107 @@
+import { useEffect, useRef } from 'react';
+import { useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { useUserId } from '@/hooks/useAuthUser';
+import type { WiseSyncResult } from '@/hooks/useWiseSync';
+
+const THROTTLE_MS = 20 * 60 * 60 * 1000; // ~1x per day
+
+async function callWise(action: string, params: Record<string, unknown> = {}) {
+  const { data, error } = await supabase.functions.invoke('wise-sync', {
+    body: { action, ...params },
+  });
+  if (error) throw new Error(error.message || 'Wise sync failed');
+  if (data?.error) throw new Error(data.error);
+  return data;
+}
+
+/**
+ * Full USD sync sequence, self-contained:
+ * profiles → balances → local Wise USD account → sync-transactions.
+ * Returns null when preconditions aren't met (no token, no account, no balance).
+ * Shared by the daily auto-sync and the manual "Sync Wise" button in Accounts.
+ */
+export async function performWiseSync(qc: QueryClient): Promise<WiseSyncResult | null> {
+  // Local Wise USD account
+  const { data: accounts } = await supabase
+    .from('accounts')
+    .select('id, name, currency')
+    .eq('is_active', true);
+  const wiseAcc = (accounts || []).find(
+    (a: any) => /wise/i.test(a.name) && a.currency === 'USD',
+  );
+  if (!wiseAcc) return null;
+
+  // Profile (uses server-stored token; throws if none configured)
+  const profilesRes = await callWise('get-profiles');
+  const profileId = profilesRes?.profiles?.[0]?.id;
+  if (!profileId) return null;
+
+  // USD balance
+  const balancesRes = await callWise('get-balances', { profileId });
+  const usdBalance = (balancesRes?.balances || []).find(
+    (b: any) => (b.currency || b.amount?.currency) === 'USD',
+  );
+  if (!usdBalance?.id) return null;
+
+  const result: WiseSyncResult = await callWise('sync-transactions', {
+    profileId,
+    balanceId: usdBalance.id,
+    accountId: wiseAcc.id,
+    currency: 'USD',
+  });
+
+  qc.invalidateQueries({ queryKey: ['transactions'] });
+  qc.invalidateQueries({ queryKey: ['account-balances'] });
+  qc.invalidateQueries({ queryKey: ['accounts'] });
+  qc.invalidateQueries({ queryKey: ['wise-sync-log'] });
+  qc.invalidateQueries({ queryKey: ['merchants'] });
+  qc.invalidateQueries({ queryKey: ['recurring-instances'] });
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) await supabase.rpc('refresh_recurring_tracking', { p_user_id: user.id });
+  } catch { /* non-fatal */ }
+
+  return result;
+}
+
+/**
+ * Runs a silent Wise sync once per ~day on app load (localStorage throttle).
+ * Only surfaces a toast when new transactions actually came in.
+ */
+export function useWiseAutoSync() {
+  const userId = useUserId();
+  const qc = useQueryClient();
+  const started = useRef(false);
+
+  useEffect(() => {
+    if (!userId || started.current) return;
+    started.current = true;
+
+    const key = `wise-auto-sync-${userId}`;
+    const last = Number(localStorage.getItem(key) || 0);
+    if (Date.now() - last < THROTTLE_MS) return;
+
+    (async () => {
+      try {
+        // Skip entirely if Wise was never connected (no token stored)
+        const { data: settings } = await (supabase as any)
+          .from('user_settings')
+          .select('wise_token')
+          .eq('user_id', userId)
+          .maybeSingle();
+        if (!settings?.wise_token) return;
+
+        const result = await performWiseSync(qc);
+        localStorage.setItem(key, String(Date.now()));
+        if (result && result.imported > 0) {
+          toast.success(`Wise: ${result.imported} transacciones nuevas`);
+        }
+      } catch (e) {
+        // Silent — auto-sync must never interrupt the user.
+        console.warn('[useWiseAutoSync]', e);
+      }
+    })();
+  }, [userId, qc]);
+}

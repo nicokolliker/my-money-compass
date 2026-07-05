@@ -8,6 +8,7 @@ import { PrivacyModeProvider } from "@/hooks/usePrivacyMode";
 import { ThemeProvider } from "@/hooks/useTheme";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useEnsureDigitalSubcategories } from "@/hooks/useEnsureDigitalSubcategories";
+import { useWiseAutoSync } from "@/hooks/useWiseAutoSync";
 import Dashboard from "./pages/Dashboard";
 import Accounts from "./pages/Accounts";
 import DebtsPage from "./pages/Debts";
@@ -44,6 +45,7 @@ function ProtectedRoutes() {
 
 function AuthedApp() {
   useEnsureDigitalSubcategories();
+  useWiseAutoSync();
   return (
     <AppLayout>
       <Routes>

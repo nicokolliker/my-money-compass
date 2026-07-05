@@ -15,7 +15,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { ACCOUNT_TYPE_LABELS, CURRENCIES, formatCurrency, formatUSD } from '@/lib/constants';
 import { MerchantLogo } from '@/components/MerchantLogo';
 import { getAccountStyle } from '@/lib/accountIcons';
-import { Plus, ChevronDown, FolderPlus, Pencil, Trash2, FileUp, PenLine, Wifi, Clock, AlertTriangle, EyeOff, ArrowRight } from 'lucide-react';
+import { Plus, ChevronDown, FolderPlus, Pencil, Trash2, FileUp, PenLine, Wifi, Clock, AlertTriangle, EyeOff, ArrowRight, RefreshCw } from 'lucide-react';
+import { performWiseSync } from '@/hooks/useWiseAutoSync';
 import { toast } from 'sonner';
 import { DemoDataBanner } from '@/components/DemoDataBanner';
 import { useDemoData } from '@/hooks/useDemoData';
@@ -114,6 +115,23 @@ export default function Accounts() {
 
 
   const qc = useQueryClient();
+  const [wiseSyncing, setWiseSyncing] = useState(false);
+  const handleWiseSync = async () => {
+    setWiseSyncing(true);
+    try {
+      const result = await performWiseSync(qc);
+      if (!result) { toast.info('Wise no está configurado (Integrations → Wise)'); return; }
+      toast.success(
+        result.imported > 0
+          ? `Wise: ${result.imported} transacciones nuevas`
+          : 'Wise al día — sin movimientos nuevos',
+      );
+    } catch (e: any) {
+      toast.error(e.message || 'Error al sincronizar Wise');
+    } finally {
+      setWiseSyncing(false);
+    }
+  };
 
   const IMPORTABLE = ['arq', 'dolarapp', 'mercado', 'galicia'];
   function getLastImport(accountName: string): string | null {
@@ -228,6 +246,11 @@ export default function Accounts() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-foreground">Accounts</h1>
         <div className="flex gap-2">
+          {(accounts || []).some((a: any) => /wise/i.test(a.name)) && (
+            <Button size="sm" variant="outline" className="rounded-xl" onClick={handleWiseSync} disabled={wiseSyncing}>
+              <RefreshCw className={`h-4 w-4 mr-1 ${wiseSyncing ? 'animate-spin' : ''}`} /> Sync Wise
+            </Button>
+          )}
           <Button size="sm" variant="outline" className="rounded-xl" onClick={() => { setEditGroupId(null); setNewGroupName(''); setShowGroupForm(true); }}>
             <FolderPlus className="h-4 w-4 mr-1" /> Group
           </Button>

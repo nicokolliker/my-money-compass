@@ -10,7 +10,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { useMerchants, useUpdateMerchant, useDeleteMerchant, useMergeMerchants, useMerchantTransactions } from '@/hooks/useMerchants';
+import { useMerchants, useUpdateMerchant, useDeleteMerchant, useMergeMerchants, useMerchantTransactions, useApplyMerchantCategory } from '@/hooks/useMerchants';
 import { useCategories } from '@/hooks/useCategories';
 import { getBrandLogo, getInitialsColor } from '@/lib/brandLogos';
 import { MerchantLogo } from '@/components/MerchantLogo';
@@ -55,7 +55,21 @@ export default function MerchantsTab() {
   const [editForm, setEditForm] = useState({ display_name: '', default_category_id: '', domain: '' });
 
   const selected = merchants?.find(m => m.id === selectedId);
-  const { data: merchantTxs } = useMerchantTransactions(selectedId);
+  const { data: merchantTxs } = useMerchantTransactions(
+    selected ? { id: selected.id, name: selected.name } : null,
+  );
+  const applyCategory = useApplyMerchantCategory();
+
+  const handleApplyToAll = async () => {
+    if (!selected || !editForm.default_category_id) return;
+    try {
+      const n = await applyCategory.mutateAsync({
+        merchant: { id: selected.id, name: selected.name },
+        categoryId: editForm.default_category_id,
+      });
+      toast.success(`${n} transacciones actualizadas`);
+    } catch (e: any) { toast.error(e.message); }
+  };
 
   const filtered = merchants?.filter(m => {
     const q = search.toLowerCase();
@@ -236,6 +250,25 @@ export default function MerchantsTab() {
               {/* Transactions for this merchant */}
               {merchantTxs && merchantTxs.length > 0 && (
                 <div>
+                  <div className="rounded-xl bg-muted/40 px-3 py-2.5 mb-3 flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">
+                      {merchantTxs.length} transacciones
+                    </span>
+                    <span className="font-mono font-semibold text-foreground">
+                      Total: {formatUSD(merchantTxs.reduce((sum: number, tx: any) => sum + Math.abs(Number(tx.amount_usd ?? tx.amount) || 0), 0))}
+                    </span>
+                  </div>
+                  {editForm.default_category_id && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full rounded-xl mb-3"
+                      onClick={handleApplyToAll}
+                      disabled={applyCategory.isPending}
+                    >
+                      {applyCategory.isPending ? 'Aplicando...' : `Aplicar categoría a las ${merchantTxs.length} transacciones`}
+                    </Button>
+                  )}
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
                     Recent Transactions ({merchantTxs.length})
                   </p>

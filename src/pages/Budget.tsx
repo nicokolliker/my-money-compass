@@ -157,6 +157,38 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
     }
   };
 
+  // Shift+Enter in a cell: apply the value from this month through December.
+  const saveBudgetForward = async (categoryId: string, fromMonthIndex: number, value: number) => {
+    if (!categoryId) return;
+    try {
+      await Promise.all(
+        Array.from({ length: 12 - fromMonthIndex }, (_, k) => fromMonthIndex + k).map((mi) =>
+          upsertBudget.mutateAsync({
+            category_id: categoryId,
+            month: monthStrFor(selectedYear, mi),
+            amount: value,
+            currency: 'USD',
+          }),
+        ),
+      );
+      toast.success(`Aplicado de ${MONTHS[fromMonthIndex]} a Dic`);
+    } catch (e: any) {
+      toast.error(e.message || 'Error saving');
+    }
+  };
+
+  // Shared keydown for budget cells: Enter saves the month, Shift+Enter fills forward.
+  const budgetCellKeyDown = (categoryId: string, monthIndex: number) =>
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key !== 'Enter') return;
+      const v = parseFloat((e.target as HTMLInputElement).value);
+      if (isNaN(v)) return;
+      e.preventDefault();
+      if (e.shiftKey) saveBudgetForward(categoryId, monthIndex, v);
+      else saveBudget(categoryId, monthIndex, v);
+      (e.target as HTMLInputElement).blur();
+    };
+
   // ----- Chart data: budgeted+fixed vs actual for the selected chart month -----
   const chartData = useMemo(() => {
     return tree
@@ -374,7 +406,10 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
         <div className="rounded-2xl border border-border bg-card overflow-hidden">
 
           <div className="flex items-center justify-between px-5 py-3 border-b border-border">
-            <h3 className="text-sm font-semibold text-foreground">Planificación anual {selectedYear}</h3>
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">Planificación anual {selectedYear}</h3>
+              <p className="text-[10px] text-muted-foreground">Tip: Shift+Enter en una celda aplica el valor hasta diciembre</p>
+            </div>
             <div className="flex items-center gap-1 bg-muted rounded-lg p-0.5">
               <button
                 onClick={() => setTableView('split')}
@@ -439,6 +474,7 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                             placeholder="0"
                             className={cn('h-7 text-xs text-center px-1 tabular-nums border-border/50 rounded-lg', noSpinClass)}
                             onBlur={e => { const v = parseFloat(e.target.value); if (!isNaN(v) && incomeCategoryId) saveBudget(incomeCategoryId, i, v); }}
+                            onKeyDown={incomeCategoryId ? budgetCellKeyDown(incomeCategoryId, i) : undefined}
                           />
                         )}
                       </td>
@@ -543,6 +579,7 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                                   placeholder={avg > 0 ? `~${Math.round(avg)}` : '0'}
                                   className={cn('h-7 text-xs text-center px-1 tabular-nums border-border/50 rounded-lg placeholder:text-muted-foreground/50 placeholder:italic', noSpinClass)}
                                   onBlur={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) saveBudget(cat.id, i, v); }}
+                                  onKeyDown={budgetCellKeyDown(cat.id, i)}
                                 />
                               )}
                             </td>
@@ -576,6 +613,7 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
                                     placeholder={avg > 0 ? `~${Math.round(avg)}` : '0'}
                                     className={cn('h-7 text-xs text-center px-1 tabular-nums border-border/50 rounded-lg placeholder:text-muted-foreground/50 placeholder:italic', noSpinClass)}
                                     onBlur={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) saveBudget(child.id, i, v); }}
+                                    onKeyDown={budgetCellKeyDown(child.id, i)}
                                   />
                                 )}
                               </td>

@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ExternalLink, Plus, AlertTriangle, CheckCircle2, Clock, Upload, Pencil } from 'lucide-react';
+import { ExternalLink, Plus, AlertTriangle, CheckCircle2, Clock, Upload, Pencil, Repeat } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useUserSettings, useUpsertUserSettings, type MonotributoConfig } from '@/hooks/useUserSettings';
@@ -60,6 +60,67 @@ export default function MonotributoPage() {
   const { data: settings } = useUserSettings();
   const [showForm, setShowForm] = useState(false);
   const [showConfig, setShowConfig] = useState(false);
+  const [syncingRecurring, setSyncingRecurring] = useState(false);
+
+  // Upsert inteligente: crea o actualiza el recurrente AFIP con la cuota vigente,
+  // para que la cuota mensual entre al tracking de Recurring y al Budget.
+  const handleSyncRecurring = async () => {
+    setSyncingRecurring(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { data: cats } = await supabase
+        .from('categories')
+        .select('id, name')
+        .ilike('name', 'obligaciones')
+        .limit(1);
+      const catId = cats?.[0]?.id || null;
+
+      const { data: existing } = await supabase
+        .from('recurring_expenses')
+        .select('id, amount')
+        .ilike('name', '%monotributo%')
+        .eq('user_id', user.id)
+        .limit(1)
+        .maybeSingle();
+
+      if (existing?.id) {
+        await supabase
+          .from('recurring_expenses')
+          .update({ amount: CUOTA_ACTUAL, is_active: true, category_id: catId, linked_category_id: catId } as any)
+          .eq('id', existing.id);
+        toast.success(`Recurrente AFIP actualizado a ${formatARS(CUOTA_ACTUAL)}`);
+      } else {
+        const nextDue = new Date();
+        nextDue.setDate(20);
+        if (nextDue < new Date()) nextDue.setMonth(nextDue.getMonth() + 1);
+        await supabase.from('recurring_expenses').insert({
+          user_id: user.id,
+          name: 'Monotributo AFIP',
+          type: 'obligaciones',
+          amount: CUOTA_ACTUAL,
+          currency: 'ARS',
+          frequency: 'monthly',
+          due_day: 20,
+          category_id: catId,
+          linked_category_id: catId,
+          is_active: true,
+          next_due_date: nextDue.toISOString().split('T')[0],
+        } as any);
+        toast.success('Recurrente AFIP creado — visible en Recurring y Budget');
+      }
+      try {
+        await supabase.rpc('refresh_recurring_tracking', { p_user_id: user.id });
+      } catch { /* non-fatal */ }
+      qc.invalidateQueries({ queryKey: ['recurring-expenses'] });
+      qc.invalidateQueries({ queryKey: ['recurring-instances'] });
+    } catch (e: any) {
+      toast.error(e.message || 'Error al sincronizar recurrente');
+    } finally {
+      setSyncingRecurring(false);
+    }
+  };
 
   const config: MonotributoConfig = {
     ...DEFAULT_MONOTRIBUTO,
@@ -152,6 +213,16 @@ export default function MonotributoPage() {
               <p className="text-xs text-muted-foreground mt-1">
                 Cuota mensual: {formatARS(CUOTA_ACTUAL)} · Vigencia: {VIGENCIA}
               </p>
+              <Button
+                size="sm"
+                variant="outline"
+                className="mt-2 h-7 text-xs rounded-lg"
+                onClick={handleSyncRecurring}
+                disabled={syncingRecurring}
+              >
+                <Repeat className={`h-3 w-3 mr-1 ${syncingRecurring ? 'animate-spin' : ''}`} />
+                {syncingRecurring ? 'Sincronizando...' : 'Crear/Actualizar recurrente AFIP'}
+              </Button>
             </div>
             <div className="text-right">
               <p className="text-xs text-muted-foreground">Próxima recategorización</p>
