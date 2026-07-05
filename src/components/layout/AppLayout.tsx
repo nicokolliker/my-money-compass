@@ -142,7 +142,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
       {/* Desktop sidebar — clean white card */}
       <aside className="hidden lg:flex lg:w-72 lg:flex-col lg:fixed lg:inset-y-0 lg:p-3 z-30">
-        <div className="flex flex-col h-full bg-white border border-border rounded-2xl shadow-[0_8px_28px_-18px_rgba(94,108,246,0.25)]">
+        <div className="flex flex-col h-full bg-card border border-border rounded-2xl shadow-[0_8px_28px_-18px_rgba(94,108,246,0.25)]">
           <div className="flex h-16 items-center gap-2.5 px-5 border-b border-border">
             <img src="/compass.svg" alt="My Money Compass" className="h-7 w-7 shrink-0" />
             <h1 className="font-display text-base font-semibold tracking-tight text-foreground">
@@ -247,7 +247,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
           </button>
         );
         return (
-          <nav className="lg:hidden fixed bottom-0 inset-x-0 bg-white border-t border-border z-50 safe-area-bottom">
+          <nav className="lg:hidden fixed bottom-0 inset-x-0 bg-card border-t border-border z-50 safe-area-bottom">
             <div className="flex items-center justify-around h-16">
               {MOBILE_LEFT.map(renderTab)}
               <button
