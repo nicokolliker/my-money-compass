@@ -428,9 +428,9 @@ export default function BudgetPage({ embedded = false }: { embedded?: boolean } 
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="overflow-auto max-h-[72vh]">
             <table className="text-xs border-collapse" style={{ minWidth: '960px', width: '100%' }}>
-              <thead className="sticky top-0 z-20">
+              <thead className="sticky top-0 z-20 bg-muted">
                 <tr className="border-b border-border">
                   <th className="text-left px-4 py-2.5 sticky left-0 z-30 min-w-[160px] font-medium text-muted-foreground text-xs"
                     style={{ background: 'hsl(var(--muted))', boxShadow: '2px 0 4px -2px rgba(0,0,0,0.06)' }}>

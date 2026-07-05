@@ -96,6 +96,40 @@ export function useEnsureDigitalSubcategories() {
           if (id) keyToSubId[key] = id;
         }
 
+        // --- Self-heal recurring_expenses.subtype ---
+        // An older selector bug stored the subcategory UUID (or the label)
+        // instead of the subtype key ('ia', 'entretenimiento', ...). Those
+        // rows never aggregate into their Budget subcategory. Normalize them.
+        try {
+          const validKeys = new Set(Object.keys(DIGITAL_SUBTYPES));
+          const labelToKey = new Map<string, string>();
+          for (const [key, def] of Object.entries(DIGITAL_SUBTYPES)) {
+            labelToKey.set(def.label.toLowerCase(), key);
+          }
+          const subIdToKey = new Map<string, string>();
+          for (const [key, id] of Object.entries(keyToSubId)) {
+            subIdToKey.set(id, key);
+          }
+          const { data: recs } = await supabase
+            .from('recurring_expenses')
+            .select('id, subtype')
+            .eq('user_id', userId)
+            .not('subtype', 'is', null);
+          for (const r of (recs || []) as Array<{ id: string; subtype: string | null }>) {
+            const st = (r.subtype || '').trim();
+            if (!st || validKeys.has(st)) continue;
+            const fixed = subIdToKey.get(st) || labelToKey.get(st.toLowerCase()) || null;
+            if (fixed) {
+              await supabase
+                .from('recurring_expenses')
+                .update({ subtype: fixed } as any)
+                .eq('id', r.id);
+            }
+          }
+        } catch (e) {
+          console.warn('[useEnsureDigitalSubcategories] subtype heal failed', e);
+        }
+
         // --- Backfill: Digital transactions missing subcategory_id ---
         const { data: txs } = await supabase
           .from('transactions')
