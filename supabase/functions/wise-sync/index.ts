@@ -453,14 +453,22 @@ Deno.serve(async (req) => {
 
       // Auto-create merchants from this batch (non-fatal on failure)
       try {
+        // Keep in sync with normalizeMerchantName in src/lib/merchantSync.ts
+        const STATE_SUFFIX_RE = /\s*[—–-]\s*(pending|withdrawn|moved|reversed|cancelled|declined)\s*$/i;
+        const BLOCKLIST_RE = /^(to\s+[a-z]{3}|liquidaci[oó]n\b.*|transferencia\b.*|balance cashback)$/i;
+        const normalizeName = (raw: string): string | null => {
+          let n = (raw || "").trim().replace(/\s+/g, " ").replace(STATE_SUFFIX_RE, "").trim();
+          if (n.length < 2 || BLOCKLIST_RE.test(n)) return null;
+          return n;
+        };
         const wanted = new Map<string, { name: string; category_id: string | null }>();
         for (const tx of txs) {
-          const raw = (tx.details?.merchant?.name || "").trim();
-          if (!raw || raw.length < 2) continue;
-          const key = raw.toLowerCase();
+          const name = normalizeName(tx.details?.merchant?.name || "");
+          if (!name) continue;
+          const key = name.toLowerCase();
           if (!wanted.has(key)) {
-            const catId = matchRule(raw);
-            wanted.set(key, { name: raw, category_id: catId });
+            const catId = matchRule(name);
+            wanted.set(key, { name, category_id: catId });
           }
         }
         if (wanted.size > 0) {

@@ -11,7 +11,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useMerchants, useUpdateMerchant, useDeleteMerchant, useMergeMerchants, useMerchantTransactions, useApplyMerchantCategory, useCreateMerchant } from '@/hooks/useMerchants';
-import { syncMerchantsFromImport } from '@/lib/merchantSync';
+import { syncMerchantsFromImport, cleanupMerchantArtifacts } from '@/lib/merchantSync';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCategories } from '@/hooks/useCategories';
 import { getBrandLogo, getInitialsColor } from '@/lib/brandLogos';
@@ -82,9 +82,13 @@ export default function MerchantsTab() {
         .eq('user_id', user.id)
         .in('type', ['expense', 'income']);
       if (error) throw error;
+      const removed = await cleanupMerchantArtifacts();
       const n = await syncMerchantsFromImport(user.id, (txs || []) as any[]);
       qc.invalidateQueries({ queryKey: ['merchants'] });
-      toast.success(n > 0 ? `${n} merchants creados desde transacciones` : 'Sin merchants nuevos — todo ya existía');
+      const parts: string[] = [];
+      if (n > 0) parts.push(`${n} creados`);
+      if (removed > 0) parts.push(`${removed} duplicados eliminados`);
+      toast.success(parts.length ? `Merchants: ${parts.join(' · ')}` : 'Sin cambios — todo ya existía');
     } catch (e: any) {
       toast.error(e.message || 'Error generando merchants');
     } finally {
