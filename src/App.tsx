@@ -92,22 +92,24 @@ function AuthGuard() {
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <AuthProvider>
-          <PrivacyModeProvider>
-            <Routes>
-              <Route path="/auth" element={<AuthGuard />} />
-              <Route path="/reset-password" element={<ResetPassword />} />
-              <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
-              <Route path="/*" element={<ProtectedRoutes />} />
-            </Routes>
-          </PrivacyModeProvider>
-        </AuthProvider>
-      </BrowserRouter>
-    </TooltipProvider>
+    <ThemeProvider>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <AuthProvider>
+            <PrivacyModeProvider>
+              <Routes>
+                <Route path="/auth" element={<AuthGuard />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
+                <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
+                <Route path="/*" element={<ProtectedRoutes />} />
+              </Routes>
+            </PrivacyModeProvider>
+          </AuthProvider>
+        </BrowserRouter>
+      </TooltipProvider>
+    </ThemeProvider>
   </QueryClientProvider>
 );
 
