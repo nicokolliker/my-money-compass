@@ -398,6 +398,49 @@ export default function Transactions() {
         updates.subtype = null;
       }
       await updateTx.mutateAsync(updates);
+
+      // Offer to recategorize all other transactions of the same merchant.
+      if (catId) {
+        const { normalizeMerchantName } = await import('@/lib/merchantSync');
+        const tx: any = transactions?.find((t: any) => t.id === txId);
+        const norm = normalizeMerchantName(tx?.merchant || tx?.description);
+        if (norm) {
+          const key = norm.toLowerCase();
+          const siblings = ((transactions || []) as any[]).filter((t: any) => {
+            if (t.id === txId) return false;
+            if (t.category_id === catId) return false;
+            const n = normalizeMerchantName(t.merchant || t.description);
+            return n?.toLowerCase() === key;
+          });
+          if (siblings.length > 0) {
+            const batch = { ...updates };
+            delete (batch as any).id;
+            toast.success('Category updated', {
+              duration: 8000,
+              action: {
+                label: `Aplicar a ${siblings.length} más de ${norm}`,
+                onClick: async () => {
+                  try {
+                    const ids = siblings.map((t: any) => t.id);
+                    for (let i = 0; i < ids.length; i += 200) {
+                      const { error } = await supabase
+                        .from('transactions')
+                        .update(batch)
+                        .in('id', ids.slice(i, i + 200));
+                      if (error) throw error;
+                    }
+                    qc.invalidateQueries({ queryKey: ['transactions'] });
+                    toast.success(`${ids.length} transacciones de ${norm} recategorizadas`);
+                  } catch (e: any) {
+                    toast.error(e.message || 'Error al recategorizar');
+                  }
+                },
+              },
+            });
+            return;
+          }
+        }
+      }
       toast.success('Category updated');
     }
     catch (e: any) { toast.error(e.message); }

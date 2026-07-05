@@ -388,6 +388,8 @@ Deno.serve(async (req) => {
       // First occurrence keeps the legacy format so existing rows still dedup;
       // subsequent ones get a -2/-3 suffix and finally get imported.
       const seenIds = new Map<string, number>();
+      // Fresh data per external_id for the pending->settled pass below.
+      const batchById = new Map<string, { description: string; merchant: string | null; amount: number; amount_usd: number; date: string }>();
 
       for (const tx of txs) {
         const ref =
@@ -446,9 +448,53 @@ Deno.serve(async (req) => {
           sumImported += amount;
         } else {
           skipped += 1;
+          batchById.set(external_id, { description, merchant: merchantName, amount, amount_usd: amountUsd, date });
         }
         if (!minDate || date < minDate) minDate = date;
         if (!maxDate || date > maxDate) maxDate = date;
+      }
+
+      // Pending -> Settled: Wise keeps the same referenceNumber when a card
+      // charge settles, but updates description (drops ' — Pending') and may
+      // adjust the amount. ignoreDuplicates freezes the row at its pending
+      // version forever — so re-check existing rows that still look pending
+      // and refresh their NEUTRAL fields only (never category/subtype, which
+      // may be user-set).
+      let settledUpdated = 0;
+      try {
+        const skippedIds = [...batchById.keys()];
+        for (let i = 0; i < skippedIds.length; i += 200) {
+          const chunk = skippedIds.slice(i, i + 200);
+          const { data: pendingRows } = await admin
+            .from("transactions")
+            .select("id, external_id, description, amount")
+            .in("external_id", chunk)
+            .eq("user_id", userId)
+            .ilike("description", "%pending%");
+          for (const row of (pendingRows || []) as Array<{ id: string; external_id: string; description: string; amount: number }>) {
+            const fresh = batchById.get(row.external_id);
+            if (!fresh) continue;
+            const stillPending = /pending/i.test(fresh.description);
+            const changed = fresh.description !== row.description || Number(fresh.amount) !== Number(row.amount);
+            if (stillPending || !changed) continue;
+            const { error: updErr } = await admin
+              .from("transactions")
+              .update({
+                description: fresh.description,
+                merchant: fresh.merchant,
+                amount: fresh.amount,
+                amount_usd: fresh.amount_usd,
+                date: fresh.date,
+              })
+              .eq("id", row.id);
+            if (!updErr) settledUpdated += 1;
+          }
+        }
+        if (settledUpdated > 0) {
+          diagnostics.push(`${settledUpdated} transacciones pending liquidadas (actualizadas).`);
+        }
+      } catch (e: any) {
+        diagnostics.push(`Settle pass falló: ${e.message}`);
       }
 
       // Auto-create merchants from this batch (non-fatal on failure)
