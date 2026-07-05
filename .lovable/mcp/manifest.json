@@ -1,0 +1,183 @@
+{
+  "version": 1,
+  "sdk_version": "0.20.0",
+  "path": "/functions/v1/mcp",
+  "auth": {
+    "type": "oauth",
+    "issuer": "https://izkjttswwcsjjlhbicow.supabase.co/auth/v1",
+    "accepted_audiences": [
+      "authenticated"
+    ]
+  },
+  "mcp": {
+    "server": {
+      "name": "my-money-compass-mcp",
+      "version": "0.1.0",
+      "title": "My Money Compass"
+    },
+    "tools": [
+      {
+        "name": "list_accounts",
+        "title": "List accounts",
+        "description": "List all financial accounts (bank, cash, card, crypto) for the signed-in user, including institution, currency and source.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {}
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_transactions",
+        "title": "List transactions",
+        "description": "List transactions for the signed-in user, optionally filtered by date range or merchant substring. Returns up to `limit` rows (default 50, max 500) sorted newest first.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "since": {
+              "type": "string",
+              "description": "Inclusive start date (YYYY-MM-DD)."
+            },
+            "until": {
+              "type": "string",
+              "description": "Inclusive end date (YYYY-MM-DD)."
+            },
+            "merchant_contains": {
+              "type": "string",
+              "description": "Case-insensitive substring to match against merchant or description."
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "description": "Max rows to return. Default 50."
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_categories",
+        "title": "List categories",
+        "description": "List spending categories and their subcategories for the signed-in user.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {}
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_recurring_expenses",
+        "title": "List recurring expenses",
+        "description": "List subscriptions and other recurring expenses for the signed-in user.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {}
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_budgets",
+        "title": "List budgets",
+        "description": "List monthly per-category budget limits for the signed-in user, optionally scoped to a specific month (YYYY-MM).",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "month": {
+              "type": "string",
+              "description": "Month in YYYY-MM format. Omit to return all budgets."
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "create_transaction",
+        "title": "Create transaction",
+        "description": "Create a new transaction (expense or income) for the signed-in user. Amount is negative for expenses, positive for income.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "date": {
+              "type": "string",
+              "description": "Transaction date, YYYY-MM-DD."
+            },
+            "amount": {
+              "type": "number",
+              "description": "Signed amount. Negative for expenses, positive for income."
+            },
+            "currency": {
+              "type": "string",
+              "description": "ISO currency code, e.g. USD, ARS, EUR."
+            },
+            "description": {
+              "type": "string",
+              "description": "Human-readable description."
+            },
+            "merchant": {
+              "type": "string",
+              "description": "Merchant name."
+            },
+            "account_id": {
+              "type": "string",
+              "description": "Account UUID this transaction belongs to."
+            },
+            "category_id": {
+              "type": "string",
+              "description": "Category UUID."
+            },
+            "subcategory_id": {
+              "type": "string",
+              "description": "Subcategory UUID."
+            }
+          },
+          "required": [
+            "date",
+            "amount",
+            "currency",
+            "description"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      }
+    ]
+  }
+}
