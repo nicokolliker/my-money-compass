@@ -79,6 +79,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const { signOut } = useAuth();
   const { isPrivate, togglePrivacy } = usePrivacyMode();
+  const { theme, toggleTheme } = useTheme();
   const qc = useQueryClient();
 
   const initialOpen: Record<string, boolean> = {};
