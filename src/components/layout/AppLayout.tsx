@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import {
   LayoutDashboard, Wallet, ArrowLeftRight, BarChart3, Repeat, BookOpen, Plus,
   CalendarDays, Target, LogOut, Upload, ChevronDown, ChevronRight, Tag, Store, DollarSign, Plug, LayoutGrid, CreditCard, Receipt, Eye, EyeOff, MoreHorizontal,
+  Moon, Sun,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -13,6 +14,7 @@ import { TransactionForm } from '@/components/transactions/TransactionForm';
 import { DebugPanel } from '@/components/DebugPanel';
 import { useAuth } from '@/hooks/useAuth';
 import { usePrivacyMode } from '@/hooks/usePrivacyMode';
+import { useTheme } from '@/hooks/useTheme';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -77,6 +79,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const { signOut } = useAuth();
   const { isPrivate, togglePrivacy } = usePrivacyMode();
+  const { theme, toggleTheme } = useTheme();
   const qc = useQueryClient();
 
   const initialOpen: Record<string, boolean> = {};
@@ -174,6 +177,15 @@ export function AppLayout({ children }: { children: ReactNode }) {
           })}
           </nav>
           <div className="p-3 border-t border-border space-y-2">
+            <Button
+              variant="outline"
+              className="w-full rounded-lg h-9 justify-start text-muted-foreground hover:text-foreground"
+              onClick={toggleTheme}
+              title={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+            >
+              {theme === 'dark' ? <Sun className="h-4 w-4 mr-2" /> : <Moon className="h-4 w-4 mr-2" />}
+              {theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
+            </Button>
             <Button
               variant="outline"
               className="w-full rounded-lg h-9 justify-start text-muted-foreground hover:text-foreground"
@@ -293,7 +305,14 @@ export function AppLayout({ children }: { children: ReactNode }) {
                 </button>
               );
             })}
-            <div className="pt-2 mt-2 border-t border-border/40">
+            <div className="pt-2 mt-2 border-t border-border/40 space-y-1">
+              <button
+                onClick={() => { toggleTheme(); }}
+                className="flex items-center gap-3 w-full rounded-xl px-3 py-3 text-sm font-medium text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-all"
+              >
+                {theme === 'dark' ? <Sun className="h-4 w-4 shrink-0" /> : <Moon className="h-4 w-4 shrink-0" />}
+                {theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
+              </button>
               <button
                 onClick={() => { setShowMore(false); signOut(); }}
                 className="flex items-center gap-3 w-full rounded-xl px-3 py-3 text-sm font-medium text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-all"
