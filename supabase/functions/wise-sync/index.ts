@@ -94,9 +94,13 @@ async function fetchActivitiesFallback(
 ) {
   const txs: any[] = [];
   const unmatched: Array<{ type: string | null; title: string | null; primaryAmount: string | null }> = [];
+  const rawSample: Array<Record<string, unknown>> = [];
   let cursor: string | null = null;
   for (let page = 0; page < 5; page += 1) {
-    const params = new URLSearchParams({ since, until, size: "50", status: "COMPLETED" });
+    // No status filter: incoming transfers can sit IN_PROGRESS for days in
+    // Wise while already visible in the user's app. Cancelled/failed are
+    // excluded per-activity below.
+    const params = new URLSearchParams({ since, until, size: "50" });
     if (cursor) params.set("nextCursor", cursor);
     const payload = await wiseFetch(
       `/v1/profiles/${profileId}/activities?${params.toString()}`,
@@ -105,6 +109,17 @@ async function fetchActivitiesFallback(
     );
 
     for (const activity of payload?.activities ?? []) {
+      if (rawSample.length < 15) {
+        rawSample.push({
+          type: activity.type || activity.resource?.type || null,
+          status: activity.status || null,
+          title: String(activity.title || "").slice(0, 60),
+          primaryAmount: String(activity.primaryAmount || "").slice(0, 50),
+          date: activity.createdOn || activity.updatedOn || null,
+        });
+      }
+      const st = (activity.status || "").toUpperCase();
+      if (st === "CANCELLED" || st === "FAILED" || st === "DECLINED") continue;
       const amount = amountFromActivity(activity, currency);
       const date = activity.createdOn || activity.updatedOn;
       if (amount === null || !date) {
@@ -135,7 +150,7 @@ async function fetchActivitiesFallback(
     cursor = payload?.cursor ?? null;
     if (!cursor) break;
   }
-  return { txs, unmatched };
+  return { txs, unmatched, rawSample };
 }
 
 async function getAuthenticatedUserId(
@@ -314,6 +329,7 @@ Deno.serve(async (req) => {
           txs = fb.txs;
           statementOk = txs.length > 0;
           diagnostics.push(`Activities API devolvió ${txs.length} movimientos para ${currency}.`);
+          diagnostics.push(`Muestra cruda (${currency}): ${JSON.stringify(fb.rawSample)}`);
           if (fb.unmatched.length > 0) {
             // Surface the raw shape of anything we couldn't parse an amount
             // from — this is exactly what we need to see if a real deposit
