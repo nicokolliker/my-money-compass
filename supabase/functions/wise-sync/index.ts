@@ -99,11 +99,16 @@ async function fetchActivitiesFallback(
       const amount = amountFromActivity(activity, currency);
       const date = activity.createdOn || activity.updatedOn;
       if (amount === null || !date) {
-        unmatched.push({
-          type: activity.type || activity.resource?.type || null,
-          title: activity.title || null,
-          primaryAmount: activity.primaryAmount || null,
-        });
+        // Only surface activities that mention the target currency — anything
+        // else is just a different-currency activity handled by another pass.
+        const raw = `${activity.primaryAmount || ""} ${activity.secondaryAmount || ""}`;
+        if (raw.toUpperCase().includes(currency.toUpperCase())) {
+          unmatched.push({
+            type: activity.type || activity.resource?.type || null,
+            title: activity.title || null,
+            primaryAmount: activity.primaryAmount || null,
+          });
+        }
         continue;
       }
       const description = cleanWiseText(

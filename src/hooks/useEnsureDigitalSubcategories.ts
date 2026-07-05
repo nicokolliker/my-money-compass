@@ -82,7 +82,7 @@ export function useEnsureDigitalSubcategories() {
         if (missing.length) {
           const { data: inserted } = await supabase
             .from('subcategories')
-            .insert(missing.map((name) => ({ category_id: digitalCat.id, name })))
+            .insert(missing.map((name) => ({ category_id: digitalCat.id, name, user_id: userId })))
             .select('id, name');
           for (const s of (inserted || []) as Array<{ id: string; name: string }>) {
             existingByLabel.set((s.name || '').toLowerCase(), s.id);
