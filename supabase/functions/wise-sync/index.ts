@@ -65,8 +65,10 @@ function amountFromActivity(activity: any, currency: string) {
     const parsed = parseMoney(match[1]);
     if (!Number.isFinite(parsed)) continue;
 
-    const text = `${activity.type || ""} ${activity.title || ""} ${activity.description || ""}`.toLowerCase();
+    const rawType = (activity.type || activity.resource?.type || "").toLowerCase();
+    const text = `${rawType} ${activity.title || ""} ${activity.description || ""}`.toLowerCase();
     if (parsed < 0) return parsed;
+    if (/^(deposit|money_added|balance_credit|top_up|topup)$/.test(rawType)) return Math.abs(parsed);
     if (/refund|cashback|interest|received|deposit|top\s*up|added|incoming|reversal|reembolso|recib/.test(text)) return parsed;
     if (/card_payment|cash_withdrawal|direct_debit|fee|sent|send|paid|spent|withdraw|deduct|charge|payment|outgoing|enviado|pagad/.test(text)) return -Math.abs(parsed);
     return parsed;
@@ -82,8 +84,9 @@ async function fetchActivitiesFallback(
   until: string,
 ) {
   const txs: any[] = [];
+  const unmatched: Array<{ type: string | null; title: string | null; primaryAmount: string | null }> = [];
   let cursor: string | null = null;
-  for (let page = 0; page < 2; page += 1) {
+  for (let page = 0; page < 5; page += 1) {
     const params = new URLSearchParams({ since, until, size: "50", status: "COMPLETED" });
     if (cursor) params.set("nextCursor", cursor);
     const payload = await wiseFetch(
@@ -95,7 +98,14 @@ async function fetchActivitiesFallback(
     for (const activity of payload?.activities ?? []) {
       const amount = amountFromActivity(activity, currency);
       const date = activity.createdOn || activity.updatedOn;
-      if (amount === null || !date) continue;
+      if (amount === null || !date) {
+        unmatched.push({
+          type: activity.type || activity.resource?.type || null,
+          title: activity.title || null,
+          primaryAmount: activity.primaryAmount || null,
+        });
+        continue;
+      }
       const description = cleanWiseText(
         [activity.title, activity.description].filter(Boolean).join(" — "),
       ) || "Wise";
@@ -111,7 +121,7 @@ async function fetchActivitiesFallback(
     cursor = payload?.cursor ?? null;
     if (!cursor) break;
   }
-  return txs;
+  return { txs, unmatched };
 }
 
 async function getAuthenticatedUserId(
@@ -277,16 +287,28 @@ Deno.serve(async (req) => {
       if (!statementOk) {
         diagnostics.push("Wise bloqueó balance-statements; intentando fallback con Activities API.");
         try {
-          const fallbackSince = new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString();
-          txs = await fetchActivitiesFallback(
+          // 90 days (was 30): a slow-settling deposit shouldn't fall outside
+          // the fallback window just because the primary endpoint is blocked.
+          const fallbackSince = new Date(now - 90 * 24 * 60 * 60 * 1000).toISOString();
+          const fb = await fetchActivitiesFallback(
             profileId,
             token,
             currency,
             fallbackSince,
             new Date(now).toISOString(),
           );
+          txs = fb.txs;
           statementOk = txs.length > 0;
           diagnostics.push(`Activities API devolvió ${txs.length} movimientos para ${currency}.`);
+          if (fb.unmatched.length > 0) {
+            // Surface the raw shape of anything we couldn't parse an amount
+            // from — this is exactly what we need to see if a real deposit
+            // (e.g. from Deel) is silently being dropped by amountFromActivity.
+            diagnostics.push(
+              `${fb.unmatched.length} actividades sin monto reconocido: ` +
+                JSON.stringify(fb.unmatched.slice(0, 8)),
+            );
+          }
         } catch (e: any) {
           diagnostics.push(`Activities API falló: ${e.message}`);
         }
