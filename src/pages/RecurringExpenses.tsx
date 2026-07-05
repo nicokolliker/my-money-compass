@@ -102,7 +102,7 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
     const map: Record<string, string | null> = {};
     if (!items) return map;
     items.forEach(i => {
-      let cid: string | null = (i as any).linked_category_id || null;
+      let cid: string | null = (i as any).linked_category_id || (i as any).category_id || null;
       if (!cid) {
         const legacyName = LEGACY_TYPE_TO_NAME[i.type];
         if (legacyName) cid = tree.find(c => c.name === legacyName)?.id || null;
@@ -219,7 +219,7 @@ export default function RecurringExpenses({ embedded = false }: { embedded?: boo
   }, [allSubcategories]);
 
   const openEdit = (item: any) => {
-    const cid = itemCategoryId[item.id] || (tree[0]?.id ?? '');
+    const cid = itemCategoryId[item.id] || '';
     setForm({
       name: item.name,
       type: cid,
