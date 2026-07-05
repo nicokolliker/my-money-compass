@@ -251,6 +251,10 @@ export function parseArqStatements(
   const usedUsdIdx = new Set<number>();
 
   // ── ARS rows → expense / transfer / fee transactions ─────────────────────
+  // Occurrence counter so two identical (date, amount) rows get distinct IDs.
+  // First occurrence keeps the legacy format so already-imported rows still dedup.
+  const seenArsIds = new Map<string, number>();
+
   const arsTransactions: ParsedTransaction[] = arsRows.map((r) => {
     let matched   = false;
     let amountUSD = 0;
@@ -275,6 +279,10 @@ export function parseArqStatements(
     }
     // transfer rows keep amountUSD = 0 (no FX conversion needed — shown separately)
 
+    const baseId = `arq-ARS-${r.date}-${r.rawAmount}`;
+    const occ = (seenArsIds.get(baseId) || 0) + 1;
+    seenArsIds.set(baseId, occ);
+
     return {
       date:           r.date,
       description:    r.description,
@@ -282,7 +290,7 @@ export function parseArqStatements(
       amountARS:      r.amountARS,
       type:           r.type,
       transferTarget: r.transferTarget,
-      external_id:    `arq-ARS-${r.date}-${r.rawAmount}`,
+      external_id:    occ === 1 ? baseId : `${baseId}-${occ}`,
       matched,
     };
   });

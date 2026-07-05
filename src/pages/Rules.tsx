@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useRules, useCreateRule, useDeleteRule } from '@/hooks/useRules';
 import { useCategories } from '@/hooks/useCategories';
 import { useFxRates, useCreateFxRate, useDeleteFxRate } from '@/hooks/useFxRates';
@@ -241,7 +242,15 @@ function RulesPanel() {
 function ReapplyRulesButton() {
   const qc = useQueryClient();
   const [loading, setLoading] = useState(false);
-  const handleClick = async () => {
+
+  /**
+   * overwrite=false → only fills transactions with NULL category (safe default).
+   * overwrite=true  → re-evaluates ALL transactions; any whose matched rule
+   *                   differs from the current category/subcategory gets updated.
+   *                   Transactions matching no rule are never touched, so manual
+   *                   categorizations without a conflicting rule are preserved.
+   */
+  const run = async (overwrite: boolean) => {
     setLoading(true);
     try {
       const { fetchUserRules, matchRuleCategory, fetchDigitalSubcatMap, resolveDigitalSubcategoryId } = await import('@/lib/applyRules');
@@ -250,18 +259,23 @@ function ReapplyRulesButton() {
       const rules = await fetchUserRules();
       if (rules.length === 0) { toast.info('No hay reglas para aplicar'); return; }
       const digitalMap = await fetchDigitalSubcatMap();
-      const { data: txs, error } = await supabase
+
+      let q = supabase
         .from('transactions')
-        .select('id, description, merchant')
-        .eq('user_id', user.id)
-        .is('category_id', null);
+        .select('id, description, merchant, category_id, subcategory_id')
+        .eq('user_id', user.id);
+      if (!overwrite) q = q.is('category_id', null);
+      const { data: txs, error } = await q;
       if (error) throw error;
+
       // Group by (category_id, subcategory_id) to minimise round trips.
       const groups = new Map<string, { category_id: string; subcategory_id: string | null; ids: string[] }>();
       for (const t of (txs || []) as any[]) {
         const catId = matchRuleCategory(rules, t.description, t.merchant);
         if (!catId) continue;
         const subId = resolveDigitalSubcategoryId(catId, `${t.merchant || ''} ${t.description || ''}`, digitalMap);
+        // In overwrite mode, skip rows that already match the rule outcome.
+        if (overwrite && t.category_id === catId && (t.subcategory_id || null) === (subId || null)) continue;
         const key = `${catId}::${subId || ''}`;
         const g = groups.get(key) || { category_id: catId, subcategory_id: subId, ids: [] };
         g.ids.push(t.id);
@@ -269,26 +283,45 @@ function ReapplyRulesButton() {
       }
       let total = 0;
       for (const g of groups.values()) {
-        const { error: upErr } = await supabase
-          .from('transactions')
-          .update({ category_id: g.category_id, subcategory_id: g.subcategory_id })
-          .in('id', g.ids);
-        if (upErr) throw upErr;
-        total += g.ids.length;
+        for (let i = 0; i < g.ids.length; i += 200) {
+          const chunk = g.ids.slice(i, i + 200);
+          const { error: upErr } = await supabase
+            .from('transactions')
+            .update({ category_id: g.category_id, subcategory_id: g.subcategory_id })
+            .in('id', chunk);
+          if (upErr) throw upErr;
+          total += chunk.length;
+        }
       }
       qc.invalidateQueries({ queryKey: ['transactions'] });
-      toast.success(total > 0 ? `${total} transacciones categorizadas` : 'No hubo coincidencias');
+      toast.success(total > 0 ? `${total} transacciones ${overwrite ? 'recategorizadas' : 'categorizadas'}` : 'No hubo coincidencias');
     } catch (e: any) {
       toast.error(e.message || 'Error al re-aplicar reglas');
     } finally {
       setLoading(false);
     }
   };
+
   return (
-    <Button size="sm" variant="outline" onClick={handleClick} disabled={loading}>
-      <RefreshCw className={`h-4 w-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
-      {loading ? 'Aplicando...' : 'Re-aplicar reglas'}
-    </Button>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button size="sm" variant="outline" disabled={loading}>
+          <RefreshCw className={`h-4 w-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
+          {loading ? 'Aplicando...' : 'Re-aplicar reglas'}
+          <ChevronDown className="h-3 w-3 ml-1" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={() => run(false)}>
+          Solo sin categoría
+          <span className="ml-2 text-xs text-muted-foreground">(seguro)</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => run(true)}>
+          Todas (sobrescribir)
+          <span className="ml-2 text-xs text-muted-foreground">(corrige existentes)</span>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

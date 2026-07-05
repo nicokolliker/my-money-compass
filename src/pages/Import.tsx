@@ -74,6 +74,7 @@ import { useQueryClient } from '@tanstack/react-query';
 
 import { extractPdfText } from '@/lib/pdfReader';
 import { fetchUserRules, matchRuleCategory, fetchDigitalSubcatMap, resolveDigitalSubcategoryId } from '@/lib/applyRules';
+import { syncMerchantsFromImport } from '@/lib/merchantSync';
 
 interface PreviewRow extends ParsedTransaction {
   selected: boolean;
@@ -363,6 +364,7 @@ export default function ImportPage() {
 
       const { error } = await supabase.from('transactions').insert(payload);
       if (error) throw error;
+      syncMerchantsFromImport(user.id, payload).then((n) => { if (n) qc.invalidateQueries({ queryKey: ['merchants'] }); });
 
       // PR3: update official_balance so Accounts reflects the real statement balance
       if (arqBalanceFinal !== null) {
@@ -549,6 +551,7 @@ export default function ImportPage() {
       });
       const { data: insertedRows, error } = await supabase.from('transactions').insert(payload).select('id, date, amount, type');
       if (error) throw error;
+      syncMerchantsFromImport(user.id, payload).then((n) => { if (n) qc.invalidateQueries({ queryKey: ['merchants'] }); });
       if (mpMonth) {
         await supabase.from('import_log').upsert(
           {
@@ -678,6 +681,7 @@ export default function ImportPage() {
       });
       const { error } = await supabase.from('transactions').insert(payload);
       if (error) throw error;
+      syncMerchantsFromImport(user.id, payload).then((n) => { if (n) qc.invalidateQueries({ queryKey: ['merchants'] }); });
       if (galiciaMonth) {
         await supabase.from('import_log').upsert(
           {
@@ -814,6 +818,7 @@ export default function ImportPage() {
       }
       const { error } = await supabase.from('transactions').insert(payload);
       if (error) throw error;
+      syncMerchantsFromImport(user.id, payload).then((n) => { if (n) qc.invalidateQueries({ queryKey: ['merchants'] }); });
       if (wiseMonth) {
         await supabase.from('import_log').upsert(
           {

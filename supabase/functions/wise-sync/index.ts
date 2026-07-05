@@ -383,15 +383,25 @@ Deno.serve(async (req) => {
         return digitalSubByLabel["otros"] || null;
       };
 
+      // Occurrence counter: if Wise omits referenceNumber, the fallback
+      // (date+amount) can collide for identical purchases on the same day.
+      // First occurrence keeps the legacy format so existing rows still dedup;
+      // subsequent ones get a -2/-3 suffix and finally get imported.
+      const seenIds = new Map<string, number>();
+
       for (const tx of txs) {
         const ref =
           tx.referenceNumber || tx.id || `${tx.date}-${tx.amount?.value}`;
-        const external_id = `wise-${ref}`;
+        const baseId = `wise-${ref}`;
+        const occ = (seenIds.get(baseId) || 0) + 1;
+        seenIds.set(baseId, occ);
+        const external_id = occ === 1 ? baseId : `${baseId}-${occ}`;
         const amount = Number(tx.amount?.value ?? 0);
         const date = (tx.date || "").split("T")[0];
+        const merchantName: string | null = tx.details?.merchant?.name || null;
         const description =
           tx.details?.description ||
-          tx.details?.merchant?.name ||
+          merchantName ||
           tx.details?.type ||
           "Wise";
         let type: "income" | "expense" | "transfer" =
@@ -399,8 +409,8 @@ Deno.serve(async (req) => {
         if ((tx.details?.type || "").toUpperCase() === "TRANSFER") {
           type = "transfer";
         }
-        const category_id = matchRule(description);
-        const subcategory_id = resolveSubcat(category_id, description);
+        const category_id = matchRule(`${merchantName || ""} ${description}`);
+        const subcategory_id = resolveSubcat(category_id, `${merchantName || ""} ${description}`);
 
         const amountUsd = amount * fxRate;
 
@@ -412,6 +422,7 @@ Deno.serve(async (req) => {
               account_id: accountId,
               date,
               description,
+              merchant: merchantName,
               amount,
               currency,
               fx_rate: fxRate,
@@ -438,6 +449,44 @@ Deno.serve(async (req) => {
         }
         if (!minDate || date < minDate) minDate = date;
         if (!maxDate || date > maxDate) maxDate = date;
+      }
+
+      // Auto-create merchants from this batch (non-fatal on failure)
+      try {
+        const wanted = new Map<string, { name: string; category_id: string | null }>();
+        for (const tx of txs) {
+          const raw = (tx.details?.merchant?.name || "").trim();
+          if (!raw || raw.length < 2) continue;
+          const key = raw.toLowerCase();
+          if (!wanted.has(key)) {
+            const catId = matchRule(raw);
+            wanted.set(key, { name: raw, category_id: catId });
+          }
+        }
+        if (wanted.size > 0) {
+          const { data: existingM } = await admin
+            .from("merchants")
+            .select("name")
+            .eq("user_id", userId);
+          const have = new Set(
+            ((existingM || []) as Array<{ name: string }>).map((m) =>
+              (m.name || "").toLowerCase(),
+            ),
+          );
+          const toInsert = [...wanted.values()]
+            .filter((w) => !have.has(w.name.toLowerCase()))
+            .map((w) => ({
+              user_id: userId,
+              name: w.name,
+              default_category_id: w.category_id,
+            }));
+          if (toInsert.length > 0) {
+            await admin.from("merchants").insert(toInsert);
+            diagnostics.push(`${toInsert.length} merchants nuevos creados.`);
+          }
+        }
+      } catch (e: any) {
+        diagnostics.push(`Merchant sync falló: ${e.message}`);
       }
 
       // Update account official balance
