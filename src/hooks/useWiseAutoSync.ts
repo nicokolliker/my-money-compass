@@ -17,40 +17,69 @@ async function callWise(action: string, params: Record<string, unknown> = {}) {
 }
 
 /**
- * Full USD sync sequence, self-contained:
- * profiles → balances → local Wise USD account → sync-transactions.
- * Returns null when preconditions aren't met (no token, no account, no balance).
+ * Full sync sequence for EVERY currency that has a local "Wise" account
+ * (USD, EUR, etc.) — profiles → balances → matching accounts → sync-transactions
+ * per currency, aggregated into a single result. Self-contained.
+ * Returns null when preconditions aren't met (no token, no Wise account at all).
  * Shared by the daily auto-sync and the manual "Sync Wise" button in Accounts.
  */
 export async function performWiseSync(qc: QueryClient): Promise<WiseSyncResult | null> {
-  // Local Wise USD account
+  // Local Wise accounts, any currency
   const { data: accounts } = await supabase
     .from('accounts')
     .select('id, name, currency')
     .eq('is_active', true);
-  const wiseAcc = (accounts || []).find(
-    (a: any) => /wise/i.test(a.name) && a.currency === 'USD',
-  );
-  if (!wiseAcc) return null;
+  const wiseAccounts = (accounts || []).filter((a: any) => /wise/i.test(a.name));
+  if (wiseAccounts.length === 0) return null;
 
   // Profile (uses server-stored token; throws if none configured)
   const profilesRes = await callWise('get-profiles');
   const profileId = profilesRes?.profiles?.[0]?.id;
   if (!profileId) return null;
 
-  // USD balance
   const balancesRes = await callWise('get-balances', { profileId });
-  const usdBalance = (balancesRes?.balances || []).find(
-    (b: any) => (b.currency || b.amount?.currency) === 'USD',
-  );
-  if (!usdBalance?.id) return null;
+  const balances: any[] = balancesRes?.balances || [];
 
-  const result: WiseSyncResult = await callWise('sync-transactions', {
-    profileId,
-    balanceId: usdBalance.id,
-    accountId: wiseAcc.id,
-    currency: 'USD',
-  });
+  const aggregate: WiseSyncResult = {
+    imported: 0,
+    skipped: 0,
+    total_fetched: 0,
+    official_balance: null,
+    sum_imported: 0,
+    tx_count: 0,
+    date_range: { start: null, end: null },
+    reconciled: null,
+    status: 'failed',
+    diagnostics: [],
+  };
+  let ranAny = false;
+
+  for (const acc of wiseAccounts) {
+    const bal = balances.find(
+      (b: any) => (b.currency || b.amount?.currency) === acc.currency,
+    );
+    if (!bal?.id) {
+      aggregate.diagnostics.push(`Sin balance de Wise en ${acc.currency} — omitido.`);
+      continue;
+    }
+    try {
+      const r: WiseSyncResult = await callWise('sync-transactions', {
+        profileId,
+        balanceId: bal.id,
+        accountId: acc.id,
+        currency: acc.currency,
+      });
+      ranAny = true;
+      aggregate.imported += r.imported || 0;
+      aggregate.skipped += r.skipped || 0;
+      aggregate.total_fetched += r.total_fetched || 0;
+      aggregate.diagnostics.push(`${acc.currency}: ${r.imported} nuevas, ${r.skipped} ya existían.`, ...(r.diagnostics || []));
+    } catch (e: any) {
+      aggregate.diagnostics.push(`${acc.currency} falló: ${e.message}`);
+    }
+  }
+
+  aggregate.status = ranAny ? 'success' : 'failed';
 
   qc.invalidateQueries({ queryKey: ['transactions'] });
   qc.invalidateQueries({ queryKey: ['account-balances'] });
@@ -63,7 +92,7 @@ export async function performWiseSync(qc: QueryClient): Promise<WiseSyncResult |
     if (user) await supabase.rpc('refresh_recurring_tracking', { p_user_id: user.id });
   } catch { /* non-fatal */ }
 
-  return result;
+  return ranAny ? aggregate : null;
 }
 
 /**

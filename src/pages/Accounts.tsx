@@ -126,6 +126,7 @@ export default function Accounts() {
           ? `Wise: ${result.imported} transacciones nuevas`
           : 'Wise al día — sin movimientos nuevos',
       );
+      if (result.diagnostics?.length) console.info('[Wise sync]', result.diagnostics);
     } catch (e: any) {
       toast.error(e.message || 'Error al sincronizar Wise');
     } finally {
