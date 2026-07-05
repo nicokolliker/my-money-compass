@@ -98,20 +98,32 @@ export async function cleanupMerchantArtifacts(): Promise<number> {
       byNorm.set(key, arr);
     }
 
-    // Within each normalized group, keep the clean-named row and drop suffixed variants.
+    // Within each normalized group: keep (or create by rename) exactly one
+    // clean-named row, drop the suffixed variants.
+    const toRename: Array<{ id: string; name: string }> = [];
     for (const [key, group] of byNorm) {
-      if (group.length < 2) continue;
       const clean = group.find(m => m.name.toLowerCase() === key);
-      if (!clean) continue;
-      for (const m of group) {
-        if (m.id !== clean.id) toDelete.push(m.id);
+      if (clean) {
+        for (const m of group) {
+          if (m.id !== clean.id) toDelete.push(m.id);
+        }
+      } else {
+        // No clean row exists — rename the first variant to the normalized
+        // name ("Jardin — Pending" → "Jardin") and drop the rest.
+        const norm = normalizeMerchantName(group[0].name)!;
+        toRename.push({ id: group[0].id, name: norm });
+        for (const m of group.slice(1)) toDelete.push(m.id);
       }
     }
 
-    if (toDelete.length === 0) return 0;
-    const { error } = await supabase.from('merchants').delete().in('id', toDelete);
-    if (error) return 0;
-    return toDelete.length;
+    for (const r of toRename) {
+      await supabase.from('merchants').update({ name: r.name }).eq('id', r.id);
+    }
+    if (toDelete.length > 0) {
+      const { error } = await supabase.from('merchants').delete().in('id', toDelete);
+      if (error) return toRename.length;
+    }
+    return toDelete.length + toRename.length;
   } catch {
     return 0;
   }
