@@ -20,7 +20,7 @@ interface RowState {
 }
 
 export function UncategorizedMerchantsBanner() {
-  const merchants = useUncategorizedMerchants(2);
+  const merchants = useUncategorizedMerchants(1);
   const { data: categories } = useCategories();
   const { ignore } = useIgnoredSuggestions();
   const createRule = useCreateRule();
@@ -68,14 +68,19 @@ export function UncategorizedMerchantsBanner() {
     }
     setSaving(true);
     try {
+      const { fetchDigitalSubcatMap, resolveDigitalSubcategoryId } = await import('@/lib/applyRules');
+      const digitalMap = await fetchDigitalSubcatMap();
       let updatedTxs = 0;
       let createdRules = 0;
       for (const m of toApply) {
         const state = rows[m.key];
         const isDigital = !!digitalCategoryId && state.categoryId === digitalCategoryId;
-        const update: { category_id: string; subtype?: string | null } = {
+        const update: { category_id: string; subtype?: string | null; subcategory_id?: string | null } = {
           category_id: state.categoryId,
           subtype: isDigital ? (state.subtype || getDigitalSubtype(m.name)) : null,
+          subcategory_id: isDigital
+            ? resolveDigitalSubcategoryId(state.categoryId, m.name, digitalMap)
+            : null,
         };
         const { error } = await supabase
           .from('transactions')

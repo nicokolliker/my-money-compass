@@ -10,12 +10,14 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { useMerchants, useUpdateMerchant, useDeleteMerchant, useMergeMerchants, useMerchantTransactions, useApplyMerchantCategory } from '@/hooks/useMerchants';
+import { useMerchants, useUpdateMerchant, useDeleteMerchant, useMergeMerchants, useMerchantTransactions, useApplyMerchantCategory, useCreateMerchant } from '@/hooks/useMerchants';
+import { syncMerchantsFromImport } from '@/lib/merchantSync';
+import { useQueryClient } from '@tanstack/react-query';
 import { useCategories } from '@/hooks/useCategories';
 import { getBrandLogo, getInitialsColor } from '@/lib/brandLogos';
 import { MerchantLogo } from '@/components/MerchantLogo';
 import { formatCurrency, formatUSD } from '@/lib/constants';
-import { Search, Pencil, Trash2, GitMerge, ChevronRight, Upload } from 'lucide-react';
+import { Search, Pencil, Trash2, GitMerge, ChevronRight, Upload, Plus, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -46,7 +48,49 @@ export default function MerchantsTab() {
   const deleteMerchant = useDeleteMerchant();
   const mergeMerchants = useMergeMerchants();
 
+  const qc = useQueryClient();
+  const createMerchant = useCreateMerchant();
   const [search, setSearch] = useState('');
+  const [addOpen, setAddOpen] = useState(false);
+  const [addForm, setAddForm] = useState({ name: '', domain: '', default_category_id: '' });
+  const [generating, setGenerating] = useState(false);
+
+  const handleAdd = async () => {
+    if (!addForm.name.trim()) { toast.error('El nombre es obligatorio'); return; }
+    try {
+      await createMerchant.mutateAsync({
+        name: addForm.name.trim(),
+        domain: addForm.domain.trim() || null,
+        default_category_id: addForm.default_category_id || null,
+      });
+      toast.success('Merchant creado');
+      setAddOpen(false);
+      setAddForm({ name: '', domain: '', default_category_id: '' });
+    } catch (e: any) { toast.error(e.message); }
+  };
+
+  // Backfill: crea merchants a partir de las transacciones YA importadas
+  // (el sync automático solo corre en imports nuevos).
+  const handleGenerate = async () => {
+    setGenerating(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+      const { data: txs, error } = await supabase
+        .from('transactions')
+        .select('merchant, description, category_id, type')
+        .eq('user_id', user.id)
+        .in('type', ['expense', 'income']);
+      if (error) throw error;
+      const n = await syncMerchantsFromImport(user.id, (txs || []) as any[]);
+      qc.invalidateQueries({ queryKey: ['merchants'] });
+      toast.success(n > 0 ? `${n} merchants creados desde transacciones` : 'Sin merchants nuevos — todo ya existía');
+    } catch (e: any) {
+      toast.error(e.message || 'Error generando merchants');
+    } finally {
+      setGenerating(false);
+    }
+  };
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editSheet, setEditSheet] = useState(false);
   const [mergeDialog, setMergeDialog] = useState(false);
@@ -137,10 +181,49 @@ export default function MerchantsTab() {
 
   return (
     <div className="space-y-3 mt-4">
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input placeholder="Search merchants..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9 h-9 rounded-xl" />
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Search merchants..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9 h-9 rounded-xl" />
+        </div>
+        <Button size="sm" variant="outline" className="h-9 rounded-xl shrink-0" onClick={handleGenerate} disabled={generating}>
+          <RefreshCw className={`h-4 w-4 mr-1 ${generating ? 'animate-spin' : ''}`} />
+          {generating ? 'Generando...' : 'Desde transacciones'}
+        </Button>
+        <Button size="sm" className="h-9 rounded-xl shrink-0" onClick={() => setAddOpen(true)}>
+          <Plus className="h-4 w-4 mr-1" /> Agregar
+        </Button>
       </div>
+
+      {/* Add Merchant Dialog */}
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>Nuevo Merchant</DialogTitle></DialogHeader>
+          <div className="space-y-3 pt-2">
+            <div>
+              <Label className="text-xs">Nombre *</Label>
+              <Input value={addForm.name} onChange={e => setAddForm(f => ({ ...f, name: e.target.value }))} placeholder="Netflix" className="mt-1 rounded-xl" />
+            </div>
+            <div>
+              <Label className="text-xs">Dominio (para logo automático)</Label>
+              <Input value={addForm.domain} onChange={e => setAddForm(f => ({ ...f, domain: e.target.value }))} placeholder="netflix.com" className="mt-1 rounded-xl" />
+            </div>
+            <div>
+              <Label className="text-xs">Categoría default</Label>
+              <Select value={addForm.default_category_id || 'none'} onValueChange={v => setAddForm(f => ({ ...f, default_category_id: v === 'none' ? '' : v }))}>
+                <SelectTrigger className="mt-1 rounded-xl"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None</SelectItem>
+                  {categories?.map(c => <SelectItem key={c.id} value={c.id}>{c.icon} {c.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button className="w-full rounded-xl" onClick={handleAdd} disabled={createMerchant.isPending}>
+              {createMerchant.isPending ? 'Creando...' : 'Crear merchant'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {!filtered?.length ? (
         <p className="text-center py-8 text-sm text-muted-foreground">No merchants found</p>

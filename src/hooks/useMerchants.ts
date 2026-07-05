@@ -21,6 +21,24 @@ export function useMerchants() {
   });
 }
 
+export function useCreateMerchant() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (m: { name: string; display_name?: string | null; domain?: string | null; default_category_id?: string | null }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+      const { data, error } = await supabase
+        .from('merchants')
+        .insert({ user_id: user.id, ...m })
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['merchants'] }),
+  });
+}
+
 export function useUpdateMerchant() {
   const qc = useQueryClient();
   return useMutation({
