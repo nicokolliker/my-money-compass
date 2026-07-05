@@ -56,8 +56,11 @@ function parseMoney(raw: string) {
 
 function amountFromActivity(activity: any, currency: string) {
   const currencyRe = currency.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const fields = [activity.primaryAmount, activity.secondaryAmount].map(cleanWiseText);
-  for (const field of fields) {
+  const rawFields = [activity.primaryAmount, activity.secondaryAmount];
+  const fields = rawFields.map(cleanWiseText);
+  for (let fi = 0; fi < fields.length; fi += 1) {
+    const field = fields[fi];
+    const raw = String(rawFields[fi] || "");
     const after = field.match(new RegExp(`([+-]?\\d[\\d.,\\s']*)\\s*${currencyRe}\\b`, "i"));
     const before = field.match(new RegExp(`\\b${currencyRe}\\s*([+-]?\\d[\\d.,\\s']*)`, "i"));
     const match = after || before;
@@ -65,11 +68,17 @@ function amountFromActivity(activity: any, currency: string) {
     const parsed = parseMoney(match[1]);
     if (!Number.isFinite(parsed)) continue;
 
+    // Wise wraps amounts in <positive>/<negative> tags — the most reliable
+    // sign signal, far better than guessing from title words like "sent"
+    // (which also appears in INCOMING titles: "Deel sent you 4,000 USD").
+    if (/<positive>/i.test(raw)) return Math.abs(parsed);
+    if (/<negative>/i.test(raw)) return -Math.abs(parsed);
+
     const rawType = (activity.type || activity.resource?.type || "").toLowerCase();
     const text = `${rawType} ${activity.title || ""} ${activity.description || ""}`.toLowerCase();
     if (parsed < 0) return parsed;
     if (/^(deposit|money_added|balance_credit|top_up|topup)$/.test(rawType)) return Math.abs(parsed);
-    if (/refund|cashback|interest|received|deposit|top\s*up|added|incoming|reversal|reembolso|recib/.test(text)) return parsed;
+    if (/refund|cashback|interest|received|deposit|top\s*up|added|incoming|reversal|reembolso|recib|sent you/.test(text)) return parsed;
     if (/card_payment|cash_withdrawal|direct_debit|fee|sent|send|paid|spent|withdraw|deduct|charge|payment|outgoing|enviado|pagad/.test(text)) return -Math.abs(parsed);
     return parsed;
   }
@@ -416,7 +425,7 @@ Deno.serve(async (req) => {
       // subsequent ones get a -2/-3 suffix and finally get imported.
       const seenIds = new Map<string, number>();
       // Fresh data per external_id for the pending->settled pass below.
-      const batchById = new Map<string, { description: string; merchant: string | null; amount: number; amount_usd: number; date: string }>();
+      const batchById = new Map<string, { description: string; merchant: string | null; amount: number; amount_usd: number; date: string; type: string }>();
 
       for (const tx of txs) {
         const ref =
@@ -475,7 +484,7 @@ Deno.serve(async (req) => {
           sumImported += amount;
         } else {
           skipped += 1;
-          batchById.set(external_id, { description, merchant: merchantName, amount, amount_usd: amountUsd, date });
+          batchById.set(external_id, { description, merchant: merchantName, amount, amount_usd: amountUsd, date, type });
         }
         if (!minDate || date < minDate) minDate = date;
         if (!maxDate || date > maxDate) maxDate = date;
@@ -488,22 +497,33 @@ Deno.serve(async (req) => {
       // and refresh their NEUTRAL fields only (never category/subtype, which
       // may be user-set).
       let settledUpdated = 0;
+      let signFixed = 0;
       try {
         const skippedIds = [...batchById.keys()];
         for (let i = 0; i < skippedIds.length; i += 200) {
           const chunk = skippedIds.slice(i, i + 200);
-          const { data: pendingRows } = await admin
+          const { data: existingRows } = await admin
             .from("transactions")
-            .select("id, external_id, description, amount")
+            .select("id, external_id, description, amount, type")
             .in("external_id", chunk)
-            .eq("user_id", userId)
-            .ilike("description", "%pending%");
-          for (const row of (pendingRows || []) as Array<{ id: string; external_id: string; description: string; amount: number }>) {
+            .eq("user_id", userId);
+          for (const row of (existingRows || []) as Array<{ id: string; external_id: string; description: string; amount: number; type: string }>) {
             const fresh = batchById.get(row.external_id);
             if (!fresh) continue;
-            const stillPending = /pending/i.test(fresh.description);
-            const changed = fresh.description !== row.description || Number(fresh.amount) !== Number(row.amount);
-            if (stillPending || !changed) continue;
+
+            const rowPending = /pending/i.test(row.description || "");
+            const freshPending = /pending/i.test(fresh.description);
+            const settleCase = rowPending && !freshPending;
+
+            // Sign correction: earlier parser versions classified some
+            // incoming deposits as negative ("Deel sent you..." → 'sent').
+            // The fresh parse is authoritative — fix amount/type in place.
+            const signCase =
+              Math.sign(Number(fresh.amount)) !== Math.sign(Number(row.amount)) &&
+              Number(fresh.amount) !== 0 && Number(row.amount) !== 0;
+
+            if (!settleCase && !signCase) continue;
+
             const { error: updErr } = await admin
               .from("transactions")
               .update({
@@ -512,13 +532,20 @@ Deno.serve(async (req) => {
                 amount: fresh.amount,
                 amount_usd: fresh.amount_usd,
                 date: fresh.date,
+                type: fresh.type,
               })
               .eq("id", row.id);
-            if (!updErr) settledUpdated += 1;
+            if (!updErr) {
+              if (settleCase) settledUpdated += 1;
+              if (signCase) signFixed += 1;
+            }
           }
         }
         if (settledUpdated > 0) {
           diagnostics.push(`${settledUpdated} transacciones pending liquidadas (actualizadas).`);
+        }
+        if (signFixed > 0) {
+          diagnostics.push(`${signFixed} transacciones con signo corregido.`);
         }
       } catch (e: any) {
         diagnostics.push(`Settle pass falló: ${e.message}`);
