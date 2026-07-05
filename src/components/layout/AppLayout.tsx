@@ -14,6 +14,7 @@ import { TransactionForm } from '@/components/transactions/TransactionForm';
 import { DebugPanel } from '@/components/DebugPanel';
 import { useAuth } from '@/hooks/useAuth';
 import { usePrivacyMode } from '@/hooks/usePrivacyMode';
+import { useTheme } from '@/hooks/useTheme';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
