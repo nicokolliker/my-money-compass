@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { PrivacyModeProvider } from "@/hooks/usePrivacyMode";
+import { ThemeProvider } from "@/hooks/useTheme";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useEnsureDigitalSubcategories } from "@/hooks/useEnsureDigitalSubcategories";
 import Dashboard from "./pages/Dashboard";
