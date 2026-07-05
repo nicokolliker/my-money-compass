@@ -356,22 +356,31 @@ Deno.serve(async (req) => {
           digitalSubByLabel[(s.name || "").toLowerCase()] = s.id;
         }
       }
-      // Same name -> subtype label mapping as src/lib/digitalSubtypes.ts
+      // Keep in sync with src/lib/digitalSubtypes.ts (single source of truth on the client).
+      const DIGITAL_NAME_OVERRIDES: Record<string, string[]> = {
+        "Otros": ["amazon prime", "oura"],
+      };
       const DIGITAL_NAME_MAP: Record<string, string[]> = {
         "IA": ["chatgpt", "claude", "gemini", "perplexity", "copilot", "openai", "google ai", "midjourney", "runway", "gamma", "notebooklm"],
-        "Entretenimiento": ["netflix", "spotify", "youtube", "amazon prime", "disney", "hbo", "apple tv", "paramount", "crunchyroll", "blinkist"],
+        "Entretenimiento": ["netflix", "spotify", "youtube", "disney", "hbo", "apple tv", "paramount", "crunchyroll", "blinkist"],
         "Creatividad & Productividad": ["adobe", "figma", "canva", "notion", "loom", "grammarly", "icloud", "apple one", "lovable", "granola"],
-        "Delivery & Movilidad": ["uber", "didi", "rappi", "pedidos ya", "glovo", "cabify"],
+        "Marketplace & Movilidad": ["uber", "didi", "rappi", "pedidos ya", "glovo", "cabify", "amazon", "mercadolibre", "meli", "aliexpress", "ebay"],
       };
       const resolveSubcat = (categoryId: string | null, signal: string): string | null => {
         if (!categoryId || !digitalCategoryId || categoryId !== digitalCategoryId) return null;
         const lower = (signal || "").toLowerCase();
+        for (const [label, patterns] of Object.entries(DIGITAL_NAME_OVERRIDES)) {
+          if (patterns.some(p => lower.includes(p))) {
+            return digitalSubByLabel[label.toLowerCase()] || null;
+          }
+        }
         for (const [label, patterns] of Object.entries(DIGITAL_NAME_MAP)) {
           if (patterns.some(p => lower.includes(p))) {
             return digitalSubByLabel[label.toLowerCase()] || null;
           }
         }
-        return null;
+        // Fallback: anything Digital without a specific match goes to "Otros"
+        return digitalSubByLabel["otros"] || null;
       };
 
       for (const tx of txs) {

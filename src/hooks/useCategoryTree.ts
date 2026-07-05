@@ -3,6 +3,7 @@ import { useCategories, useSubcategories } from '@/hooks/useCategories';
 import { useRecurringExpenses } from '@/hooks/useRecurringExpenses';
 import { useFxRates } from '@/hooks/useFxRates';
 import { toMonthlyAmount, toUSD } from '@/lib/money';
+import { DIGITAL_SUBTYPES } from '@/lib/digitalSubtypes';
 
 // Categories that should never appear as budget/spending rows
 export const SYSTEM_CATEGORIES = [
@@ -11,8 +12,8 @@ export const SYSTEM_CATEGORIES = [
   'Debt / Loans', 'Debt', 'Loans',
 ];
 
-// Digital subcategory names
-export const DIGITAL_SUBCATEGORIES = ['IA', 'Creatividad & Productividad', 'Entretenimiento', 'Delivery & Movilidad'];
+// Digital subcategory names — derived from the shared taxonomy (single source of truth)
+export const DIGITAL_SUBCATEGORIES = Object.values(DIGITAL_SUBTYPES).map(d => d.label);
 
 export interface SubcategoryNode {
   id: string;
@@ -46,23 +47,37 @@ export function useCategoryTree() {
     return visibleCategories.map(cat => {
       const isDigital = cat.name === 'Digital';
 
+      const catRecurring = (recurringItems || [])
+        .filter(r => r.is_active && ((r as any).linked_category_id === cat.id || (r as any).category_id === cat.id));
+
+      const monthlyUsd = (r: any) => {
+        const amountUsd = toUSD(Math.abs(Number(r.amount)), r.currency || 'USD', fxRates as any);
+        return toMonthlyAmount(amountUsd, r.frequency);
+      };
+
       const children: SubcategoryNode[] = isDigital
         ? (allSubcategories || [])
             .filter(s => s.category_id === cat.id)
-            .map(s => ({
-              id: s.id,
-              name: s.name,
-              category_id: s.category_id,
-              recurringMonthly: 0,
-            }))
+            .map(s => {
+              // Sum recurring items whose digital subtype maps to this subcategory label
+              const subLabel = (s.name || '').toLowerCase();
+              const subRecurring = catRecurring
+                .filter(r => {
+                  const key = (r as any).subtype as string | null;
+                  const label = key ? DIGITAL_SUBTYPES[key]?.label?.toLowerCase() : null;
+                  return label === subLabel;
+                })
+                .reduce((sum, r) => sum + monthlyUsd(r), 0);
+              return {
+                id: s.id,
+                name: s.name,
+                category_id: s.category_id,
+                recurringMonthly: subRecurring,
+              };
+            })
         : [];
 
-      const recurringMonthly = (recurringItems || [])
-        .filter(r => r.is_active && ((r as any).linked_category_id === cat.id || (r as any).category_id === cat.id))
-        .reduce((sum, r) => {
-          const amountUsd = toUSD(Math.abs(Number(r.amount)), r.currency || 'USD', fxRates as any);
-          return sum + toMonthlyAmount(amountUsd, r.frequency);
-        }, 0);
+      const recurringMonthly = catRecurring.reduce((sum, r) => sum + monthlyUsd(r), 0);
 
       return {
         id: cat.id,

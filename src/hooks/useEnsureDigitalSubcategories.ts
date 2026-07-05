@@ -1,23 +1,24 @@
 import { useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useUserId } from '@/hooks/useAuthUser';
-import { DIGITAL_SUBTYPES, getDigitalSubtype } from '@/lib/digitalSubtypes';
-
-const DIGITAL_SUB_LABELS = [
-  'IA',
-  'Creatividad & Productividad',
-  'Entretenimiento',
-  'Marketplace & Movilidad',
-  'Otros',
-];
+import {
+  DIGITAL_SUBTYPES,
+  DIGITAL_LEGACY_LABELS,
+  getDigitalSubtype,
+} from '@/lib/digitalSubtypes';
 
 // Session guard so we don't run on every render / route change.
 const ranForUser = new Set<string>();
 
 /**
- * On first load after login: ensure the Digital category has its 5 subcategories
- * seeded, then backfill subcategory_id on existing Digital transactions using
- * DIGITAL_NAME_MAP matching.
+ * On first load after login:
+ * 1. Self-heal legacy subcategory names (e.g. 'Delivery & Movilidad' →
+ *    'Marketplace & Movilidad'): rename if the new one doesn't exist yet,
+ *    or merge (re-point transactions, delete the old row) if both exist.
+ * 2. Seed any missing Digital subcategories.
+ * 3. Backfill subcategory_id on Digital transactions that don't have one,
+ *    using the shared name matcher. Manual assignments are never touched
+ *    (we only fill NULLs).
  */
 export function useEnsureDigitalSubcategories() {
   const userId = useUserId();
@@ -48,8 +49,34 @@ export function useEnsureDigitalSubcategories() {
           existingByLabel.set((s.name || '').toLowerCase(), s.id);
         }
 
-        // Seed missing
-        const missing = DIGITAL_SUB_LABELS.filter(
+        // --- Self-heal legacy renames ---
+        for (const [legacyLower, newLabel] of Object.entries(DIGITAL_LEGACY_LABELS)) {
+          const legacyId = existingByLabel.get(legacyLower);
+          if (!legacyId) continue;
+          const newId = existingByLabel.get(newLabel.toLowerCase());
+
+          if (!newId) {
+            // Simple rename in place — transactions keep pointing to the same id.
+            await supabase
+              .from('subcategories')
+              .update({ name: newLabel })
+              .eq('id', legacyId);
+            existingByLabel.delete(legacyLower);
+            existingByLabel.set(newLabel.toLowerCase(), legacyId);
+          } else if (newId !== legacyId) {
+            // Both exist → merge: move transactions to the new one, drop the old.
+            await supabase
+              .from('transactions')
+              .update({ subcategory_id: newId })
+              .eq('subcategory_id', legacyId);
+            await supabase.from('subcategories').delete().eq('id', legacyId);
+            existingByLabel.delete(legacyLower);
+          }
+        }
+
+        // --- Seed missing (labels derived from the shared taxonomy) ---
+        const wantedLabels = Object.values(DIGITAL_SUBTYPES).map((d) => d.label);
+        const missing = wantedLabels.filter(
           (l) => !existingByLabel.has(l.toLowerCase()),
         );
         if (missing.length) {
@@ -69,7 +96,7 @@ export function useEnsureDigitalSubcategories() {
           if (id) keyToSubId[key] = id;
         }
 
-        // Backfill: Digital transactions missing subcategory_id
+        // --- Backfill: Digital transactions missing subcategory_id ---
         const { data: txs } = await supabase
           .from('transactions')
           .select('id, merchant, description, subcategory_id')
