@@ -180,6 +180,15 @@ export function AppLayout({ children }: { children: ReactNode }) {
             <Button
               variant="outline"
               className="w-full rounded-lg h-9 justify-start text-muted-foreground hover:text-foreground"
+              onClick={toggleTheme}
+              title={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+            >
+              {theme === 'dark' ? <Sun className="h-4 w-4 mr-2" /> : <Moon className="h-4 w-4 mr-2" />}
+              {theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full rounded-lg h-9 justify-start text-muted-foreground hover:text-foreground"
               onClick={togglePrivacy}
               title={isPrivate ? 'Mostrar montos' : 'Ocultar montos'}
             >
