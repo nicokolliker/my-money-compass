@@ -176,7 +176,7 @@ Deno.serve(async (req) => {
       let importedTotal = 0;
       let skippedTotal = 0;
       const wantedMerchants = new Map<string, { name: string; category_id: string | null }>();
-      const batchById = new Map<string, { description: string; merchant: string | null; amount: number; amount_usd: number; date: string }>();
+      const batchById = new Map<string, { description: string; merchant: string | null; amount: number; amount_usd: number; date: string; type: string }>();
 
       for (const bal of balances || []) {
         const balanceId = bal?.id;
@@ -222,8 +222,10 @@ Deno.serve(async (req) => {
           const external_id = occ === 1 ? baseId : `${baseId}-${occ}`;
           const amount = tx.amount?.value ?? 0;
 
-          let type: "income" | "expense" | "transfer" = amount >= 0 ? "income" : "expense";
-          if ((tx.details?.type || "").toUpperCase() === "TRANSFER") type = "transfer";
+          // See wise-sync/index.ts: Wise's 'TRANSFER' activity type covers
+          // any cross-border wire, including third-party income (e.g. Deel
+          // payroll) — not just self-transfers. Amount sign is authoritative.
+          const type: "income" | "expense" = amount >= 0 ? "income" : "expense";
 
           let amountUsd = amount;
           let fxRate = 1;
@@ -285,6 +287,7 @@ Deno.serve(async (req) => {
               amount,
               amount_usd: amountUsd,
               date: (tx.date || "").split("T")[0],
+              type,
             });
           }
 
@@ -328,24 +331,30 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Pending -> Settled refresh (see wise-sync for full rationale).
+      // Pending -> Settled + sign/type reclass (see wise-sync for rationale).
       try {
         const skippedIds = [...batchById.keys()];
         let settledUpdated = 0;
+        let signFixed = 0;
+        let typeFixed = 0;
         for (let i = 0; i < skippedIds.length; i += 200) {
           const chunk = skippedIds.slice(i, i + 200);
-          const { data: pendingRows } = await supabaseAdmin
+          const { data: existingRows } = await supabaseAdmin
             .from("transactions")
-            .select("id, external_id, description, amount")
+            .select("id, external_id, description, amount, type")
             .in("external_id", chunk)
-            .eq("user_id", userId)
-            .ilike("description", "%pending%");
-          for (const row of (pendingRows || []) as Array<{ id: string; external_id: string; description: string; amount: number }>) {
+            .eq("user_id", userId);
+          for (const row of (existingRows || []) as Array<{ id: string; external_id: string; description: string; amount: number; type: string }>) {
             const fresh = batchById.get(row.external_id);
             if (!fresh) continue;
-            const stillPending = /pending/i.test(fresh.description);
-            const changed = fresh.description !== row.description || Number(fresh.amount) !== Number(row.amount);
-            if (stillPending || !changed) continue;
+            const rowPending = /pending/i.test(row.description || "");
+            const freshPending = /pending/i.test(fresh.description);
+            const settleCase = rowPending && !freshPending;
+            const signCase =
+              Math.sign(Number(fresh.amount)) !== Math.sign(Number(row.amount)) &&
+              Number(fresh.amount) !== 0 && Number(row.amount) !== 0;
+            const typeCase = row.type === "transfer" && fresh.type !== row.type;
+            if (!settleCase && !signCase && !typeCase) continue;
             const { error: updErr } = await supabaseAdmin
               .from("transactions")
               .update({
@@ -354,12 +363,19 @@ Deno.serve(async (req) => {
                 amount: fresh.amount,
                 amount_usd: fresh.amount_usd,
                 date: fresh.date,
+                type: fresh.type,
               })
               .eq("id", row.id);
-            if (!updErr) settledUpdated += 1;
+            if (!updErr) {
+              if (settleCase) settledUpdated += 1;
+              if (signCase) signFixed += 1;
+              if (typeCase) typeFixed += 1;
+            }
           }
         }
         if (settledUpdated > 0) diagnostics.push(`${settledUpdated} pending liquidados.`);
+        if (signFixed > 0) diagnostics.push(`${signFixed} con signo corregido.`);
+        if (typeFixed > 0) diagnostics.push(`${typeFixed} reclasificadas de transfer a income/expense.`);
       } catch (e: any) {
         diagnostics.push(`Settle pass falló: ${e.message}`);
       }

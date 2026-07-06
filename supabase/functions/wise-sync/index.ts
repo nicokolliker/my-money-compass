@@ -474,11 +474,12 @@ Deno.serve(async (req) => {
           merchantName ||
           tx.details?.type ||
           "Wise";
-        let type: "income" | "expense" | "transfer" =
-          amount >= 0 ? "income" : "expense";
-        if ((tx.details?.type || "").toUpperCase() === "TRANSFER") {
-          type = "transfer";
-        }
+        // NOTE: Wise's activity/statement 'type' field says "TRANSFER" for
+        // ANY cross-border wire — including third-party income like a Deel
+        // payroll deposit, not just self-transfers between the user's own
+        // balances. Overriding to type='transfer' here hid real income.
+        // Amount sign is the correct, authoritative signal.
+        const type: "income" | "expense" = amount >= 0 ? "income" : "expense";
         const category_id = matchRule(`${merchantName || ""} ${description}`);
         const subcategory_id = resolveSubcat(category_id, `${merchantName || ""} ${description}`);
 
@@ -530,6 +531,7 @@ Deno.serve(async (req) => {
       // may be user-set).
       let settledUpdated = 0;
       let signFixed = 0;
+      let typeFixed = 0;
       try {
         const skippedIds = [...batchById.keys()];
         for (let i = 0; i < skippedIds.length; i += 200) {
@@ -554,7 +556,13 @@ Deno.serve(async (req) => {
               Math.sign(Number(fresh.amount)) !== Math.sign(Number(row.amount)) &&
               Number(fresh.amount) !== 0 && Number(row.amount) !== 0;
 
-            if (!settleCase && !signCase) continue;
+            // Rows stuck as type='transfer' from the old blanket TRANSFER
+            // override (e.g. a Deel deposit correctly signed +, but
+            // classified as 'transfer' instead of 'income') — reclassify
+            // using today's amount-sign-is-authoritative rule.
+            const typeCase = row.type === "transfer" && fresh.type !== row.type;
+
+            if (!settleCase && !signCase && !typeCase) continue;
 
             const { error: updErr } = await admin
               .from("transactions")
@@ -570,6 +578,7 @@ Deno.serve(async (req) => {
             if (!updErr) {
               if (settleCase) settledUpdated += 1;
               if (signCase) signFixed += 1;
+              if (typeCase) typeFixed += 1;
             }
           }
         }
@@ -578,6 +587,9 @@ Deno.serve(async (req) => {
         }
         if (signFixed > 0) {
           diagnostics.push(`${signFixed} transacciones con signo corregido.`);
+        }
+        if (typeFixed > 0) {
+          diagnostics.push(`${typeFixed} transacciones reclasificadas de 'transfer' a income/expense.`);
         }
       } catch (e: any) {
         diagnostics.push(`Settle pass falló: ${e.message}`);
