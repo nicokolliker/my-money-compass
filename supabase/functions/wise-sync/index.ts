@@ -42,14 +42,14 @@ function cleanWiseText(value: unknown) {
 }
 
 function parseMoney(raw: string) {
-  const compact = raw.replace(/[\s']/g, "");
-  const lastComma = compact.lastIndexOf(",");
-  const lastDot = compact.lastIndexOf(".");
-  const decimal = lastComma > lastDot ? "," : ".";
-  const normalized = compact
-    .replace(new RegExp(`\\${decimal === "," ? "." : ","}`, "g"), "")
-    .replace(decimal, ".");
-  return Number(normalized);
+  // Wise's Activities API always formats numbers US-style: comma = thousands
+  // separator, period = decimal separator — never the reverse. The previous
+  // "infer from whichever separator appears last" heuristic broke on
+  // whole-thousand amounts with no decimal point (e.g. "6,000" has only a
+  // comma, so it got treated AS the decimal point → parsed as 6.000 = 6,
+  // silently shrinking deposits like Deel's $6,000 payroll down to $6).
+  const compact = raw.replace(/[\s']/g, "").replace(/,/g, "");
+  return Number(compact);
 }
 
 function amountFromActivity(activity: any, currency: string) {
@@ -532,6 +532,7 @@ Deno.serve(async (req) => {
       let settledUpdated = 0;
       let signFixed = 0;
       let typeFixed = 0;
+      let amountFixed = 0;
       try {
         const skippedIds = [...batchById.keys()];
         for (let i = 0; i < skippedIds.length; i += 200) {
@@ -562,7 +563,13 @@ Deno.serve(async (req) => {
             // using today's amount-sign-is-authoritative rule.
             const typeCase = row.type === "transfer" && fresh.type !== row.type;
 
-            if (!settleCase && !signCase && !typeCase) continue;
+            // Magnitude fix: the old parseMoney bug silently divided
+            // whole-thousand amounts by 1000 (e.g. Deel's $6,000 deposit
+            // got stored as $6). Any real difference vs. the freshly
+            // (correctly) parsed amount gets corrected.
+            const amountCase = Math.abs(Number(fresh.amount) - Number(row.amount)) > 0.005;
+
+            if (!settleCase && !signCase && !typeCase && !amountCase) continue;
 
             const { error: updErr } = await admin
               .from("transactions")
@@ -579,6 +586,7 @@ Deno.serve(async (req) => {
               if (settleCase) settledUpdated += 1;
               if (signCase) signFixed += 1;
               if (typeCase) typeFixed += 1;
+              if (amountCase) amountFixed += 1;
             }
           }
         }
@@ -590,6 +598,9 @@ Deno.serve(async (req) => {
         }
         if (typeFixed > 0) {
           diagnostics.push(`${typeFixed} transacciones reclasificadas de 'transfer' a income/expense.`);
+        }
+        if (amountFixed > 0) {
+          diagnostics.push(`${amountFixed} transacciones con monto corregido (bug de parseo de miles).`);
         }
       } catch (e: any) {
         diagnostics.push(`Settle pass falló: ${e.message}`);
