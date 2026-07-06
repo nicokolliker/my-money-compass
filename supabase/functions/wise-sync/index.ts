@@ -663,6 +663,20 @@ Deno.serve(async (req) => {
           ? "partial"
           : "failed";
 
+      // Ground-truth check: query the DB directly for anything matching
+      // "Deel" or "Dental", bypassing all external_id/matching logic. This
+      // shows exactly what's stored right now, no inference.
+      try {
+        const { data: deelRows } = await admin
+          .from("transactions")
+          .select("id, description, merchant, amount, amount_usd, type, currency, date, category_id, account_id")
+          .eq("user_id", userId)
+          .or("description.ilike.%deel%,description.ilike.%dental%,merchant.ilike.%deel%,merchant.ilike.%dental%");
+        diagnostics.push(`DB actual (Deel/Dental): ${JSON.stringify(deelRows || [])}`);
+      } catch (e: any) {
+        diagnostics.push(`DB check falló: ${e.message}`);
+      }
+
       await admin.from("wise_sync_log").insert({
         user_id: userId,
         profile_id: String(profileId),
