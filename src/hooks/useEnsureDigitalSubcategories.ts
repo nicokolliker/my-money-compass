@@ -130,6 +130,27 @@ export function useEnsureDigitalSubcategories() {
           console.warn('[useEnsureDigitalSubcategories] subtype heal failed', e);
         }
 
+        // --- Self-heal recurring_expenses.subtype mismatches ---
+        // Recurring items created via the "mark as recurring" dialog didn't
+        // apply the same override logic as regular transactions (e.g. Amazon
+        // Prime -> 'otros' vs the generic 'amazon' -> Marketplace match).
+        // Recompute from the name and fix if it disagrees.
+        try {
+          const { data: digitalRecurrings } = await supabase
+            .from('recurring_expenses')
+            .select('id, name, subtype')
+            .eq('category_id', digitalCat.id)
+            .eq('user_id', userId);
+          for (const r of (digitalRecurrings || []) as Array<{ id: string; name: string; subtype: string | null }>) {
+            const correct = getDigitalSubtype(r.name);
+            if (correct && correct !== r.subtype) {
+              await supabase.from('recurring_expenses').update({ subtype: correct }).eq('id', r.id);
+            }
+          }
+        } catch (e) {
+          console.warn('[useEnsureDigitalSubcategories] recurring subtype heal failed', e);
+        }
+
         // --- Backfill: Digital transactions missing subcategory_id ---
         const { data: txs } = await supabase
           .from('transactions')

@@ -457,16 +457,22 @@ export default function Transactions() {
       // Marking as recurring → open pre-filled dialog
       const tx: any = transactions?.find((t: any) => t.id === txId);
       if (!tx) return;
+      const nameSignal = tx.merchant || tx.description || '';
+      let initialSubtype = '';
+      if (digitalCatId && tx.category_id === digitalCatId) {
+        const { getDigitalSubtype } = await import('@/lib/digitalSubtypes');
+        initialSubtype = getDigitalSubtype(nameSignal);
+      }
       setRecurringDialog({
         txId: tx.id,
-        name: tx.merchant || tx.description || 'Recurring',
+        name: nameSignal || 'Recurring',
         amount: String(Math.abs(Number(tx.amount) || 0)),
         currency: tx.currency || 'USD',
         frequency: 'monthly',
         categoryId: tx.category_id || '',
         accountId: tx.account_id || '',
         nextDueDate: tx.date || new Date().toISOString().slice(0, 10),
-        subtype: '',
+        subtype: initialSubtype,
       });
     }
     catch (e: any) { toast.error(e.message); }
