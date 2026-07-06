@@ -466,8 +466,13 @@ Deno.serve(async (req) => {
       // external_id-based matching NEVER finds these older rows, so any
       // sign/type/amount correction silently no-ops for exactly the rows
       // that most need it. Date+description is a stable identifier that
-      // matches regardless of which external_id scheme produced the row.
+      // matches regardless of which external_id scheme produced the row —
+      // BUT it can collide when the same merchant appears more than once
+      // on the same day (e.g. two OXXO purchases). ambiguousDD tracks keys
+      // seen more than once so the repair pass skips them entirely rather
+      // than risk applying one transaction's amount to a different one.
       const byDateDesc = new Map<string, { amount: number; amount_usd: number; type: string; description: string; merchant: string | null }>();
+      const ddCount = new Map<string, number>();
 
       for (const tx of txs) {
         const ref =
@@ -496,12 +501,8 @@ Deno.serve(async (req) => {
         const amountUsd = amount * fxRate;
 
         const ddKey = `${date}::${description}`;
-        // Keep the largest-magnitude candidate if a key collides (rare;
-        // favors real transactions over near-empty duplicates).
-        const prevDD = byDateDesc.get(ddKey);
-        if (!prevDD || Math.abs(amount) > Math.abs(prevDD.amount)) {
-          byDateDesc.set(ddKey, { amount, amount_usd: amountUsd, type, description, merchant: merchantName });
-        }
+        ddCount.set(ddKey, (ddCount.get(ddKey) || 0) + 1);
+        byDateDesc.set(ddKey, { amount, amount_usd: amountUsd, type, description, merchant: merchantName });
 
         const { error: insErr, data: insData } = await admin
           .from("transactions")
@@ -630,6 +631,7 @@ Deno.serve(async (req) => {
       // the exact dates seen in this batch, so it never touches unrelated
       // transactions.
       let ddFixed = 0;
+      let ddSkippedAmbiguous = 0;
       try {
         const dates = [...new Set([...byDateDesc.keys()].map((k) => k.split("::")[0]))];
         for (let i = 0; i < dates.length; i += 50) {
@@ -640,9 +642,27 @@ Deno.serve(async (req) => {
             .eq("user_id", userId)
             .eq("account_id", accountId)
             .in("date", chunk);
+
+          // Group existing rows by the same key to detect same-day
+          // same-description duplicates on the DB side too.
+          const existingByKey = new Map<string, Array<{ id: string; description: string; amount: number; amount_usd: number; type: string; date: string }>>();
           for (const row of (rows || []) as Array<{ id: string; description: string; amount: number; amount_usd: number; type: string; date: string }>) {
-            const fresh = byDateDesc.get(`${row.date}::${row.description}`);
+            const key = `${row.date}::${row.description}`;
+            const arr = existingByKey.get(key) || [];
+            arr.push(row);
+            existingByKey.set(key, arr);
+          }
+
+          for (const [key, group] of existingByKey) {
+            const fresh = byDateDesc.get(key);
             if (!fresh) continue;
+            // Skip entirely if EITHER side is ambiguous (same merchant more
+            // than once that day) — we cannot safely tell which is which.
+            if ((ddCount.get(key) || 0) > 1 || group.length > 1) {
+              ddSkippedAmbiguous += 1;
+              continue;
+            }
+            const row = group[0];
             const amountDiff = Math.abs(Number(fresh.amount) - Number(row.amount)) > 0.005;
             const typeDiff = row.type === "transfer" && fresh.type !== row.type;
             const signDiff =
@@ -663,6 +683,9 @@ Deno.serve(async (req) => {
         }
         if (ddFixed > 0) {
           diagnostics.push(`${ddFixed} transacciones reparadas por fecha+descripción (bug histórico de external_id).`);
+        }
+        if (ddSkippedAmbiguous > 0) {
+          diagnostics.push(`${ddSkippedAmbiguous} claves fecha+descripción ambiguas (mismo comercio repetido el mismo día) — omitidas por seguridad.`);
         }
       } catch (e: any) {
         diagnostics.push(`Repair pass (date+desc) falló: ${e.message}`);
