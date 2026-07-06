@@ -26,9 +26,7 @@ async function wiseFetch(path: string, token: string, action: string) {
     const text = await res.text().catch(() => "");
     const snippet = text.slice(0, 300);
     if (res.status === 401 || res.status === 403) {
-      throw new Error(
-        `Wise rechazó el token (${res.status}). Verificá que sea un API token válido. ${snippet}`,
-      );
+      throw new Error(`HTTP ${res.status} en ${action}. Body: ${snippet || '(vacío)'}`);
     }
     throw new Error(`Wise API ${action} falló (${res.status}): ${snippet}`);
   }
@@ -102,6 +100,7 @@ async function fetchActivitiesFallback(
   const txs: any[] = [];
   const unmatched: Array<{ type: string | null; title: string | null; primaryAmount: string | null }> = [];
   const rawSample: Array<Record<string, unknown>> = [];
+  const diagnostics_target: any[] = [];
   let cursor: string | null = null;
   // Paginate until Wise stops returning a cursor (safety cap: 60 pages =
   // 3000 activities) — the user wants the FULL history, not a window.
@@ -118,6 +117,10 @@ async function fetchActivitiesFallback(
     );
 
     for (const activity of payload?.activities ?? []) {
+      const searchable = `${activity.title || ""} ${activity.description || ""}`.toLowerCase();
+      if (/deel|dental/.test(searchable)) {
+        diagnostics_target.push(activity);
+      }
       if (rawSample.length < 5) {
         rawSample.push({
           type: activity.type || activity.resource?.type || null,
@@ -154,7 +157,7 @@ async function fetchActivitiesFallback(
     cursor = payload?.cursor ?? null;
     if (!cursor) break;
   }
-  return { txs, unmatched, rawSample };
+  return { txs, unmatched, rawSample, diagnostics_target };
 }
 
 async function getAuthenticatedUserId(
@@ -312,7 +315,9 @@ Deno.serve(async (req) => {
           txs = txs.concat(chunk);
           statementOk = true;
         } catch (e: any) {
-          diagnostics.push(`Statement falló (${iStart.slice(0, 10)}→${iEnd.slice(0, 10)}): ${e.message}`);
+          if (!diagnostics.some((d) => d.startsWith("Statement error body:"))) {
+            diagnostics.push(`Statement error body: ${e.message}`);
+          }
         }
         windowEnd = windowStart;
       }
@@ -338,6 +343,9 @@ Deno.serve(async (req) => {
               (dates.length ? ` (rango ${dates[0]} → ${dates[dates.length - 1]}).` : "."),
           );
           diagnostics.push(`Muestra cruda (${currency}): ${JSON.stringify(fb.rawSample)}`);
+          if (fb.diagnostics_target.length > 0) {
+            diagnostics.push(`RAW Deel/Dental (${currency}): ${JSON.stringify(fb.diagnostics_target)}`);
+          }
           if (fb.unmatched.length > 0) {
             // Surface the raw shape of anything we couldn't parse an amount
             // from — this is exactly what we need to see if a real deposit
