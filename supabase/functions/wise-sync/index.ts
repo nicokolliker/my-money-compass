@@ -60,10 +60,17 @@ function amountFromActivity(activity: any, currency: string) {
   const fields = rawFields.map(cleanWiseText);
   for (let fi = 0; fi < fields.length; fi += 1) {
     const field = fields[fi];
+    if (!field) continue;
     const raw = String(rawFields[fi] || "");
     const after = field.match(new RegExp(`([+-]?\\d[\\d.,\\s']*)\\s*${currencyRe}\\b`, "i"));
     const before = field.match(new RegExp(`\\b${currencyRe}\\s*([+-]?\\d[\\d.,\\s']*)`, "i"));
-    const match = after || before;
+    // Fallback: Wise sometimes shows a deposit's own-currency amount with NO
+    // currency code at all (e.g. "+ 6,000.00" instead of "+ 6,000.00 USD"),
+    // since the Activities feed is already scoped to `?currency=<currency>`
+    // server-side. If the currency-anchored patterns fail, trust a bare
+    // signed number as belonging to the requested currency.
+    const bare = !after && !before ? field.match(/([+-]\s?\d[\d.,\s']*)/) : null;
+    const match = after || before || bare;
     if (!match) continue;
     const parsed = parseMoney(match[1]);
     if (!Number.isFinite(parsed)) continue;
@@ -78,7 +85,7 @@ function amountFromActivity(activity: any, currency: string) {
     const text = `${rawType} ${activity.title || ""} ${activity.description || ""}`.toLowerCase();
     if (parsed < 0) return parsed;
     if (/^(deposit|money_added|balance_credit|top_up|topup)$/.test(rawType)) return Math.abs(parsed);
-    if (/refund|cashback|interest|received|deposit|top\s*up|added|incoming|reversal|reembolso|recib|sent you/.test(text)) return parsed;
+    if (/refund|cashback|interest|received|deposit|top\s*up|added|money added|incoming|reversal|reembolso|recib|sent you/.test(text)) return parsed;
     if (/card_payment|cash_withdrawal|direct_debit|fee|sent|send|paid|spent|withdraw|deduct|charge|payment|outgoing|enviado|pagad/.test(text)) return -Math.abs(parsed);
     return parsed;
   }
@@ -125,16 +132,11 @@ async function fetchActivitiesFallback(
       const amount = amountFromActivity(activity, currency);
       const date = activity.createdOn || activity.updatedOn;
       if (amount === null || !date) {
-        // Only surface activities that mention the target currency — anything
-        // else is just a different-currency activity handled by another pass.
-        const raw = `${activity.primaryAmount || ""} ${activity.secondaryAmount || ""}`;
-        if (raw.toUpperCase().includes(currency.toUpperCase())) {
-          unmatched.push({
-            type: activity.type || activity.resource?.type || null,
-            title: activity.title || null,
-            primaryAmount: activity.primaryAmount || null,
-          });
-        }
+        unmatched.push({
+          type: activity.type || activity.resource?.type || null,
+          title: activity.title || null,
+          primaryAmount: activity.primaryAmount || null,
+        });
         continue;
       }
       const description = cleanWiseText(
