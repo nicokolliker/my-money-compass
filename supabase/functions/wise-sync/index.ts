@@ -494,9 +494,18 @@ Deno.serve(async (req) => {
         // payroll deposit, not just self-transfers between the user's own
         // balances. Overriding to type='transfer' here hid real income.
         // Amount sign is the correct, authoritative signal.
-        const type: "income" | "expense" = amount >= 0 ? "income" : "expense";
+        let type: "income" | "expense" | "transfer" = amount >= 0 ? "income" : "expense";
         const category_id = matchRule(`${merchantName || ""} ${description}`);
         const subcategory_id = resolveSubcat(category_id, `${merchantName || ""} ${description}`);
+
+        // Self-transfer to the user's own ARQ/DolarApp account: this is
+        // money moving pockets, not real spending. Narrow, description-based
+        // detection (NOT the generic Wise 'TRANSFER' flag, which also covers
+        // third-party payments like Deel and would wrongly hide real income/
+        // expense if reused here). Excluded from Budget via type='transfer';
+        // reconciled later against the ARQ statement import.
+        const isArqOutgoing = amount < 0 && /dolarapp|arq\b/i.test(description);
+        if (isArqOutgoing) type = "transfer";
 
         const amountUsd = amount * fxRate;
 
@@ -531,12 +540,39 @@ Deno.serve(async (req) => {
           diagnostics.push(`Upsert error ${external_id}: ${insErr.message}`);
           continue;
         }
+        let txRowId: string | null = null;
         if (insData && insData.length > 0) {
           imported += 1;
           sumImported += amount;
+          txRowId = insData[0].id;
         } else {
           skipped += 1;
           batchById.set(external_id, { description, merchant: merchantName, amount, amount_usd: amountUsd, date, type });
+        }
+
+        if (isArqOutgoing) {
+          if (!txRowId) {
+            const { data: existingRow } = await admin
+              .from("transactions")
+              .select("id")
+              .eq("external_id", external_id)
+              .eq("user_id", userId)
+              .maybeSingle();
+            txRowId = existingRow?.id ?? null;
+          }
+          if (txRowId) {
+            await admin.from("arq_reconciliations").upsert(
+              {
+                user_id: userId,
+                wise_tx_id: txRowId,
+                wise_amount_usd: Math.abs(amountUsd),
+                wise_date: date,
+                wise_description: description,
+                status: "pending",
+              },
+              { onConflict: "wise_tx_id", ignoreDuplicates: true },
+            );
+          }
         }
         if (!minDate || date < minDate) minDate = date;
         if (!maxDate || date > maxDate) maxDate = date;
@@ -580,7 +616,10 @@ Deno.serve(async (req) => {
             // override (e.g. a Deel deposit correctly signed +, but
             // classified as 'transfer' instead of 'income') — reclassify
             // using today's amount-sign-is-authoritative rule.
-            const typeCase = row.type === "transfer" && fresh.type !== row.type;
+            // Any direction: transfer->income/expense (Deel-style third-party
+            // payments wrongly hidden) OR income/expense->transfer (ARQ/
+            // DolarApp self-transfers wrongly counted as real spending).
+            const typeCase = fresh.type !== row.type;
 
             // Magnitude fix: the old parseMoney bug silently divided
             // whole-thousand amounts by 1000 (e.g. Deel's $6,000 deposit
@@ -664,7 +703,9 @@ Deno.serve(async (req) => {
             }
             const row = group[0];
             const amountDiff = Math.abs(Number(fresh.amount) - Number(row.amount)) > 0.005;
-            const typeDiff = row.type === "transfer" && fresh.type !== row.type;
+            // Any direction: transfer<->income/expense (Deel-style vs
+            // ARQ-self-transfer-style corrections).
+            const typeDiff = fresh.type !== row.type;
             const signDiff =
               Math.sign(Number(fresh.amount)) !== Math.sign(Number(row.amount)) &&
               Number(fresh.amount) !== 0 && Number(row.amount) !== 0;
@@ -678,7 +719,25 @@ Deno.serve(async (req) => {
                 merchant: fresh.merchant,
               })
               .eq("id", row.id);
-            if (!updErr) ddFixed += 1;
+            if (!updErr) {
+              ddFixed += 1;
+              // Newly reclassified as an ARQ self-transfer: create the
+              // pending reconciliation too, so it shows up for the user
+              // exactly like a fresh one would.
+              if (fresh.type === "transfer" && /dolarapp|arq\b/i.test(fresh.description)) {
+                await admin.from("arq_reconciliations").upsert(
+                  {
+                    user_id: userId,
+                    wise_tx_id: row.id,
+                    wise_amount_usd: Math.abs(Number(fresh.amount_usd)),
+                    wise_date: row.date,
+                    wise_description: fresh.description,
+                    status: "pending",
+                  },
+                  { onConflict: "wise_tx_id", ignoreDuplicates: true },
+                );
+              }
+            }
           }
         }
         if (ddFixed > 0) {
