@@ -458,6 +458,16 @@ Deno.serve(async (req) => {
       const seenIds = new Map<string, number>();
       // Fresh data per external_id for the pending->settled pass below.
       const batchById = new Map<string, { description: string; merchant: string | null; amount: number; amount_usd: number; date: string; type: string }>();
+      // Fresh data keyed by date+description for the date/description repair
+      // pass below — needed because rows imported months ago (when the
+      // now-blocked statement.json endpoint was still working) used a bare
+      // reference-number external_id, while today's Activities fallback
+      // constructs a different "activity-<id>" one. That mismatch means
+      // external_id-based matching NEVER finds these older rows, so any
+      // sign/type/amount correction silently no-ops for exactly the rows
+      // that most need it. Date+description is a stable identifier that
+      // matches regardless of which external_id scheme produced the row.
+      const byDateDesc = new Map<string, { amount: number; amount_usd: number; type: string; description: string; merchant: string | null }>();
 
       for (const tx of txs) {
         const ref =
@@ -484,6 +494,14 @@ Deno.serve(async (req) => {
         const subcategory_id = resolveSubcat(category_id, `${merchantName || ""} ${description}`);
 
         const amountUsd = amount * fxRate;
+
+        const ddKey = `${date}::${description}`;
+        // Keep the largest-magnitude candidate if a key collides (rare;
+        // favors real transactions over near-empty duplicates).
+        const prevDD = byDateDesc.get(ddKey);
+        if (!prevDD || Math.abs(amount) > Math.abs(prevDD.amount)) {
+          byDateDesc.set(ddKey, { amount, amount_usd: amountUsd, type, description, merchant: merchantName });
+        }
 
         const { error: insErr, data: insData } = await admin
           .from("transactions")
@@ -604,6 +622,50 @@ Deno.serve(async (req) => {
         }
       } catch (e: any) {
         diagnostics.push(`Settle pass falló: ${e.message}`);
+      }
+
+      // Date+description repair pass — catches rows the external_id-based
+      // pass above can never reach (old reference-number scheme vs today's
+      // Activities-fallback scheme). Scoped to this account+currency and
+      // the exact dates seen in this batch, so it never touches unrelated
+      // transactions.
+      let ddFixed = 0;
+      try {
+        const dates = [...new Set([...byDateDesc.keys()].map((k) => k.split("::")[0]))];
+        for (let i = 0; i < dates.length; i += 50) {
+          const chunk = dates.slice(i, i + 50);
+          const { data: rows } = await admin
+            .from("transactions")
+            .select("id, description, amount, amount_usd, type, date")
+            .eq("user_id", userId)
+            .eq("account_id", accountId)
+            .in("date", chunk);
+          for (const row of (rows || []) as Array<{ id: string; description: string; amount: number; amount_usd: number; type: string; date: string }>) {
+            const fresh = byDateDesc.get(`${row.date}::${row.description}`);
+            if (!fresh) continue;
+            const amountDiff = Math.abs(Number(fresh.amount) - Number(row.amount)) > 0.005;
+            const typeDiff = row.type === "transfer" && fresh.type !== row.type;
+            const signDiff =
+              Math.sign(Number(fresh.amount)) !== Math.sign(Number(row.amount)) &&
+              Number(fresh.amount) !== 0 && Number(row.amount) !== 0;
+            if (!amountDiff && !typeDiff && !signDiff) continue;
+            const { error: updErr } = await admin
+              .from("transactions")
+              .update({
+                amount: fresh.amount,
+                amount_usd: fresh.amount_usd,
+                type: fresh.type,
+                merchant: fresh.merchant,
+              })
+              .eq("id", row.id);
+            if (!updErr) ddFixed += 1;
+          }
+        }
+        if (ddFixed > 0) {
+          diagnostics.push(`${ddFixed} transacciones reparadas por fecha+descripción (bug histórico de external_id).`);
+        }
+      } catch (e: any) {
+        diagnostics.push(`Repair pass (date+desc) falló: ${e.message}`);
       }
 
       // Auto-create merchants from this batch (non-fatal on failure)
