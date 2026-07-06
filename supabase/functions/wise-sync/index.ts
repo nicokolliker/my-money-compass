@@ -96,7 +96,9 @@ async function fetchActivitiesFallback(
   const unmatched: Array<{ type: string | null; title: string | null; primaryAmount: string | null }> = [];
   const rawSample: Array<Record<string, unknown>> = [];
   let cursor: string | null = null;
-  for (let page = 0; page < 5; page += 1) {
+  // Paginate until Wise stops returning a cursor (safety cap: 60 pages =
+  // 3000 activities) — the user wants the FULL history, not a window.
+  for (let page = 0; page < 60; page += 1) {
     // No status filter: incoming transfers can sit IN_PROGRESS for days in
     // Wise while already visible in the user's app. Cancelled/failed are
     // excluded per-activity below.
@@ -109,7 +111,7 @@ async function fetchActivitiesFallback(
     );
 
     for (const activity of payload?.activities ?? []) {
-      if (rawSample.length < 15) {
+      if (rawSample.length < 5) {
         rawSample.push({
           type: activity.type || activity.resource?.type || null,
           status: activity.status || null,
@@ -316,9 +318,9 @@ Deno.serve(async (req) => {
       if (!statementOk) {
         diagnostics.push("Wise bloqueó balance-statements; intentando fallback con Activities API.");
         try {
-          // 90 days (was 30): a slow-settling deposit shouldn't fall outside
-          // the fallback window just because the primary endpoint is blocked.
-          const fallbackSince = new Date(now - 90 * 24 * 60 * 60 * 1000).toISOString();
+          // Full 2-year range, same as the (blocked) statement endpoint —
+          // the fallback is the only data source, so it must cover everything.
+          const fallbackSince = new Date(now - 2 * 365 * 24 * 60 * 60 * 1000).toISOString();
           const fb = await fetchActivitiesFallback(
             profileId,
             token,
@@ -328,7 +330,11 @@ Deno.serve(async (req) => {
           );
           txs = fb.txs;
           statementOk = txs.length > 0;
-          diagnostics.push(`Activities API devolvió ${txs.length} movimientos para ${currency}.`);
+          const dates = txs.map((t: any) => (t.date || "").slice(0, 10)).filter(Boolean).sort();
+          diagnostics.push(
+            `Activities API devolvió ${txs.length} movimientos para ${currency}` +
+              (dates.length ? ` (rango ${dates[0]} → ${dates[dates.length - 1]}).` : "."),
+          );
           diagnostics.push(`Muestra cruda (${currency}): ${JSON.stringify(fb.rawSample)}`);
           if (fb.unmatched.length > 0) {
             // Surface the raw shape of anything we couldn't parse an amount
